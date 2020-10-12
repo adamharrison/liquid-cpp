@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="Liquid" />
+		<Option makefile_is_custom="1" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<MakeCommands>
+			<Build command="$make -f $makefile $target -j 4" />
+			<CompileFile command="$make -f $makefile $file" />
+			<Clean command="$make -f $makefile clean$target" />
+			<DistClean command="$make -f $makefile distclean$target" />
+			<AskRebuildNeeded command="$make -q -f $makefile $target" />
+			<SilentBuild command="$make -f $makefile $target -j 4 &gt; $(CMD_NULL)" />
+		</MakeCommands>
+		<Build>
+			<Target title="executable">
+				<Option output="bin/feinoff" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="bin" />
+				<Option object_output="obj/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option projectCompilerOptionsRelation="2" />
+				<MakeCommands>
+					<Build command="$make -f $makefile $target -j 4" />
+					<CompileFile command="$make -f $makefile $file" />
+					<Clean command="$make -f $makefile clean$target" />
+					<DistClean command="$make -f $makefile distclean$target" />
+					<AskRebuildNeeded command="$make -q -f $makefile $target" />
+					<SilentBuild command="$make -f $makefile $target -j 4 &gt; $(CMD_NULL)" />
+				</MakeCommands>
+			</Target>
+			<Target title="test">
+				<Option output="bin/01sanity" prefix_auto="1" extension_auto="1" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option use_console_runner="0" />
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+			<Add option="-fexceptions -std=c++17" />
+			<Add directory="/usr/include/qdbm" />
+		</Compiler>
+		<Linker>
+			<Add option="-Wl,-Bstatic" />
+			<Add option="-licuuc" />
+			<Add option="-licui18n" />
+			<Add option="-Wl,-Bdynamic" />
+			<Add library="libqdbm" />
+			<Add library="pthread" />
+			<Add library="libz" />
+			<Add library="libtokyocabinet" />
+		</Linker>
+		<Unit filename="Makefile">
+			<Option target="executable" />
+		</Unit>
+		<Unit filename="src/context.cpp">
+			<Option target="executable" />
+		</Unit>
+		<Unit filename="src/context.h">
+			<Option target="executable" />
+		</Unit>
+		<Unit filename="src/exception.h">
+			<Option target="executable" />
+		</Unit>
+		<Unit filename="src/lexer.cpp">
+			<Option target="executable" />
+		</Unit>
+		<Unit filename="src/lexer.h">
+			<Option target="executable" />
+		</Unit>
+		<Unit filename="src/main.cpp">
+			<Option target="executable" />
+		</Unit>
+		<Unit filename="src/parser.h">
+			<Option target="executable" />
+		</Unit>
+		<Unit filename="src/renderer.h">
+			<Option target="executable" />
+		</Unit>
+		<Unit filename="t/01sanity.cpp">
+			<Option target="executable" />
+		</Unit>
+		<Extensions />
+	</Project>
+</CodeBlocks_project_file>
