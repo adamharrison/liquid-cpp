@@ -35,10 +35,13 @@ $(LIBRARY): $(LIBRARYOBJECTS)
 $(ODIR)/%.d: $(SDIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -MM $< -MMD -MP -MT '$(patsubst %.d,%.o,$@)' -MF $@
 
+$(ODIR)/%.d: $(TDIR)/%.cpp
+	$(CXX) $(CXXFLAGS) -MM $< -MMD -MP -MT '$(patsubst %.d,%.o,$@)' -MF $@
+
 $(ODIR)/%.o: $(SDIR)/%.cpp $(ODIR)/%.d
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(ODIR)/%.o: $(TDIR)/%.cpp
+$(ODIR)/%.o: $(TDIR)/%.cpp $(ODIR)/%.d
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(ODIR)/%.o: $(SDIR)/%.d

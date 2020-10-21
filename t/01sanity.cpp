@@ -2,20 +2,29 @@
 #include "../src/lexer.h"
 #include "../src/parser.h"
 #include "../src/renderer.h"
+#include "../src/dialect.h"
 
 #include <gtest/gtest.h>
+
+using namespace std;
 
 
 
 TEST(sanity, rendering) {
     Liquid::Context context;
-    Liquid::Parser<Liquid::Context> parser(context);
-    Liquid::Renderer<Liquid::Context> renderer(context);
+    Liquid::Parser parser(context);
+    Liquid::StandardDialect::implement(context);
 
     auto ast = parser.parse("asdf");
-    auto str = renderer.render(2, ast);
+    Liquid::Context::CPPVariable variable;
+    auto str = context.render(ast, variable);
 
     ASSERT_EQ(str, "asdf");
+
+    variable["a"] = 3;
+    ast = parser.parse("asdbfsdf {{ a + 1 + 2 }} b");
+    str = context.render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf 6 b");
 
 }
 

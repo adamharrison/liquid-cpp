@@ -1,17 +1,11 @@
 #include "context.h"
 
 namespace Liquid {
-
-    struct IfNode {
-        static constexpr const char* name = "if";
-        static constexpr bool free = false;
-    };
-    struct OutputNode {
-
-    };
-
-
-    DefaultContext::DefaultContext() {
-        registerType<IfNode>();
+    void Context::render(const Parser::Node& ast, Variable& store, void (*callback)(const char* chunk, size_t size, void* data), void* data) {
+        Parser::Node node = ast.type->render(RenderMode::FULL, *this, ast, store);
+        assert(node.type == nullptr);
+        auto s = node.getString();
+        callback(s.data(), s.size(), data);
     }
+
 };
