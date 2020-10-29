@@ -8,24 +8,83 @@
 
 using namespace std;
 
+Liquid::Context& getContext() {
+    static bool setup = false;
+    static Liquid::Context context;
+    if (!setup) {
+        Liquid::StandardDialect::implement(context);
+        setup = true;
+    }
+    return context;
+}
+Liquid::Parser& getParser() {
+    static Liquid::Parser parser(getContext());
+    return parser;
+}
 
 
-TEST(sanity, rendering) {
-    Liquid::Context context;
-    Liquid::Parser parser(context);
-    Liquid::StandardDialect::implement(context);
-
-    auto ast = parser.parse("asdf");
+TEST(sanity, literal) {
+    auto ast = getParser().parse("asdf");
     Liquid::Context::CPPVariable variable;
-    auto str = context.render(ast, variable);
-
+    auto str = getContext().render(ast, variable);
     ASSERT_EQ(str, "asdf");
+}
 
+TEST(sanity, variable) {
+    Liquid::Context::CPPVariable variable;
     variable["a"] = 3;
-    ast = parser.parse("asdbfsdf {{ a + 1 + 2 }} b");
-    str = context.render(ast, variable);
-    ASSERT_EQ(str, "asdbfsdf 6 b");
+    auto ast = getParser().parse("{{ a }}");
+    auto str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "3");
+}
 
+TEST(sanity, addition) {
+    Liquid::Context::CPPVariable variable;
+    variable["a"] = 3;
+    auto ast = getParser().parse("asdbfsdf {{ a + 1 + 2 }} b");
+    auto str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf 6 b");
+}
+
+TEST(sanity, subtraction) {
+    Liquid::Context::CPPVariable variable;
+    variable["a"] = 3;
+    auto ast = getParser().parse("asdbfsdf {{ a - 1 + 2 }} b");
+    auto str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf 4 b");
+}
+
+TEST(sanity, multiply) {
+    Liquid::Context::CPPVariable variable;
+    variable["a"] = 3;
+    auto ast = getParser().parse("asdbfsdf {{ a * 2 }} b");
+    auto str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf 6 b");
+}
+
+
+TEST(sanity, divide) {
+    Liquid::Context::CPPVariable variable;
+    variable["a"] = 3;
+    auto ast = getParser().parse("asdbfsdf {{ a / 2 }} b");
+    auto str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf 1 b");
+}
+
+TEST(sanity, orderOfOperations) {
+    Liquid::Context::CPPVariable variable;
+    variable["a"] = 3;
+    auto ast = getParser().parse("asdbfsdf {{ a + 3 * 6 }} b");
+    auto str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf 21 b");
+}
+
+TEST(sanity, parenthesis) {
+    /*Liquid::Context::CPPVariable variable;
+    variable["a"] = 3;
+    auto ast = getParser().parse("asdbfsdf {{ a - (1 + 2) }} b");
+    auto str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf 0 b");*/
 }
 
 

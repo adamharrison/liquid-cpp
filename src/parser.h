@@ -12,66 +12,6 @@ namespace Liquid {
     struct Parser {
         const Context& context;
 
-        struct Variable;
-        struct Variant;
-
-        struct Node {
-            const NodeType* type;
-            vector<Variable> arguments;
-            vector<unique_ptr<Node>> children;
-
-            Node() : type(nullptr) { }
-            Node(const NodeType* type) : type(type) { }
-            Node(const Node& node) :type(node.type), arguments(node.arguments) {
-                children.reserve(node.children.size());
-                for (auto it = node.children.begin(); it != node.children.end(); ++it)
-                    children.push_back(make_unique<Node>(*it->get()));
-            }
-            Node(const Variable& v) : type(nullptr) { arguments.push_back(v); }
-            Node(const Variant& v) : type(nullptr) { arguments.push_back(Variable(v)); }
-            Node(Node&& node) :type(node.type), arguments(std::move(node.arguments)), children(std::move(node.children)) { }
-            ~Node() { }
-
-            string getString();
-
-            Variable& variable() { assert(!type && arguments.size() == 1); return arguments[0]; }
-
-            Node& operator = (const Node& n) {
-                type = n.type;
-                arguments = n.arguments;
-                children.clear();
-                children.reserve(n.children.size());
-                for (auto it = n.children.begin(); it != n.children.end(); ++it)
-                    children.push_back(make_unique<Node>(*it->get()));
-                return *this;
-            }
-        };
-        struct Error {
-            enum Type {
-                // Self-explamatory.
-                UNKNOWN_TAG,
-                UNKNOWN_OPERATOR,
-                // Weird symbol in weird place.
-                INVALID_SYMBOL,
-                // Was expecting somthing else, i.e. {{ i + }}; was expecting a number there.
-                UNEXPECTED_END
-            };
-
-            Type type;
-            size_t column;
-            size_t row;
-            std::string message;
-
-            template <class T>
-            Error(T& lexer, Type type) : type(type), column(lexer.column), row(lexer.row) {
-
-            }
-            template <class T>
-            Error(T& lexer, Type type, const std::string& message) : type(type), column(lexer.column), row(lexer.row), message(message) {
-
-            }
-        };
-
 
         struct Variant {
             union {
@@ -122,49 +62,135 @@ namespace Liquid {
                 return *this;
             }
         };
-        // If a named variable, the first variant in the chain is a string literal.
-        struct Variable {
-            enum class Type {
-                // Unitialized
-                UNDEF,
-                // Represented by a variant.
-                STATIC,
-                // A list of literals and whatnot to dereference from in the chain.
-                REFERENCE,
-                // A list of literals and whatnot to dereference from, but the first is a literal that is the named argument.
-                NAMED,
-                // A pointer to the dynamic variable.
-                DYNAMIC
+
+        struct Node {
+            const NodeType* type;
+            size_t line;
+            size_t column;
+
+            union {
+                Variant variant;
+                vector<unique_ptr<Node>> children;
             };
-            Type type;
-            Variant variant;
-            vector<Variable> chain;
 
-            Variable() : type(Type::UNDEF) { }
-            Variable(Type type) : type(type) { }
-            Variable(Variable&& v) : type(v.type), variant(std::move(v.variant)), chain(std::move(v.chain)) { }
-            Variable(const Variable& v) : type(v.type), variant(v.variant), chain(v.chain) { type = v.type; }
-            Variable(const Variant& v) : type(v.type == Variant::Type::POINTER ? Type::DYNAMIC : Type::STATIC), variant(v) { }
-            Variable(Variant&& v) : type(Type::STATIC), variant(std::move(v)) { }
+            Node() : type(nullptr), variant() { }
+            Node(const NodeType* type) : type(type), children() { }
+            Node(const Node& node) :type(node.type) {
+                if (type) {
+                    new(&children) vector<unique_ptr<Node>>();
+                    children.reserve(node.children.size());
+                    for (auto it = node.children.begin(); it != node.children.end(); ++it)
+                        children.push_back(make_unique<Node>(*it->get()));
+                } else {
+                    new(&variant) Variant(node.variant);
+                }
+            }
+            Node(const Variant& v) : type(nullptr), variant(v) { }
+            Node(Node&& node) :type(node.type), children(std::move(node.children)) { }
+            ~Node() {
+                if (type)
+                    children.~vector<unique_ptr<Node>>();
+            }
 
-            Variable& operator = (const Variable& v) {
-                type = v.type;
-                variant = v.variant;
-                chain = v.chain;
+            string getString();
+
+            bool canAcceptMoreChildren() const;
+
+            Node& operator = (const Node& n) {
+                if (type)
+                    children.~vector<unique_ptr<Node>>();
+                if (n.type) {
+                    new(&children) vector<unique_ptr<Node>>();
+                    children.reserve(n.children.size());
+                    for (auto it = n.children.begin(); it != n.children.end(); ++it)
+                        children.push_back(make_unique<Node>(*it->get()));
+                } else {
+                    new(&variant) Variant();
+                }
+                type = n.type;
+                return *this;
+            }
+
+            Node& operator = (Node&& n) {
+                if (type)
+                    children.~vector<unique_ptr<Node>>();
+                if (n.type) {
+                    new(&children) vector<unique_ptr<Node>>();
+                    children = move(n.children);
+                } else {
+                    new(&variant) Variant();
+                }
+                type = n.type;
                 return *this;
             }
         };
+        struct Error {
+            enum Type {
+                // Self-explamatory.
+                UNKNOWN_TAG,
+                UNKNOWN_OPERATOR,
+                // Weird symbol in weird place.
+                INVALID_SYMBOL,
+                // Was expecting somthing else, i.e. {{ i + }}; was expecting a number there.
+                UNEXPECTED_END,
+                UNBALANCED_GROUP
+            };
+
+            Type type;
+            size_t column;
+            size_t row;
+            std::string message;
+
+            template <class T>
+            Error(T& lexer, Type type) : type(type), column(lexer.column), row(lexer.row) {
+
+            }
+            template <class T>
+            Error(T& lexer, Type type, const std::string& message) : type(type), column(lexer.column), row(lexer.row), message(message) {
+
+            }
+        };
+
+        struct ParserException : std::exception {
+            Error error;
+            std::string message;
+            ParserException(const Error& error) : error(error) {
+                char buffer[512];
+                switch (error.type) {
+                    case Error::Type::UNKNOWN_TAG:
+                        sprintf(buffer, "Unknown tag '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                    break;
+                    case Error::Type::UNKNOWN_OPERATOR:
+                        sprintf(buffer, "Unknown operator '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                    break;
+                    case Error::Type::INVALID_SYMBOL:
+                        sprintf(buffer, "Invalid symbol '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                    break;
+                    case Error::Type::UNEXPECTED_END:
+                        sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.row, error.column);
+                    break;
+                    case Error::Type::UNBALANCED_GROUP:
+                        sprintf(buffer, "Unbalanced end to group on line %lu, column %lu.", error.row, error.column);
+                    break;
+                }
+                message = buffer;
+            }
+
+            const char* what() const noexcept {
+               return message.data();
+            }
+        };
+
+
 
         enum class State {
             NODE,
-            ARGUMENT,
-            VARIABLE,
-            VARIABLE_FINISHED
+            ARGUMENT
         };
 
         State state = State::NODE;
-        int argumentIdx = 0;
-        int argumentNodeIdx = 0;
+        int groupDepth = 0;
+        int dereferenceDepth = 0;
 
 
         vector<unique_ptr<Node>> nodes;
@@ -179,46 +205,21 @@ namespace Liquid {
             typedef Liquid::Lexer<Lexer> SUPER;
 
             bool literal(const char* str, size_t len);
-            bool dot() {
-                switch (parser.state) {
-                    case Parser::State::NODE:
-                    case Parser::State::ARGUMENT:
-                    case Parser::State::VARIABLE:
-                        parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
-                        return false;
-                    break;
-                    case Parser::State::VARIABLE_FINISHED:
-                        parser.state = Parser::State::VARIABLE;
-                    break;
-                }
-                return true;
-            }
-
+            bool dot();
             bool colon();
             bool comma();
 
             bool startOutputBlock(bool suppress);
             bool endOutputBlock(bool suppress);
 
-            bool startVariableDereference() {
-                switch (parser.state) {
-                    case Parser::State::NODE:
-                    case Parser::State::ARGUMENT:
-                    case Parser::State::VARIABLE:
-                        parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
-                        return false;
-                    break;
-                    case Parser::State::VARIABLE_FINISHED:
-                        parser.state = Parser::State::ARGUMENT;
-                    break;
-                }
-                return true;
-            }
-
+            bool startVariableDereference();
             bool endVariableDereference();
             bool string(const char* str, size_t len);
             bool integer(long long i);
             bool floating(double f);
+
+            bool openParenthesis();
+            bool closeParenthesis();
 
             Lexer(const Context& context, Parser& parser) : Liquid::Lexer<Lexer>(context), parser(parser) { }
         };
@@ -229,12 +230,11 @@ namespace Liquid {
 
         }
 
-        Variable& activeVariable() {
-            return nodes.back()->arguments.back();
-        }
+        void appendOperandNode(unique_ptr<Node> node);
+        Node& getArgumentNode();
 
-        // Called at the end of a control tag, output tag, or comma. Closes up an argument and appends it to the apppropraite node.
-        void closeVariable();
+        // Pops the last node in the stack, and then applies it as the last child of the node prior to it.
+        void popNode();
 
         Node parse(const char* buffer, size_t len);
         Node parse(const string& str) {

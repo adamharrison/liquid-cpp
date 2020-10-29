@@ -6,7 +6,7 @@ namespace Liquid {
     struct IfNode : TagNodeType {
         struct ElseNode : TagNodeType {
             ElseNode() : TagNodeType(Type::TAG_FREE, "else") { }
-            Parser::Node render(const RenderMode mode, const Context& context, const Parser::Node& node, Variable& store) const {
+            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
                 return Parser::Node();
             }
         };
@@ -15,7 +15,7 @@ namespace Liquid {
             intermediates["else"] = make_unique<ElseNode>();
         }
 
-        Parser::Node render(const RenderMode mode, const Context& context, const Parser::Node& node, Variable& store) const {
+        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
             return Parser::Node();
         }
     };
@@ -23,7 +23,7 @@ namespace Liquid {
     struct ForNode : TagNodeType {
         struct ElseNode : NodeType {
             ElseNode() : NodeType(Type::TAG_FREE, "else") { }
-            Parser::Node render(const RenderMode mode, const Context& context, const Parser::Node& node, Variable& store) const {
+            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
                 return Parser::Node();
             }
         };
@@ -32,44 +32,94 @@ namespace Liquid {
             intermediates["else"] = make_unique<ElseNode>();
         }
 
-        Parser::Node render(const RenderMode mode, const Context& context, const Parser::Node& node, Variable& store) const {
+        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
             return Parser::Node();
         }
     };
 
-    struct PlusOperatorNode : OperatorNodeType {
-        PlusOperatorNode() : OperatorNodeType("+", Arity::BINARY) { }
-        Parser::Node render(const RenderMode mode, const Context& context, const Parser::Node& node, Variable& store) const {
-            double number = 0.0;
-            bool convertToInteger = true;
-            for (auto it = node.children.begin(); it != node.children.end(); ++it) {
-                Parser::Node result = (*it)->type ? (*it)->type->render(mode, context, *(*it).get(), store) : **it;
-                auto& variable = result.variable();
-                assert(variable.type == Parser::Variable::Type::STATIC);
-                switch (variable.variant.type) {
-                    case Parser::Variant::Type::INT:
-                        number += variable.variant.i;
-                    break;
-                    case Parser::Variant::Type::FLOAT:
-                        number += variable.variant.f;
-                        convertToInteger = false;
-                    break;
-                    case Parser::Variant::Type::NIL:
-                    case Parser::Variant::Type::STRING:
-                    case Parser::Variant::Type::POINTER:
-                    break;
-                }
-            }
-            if (convertToInteger)
-                return Parser::Node(Parser::Variant((long long)number));
-            return Parser::Node(Parser::Variant(number));
 
+    template <class DerivedNode>
+    struct ArithmeticOperatorNode : OperatorNodeType {
+        ArithmeticOperatorNode(const char* symbol, int priority) : OperatorNodeType(symbol, Arity::BINARY, priority) { }
+        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            Parser::Node op1 = node.children[0]->type ? node.children[0]->type->render(context, *node.children[0].get(), store) : *node.children[0];
+            Parser::Node op2 = node.children[1]->type ? node.children[1]->type->render(context, *node.children[1].get(), store) : *node.children[1];
+            if (op1.type || op2.type)
+                return Parser::Node();
+            switch (op1.variant.type) {
+                case Parser::Variant::Type::INT:
+                    switch (op2.variant.type) {
+                        case Parser::Variant::Type::INT:
+                            return Parser::Node(Parser::Variant(static_cast<const DerivedNode*>(this)->operate(op1.variant.i, op2.variant.i)));
+                        break;
+                        case Parser::Variant::Type::FLOAT:
+                            return Parser::Node(Parser::Variant(static_cast<const DerivedNode*>(this)->operate(op1.variant.i, op2.variant.f)));
+                        break;
+                        default:
+                        break;
+                    }
+                break;
+                case Parser::Variant::Type::FLOAT:
+                    switch (op2.variant.type) {
+                        case Parser::Variant::Type::INT:
+                            return Parser::Node(Parser::Variant(static_cast<const DerivedNode*>(this)->operate(op1.variant.f, op2.variant.i)));
+                        break;
+                        case Parser::Variant::Type::FLOAT:
+                            return Parser::Node(Parser::Variant(static_cast<const DerivedNode*>(this)->operate(op1.variant.f, op2.variant.f)));
+                        break;
+                        default:
+                        break;
+                    }
+                break;
+                default:
+                break;
+            }
+            return Parser::Node();
         }
     };
+
+    struct PlusOperatorNode : ArithmeticOperatorNode<PlusOperatorNode> {
+        PlusOperatorNode() : ArithmeticOperatorNode<PlusOperatorNode>("+", 5) { }
+
+        double operate(double v1, long long v2) const { return v1 + v2; }
+        double operate(double v1, double v2) const { return v1 + v2; }
+        double operate(long long v1, double v2) const { return v1 + v2; }
+        long long operate(long long v1, long long v2) const { return v1 + v2; }
+    };
+    struct MinusOperatorNode : ArithmeticOperatorNode<MinusOperatorNode> {
+        MinusOperatorNode() : ArithmeticOperatorNode<MinusOperatorNode>("-", 5) { }
+
+        double operate(double v1, long long v2) const { return v1 - v2; }
+        double operate(double v1, double v2) const { return v1 - v2; }
+        double operate(long long v1, double v2) const { return v1 - v2; }
+        long long operate(long long v1, long long v2) const { return v1 - v2; }
+    };
+
+    struct MultiplyOperatorNode : ArithmeticOperatorNode<MultiplyOperatorNode> {
+        MultiplyOperatorNode() : ArithmeticOperatorNode<MultiplyOperatorNode>("*", 10) { }
+
+        double operate(double v1, long long v2) const { return v1 * v2; }
+        double operate(double v1, double v2) const { return v1 * v2; }
+        double operate(long long v1, double v2) const { return v1 * v2; }
+        long long operate(long long v1, long long v2) const { return v1 * v2; }
+    };
+
+    struct DivideOperatorNode : ArithmeticOperatorNode<DivideOperatorNode> {
+        DivideOperatorNode() : ArithmeticOperatorNode<DivideOperatorNode>("/", 10) { }
+
+        double operate(double v1, long long v2) const { return v1 / v2; }
+        double operate(double v1, double v2) const { return v1 / v2; }
+        double operate(long long v1, double v2) const { return v1 / v2; }
+        long long operate(long long v1, long long v2) const { return v1 / v2; }
+    };
+
 
     void StandardDialect::implement(Context& context) {
         context.registerType(make_unique<IfNode>());
         context.registerType(make_unique<ForNode>());
         context.registerType(make_unique<PlusOperatorNode>());
+        context.registerType(make_unique<MinusOperatorNode>());
+        context.registerType(make_unique<MultiplyOperatorNode>());
+        context.registerType(make_unique<DivideOperatorNode>());
     }
 }

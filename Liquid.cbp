@@ -84,9 +84,7 @@
 		<Unit filename="src/renderer.h">
 			<Option target="executable" />
 		</Unit>
-		<Unit filename="t/01sanity.cpp">
-			<Option target="executable" />
-		</Unit>
+		<Unit filename="t/01sanity.cpp" />
 		<Extensions />
 	</Project>
 </CodeBlocks_project_file>
