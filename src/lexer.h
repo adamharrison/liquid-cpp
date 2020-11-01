@@ -90,127 +90,122 @@ namespace Liquid {
                     case State::CONTROL: {
                         size_t nonWhitespaceCharacter, endOfWord, ongoingWord;
                         for (nonWhitespaceCharacter = offset; isWhitespace(str[nonWhitespaceCharacter]) && nonWhitespaceCharacter < size; ++nonWhitespaceCharacter);
-                        switch (str[nonWhitespaceCharacter]) {
-                            case '"': {
-                                for (endOfWord = nonWhitespaceCharacter+1; endOfWord < size && (str[endOfWord] == '\\' || str[endOfWord] != '"'); ++endOfWord);
-                                ongoing = static_cast<T*>(this)->string(&str[nonWhitespaceCharacter+1], endOfWord - nonWhitespaceCharacter - 1);
-                                offset = endOfWord;
-                            } break;
-                            case '\'': {
-                                for (endOfWord = nonWhitespaceCharacter+1; endOfWord < size && (str[endOfWord] == '\\' || str[endOfWord] != '\''); ++endOfWord);
-                                ongoing = static_cast<T*>(this)->string(&str[nonWhitespaceCharacter+1], endOfWord - nonWhitespaceCharacter - 1);
-                                offset = endOfWord;
-                            } break;
-                            default: {
-                                bool isNumber = true;
-                                bool hasPoint = false;
-                                ongoingWord = nonWhitespaceCharacter;
-                                for (endOfWord = nonWhitespaceCharacter; endOfWord < size && !isWhitespace(str[endOfWord]); ++endOfWord) {
-                                    switch (str[endOfWord]) {
-                                        case '-':
-                                            if (endOfWord != nonWhitespaceCharacter)
-                                                isNumber = false;
-                                        break;
-                                        case '[':
-                                        case ']':
-                                        case '(':
-                                        case ')':
-                                        case ':':
-                                        case ',':
-                                            if (endOfWord - ongoingWord > 0) {
-                                                if (!isNumber)
-                                                    ongoing = static_cast<T*>(this)->literal(&str[nonWhitespaceCharacter], endOfWord - ongoingWord);
-                                                else if (hasPoint)
-                                                    ongoing = static_cast<T*>(this)->floating(atof(&str[ongoingWord]));
-                                                else
-                                                    ongoing = static_cast<T*>(this)->integer(atoll(&str[ongoingWord]));
-                                                ongoingWord = endOfWord;
-                                            }
-                                            if (ongoing) {
-                                                switch (str[endOfWord]) {
-                                                    case '[': ongoing = static_cast<T*>(this)->startVariableDereference(); ++ongoingWord; break;
-                                                    case ']': ongoing = static_cast<T*>(this)->endVariableDereference(); ++ongoingWord; break;
-                                                    case '(': ongoing = static_cast<T*>(this)->openParenthesis(); ++ongoingWord; break;
-                                                    case ')': ongoing = static_cast<T*>(this)->closeParenthesis(); ++ongoingWord; break;
-                                                    case ':': ongoing = static_cast<T*>(this)->colon(); ++ongoingWord; break;
-                                                    case ',': ongoing = static_cast<T*>(this)->comma(); ++ongoingWord; break;
-                                                }
-                                                ++nonWhitespaceCharacter;
-                                            }
-                                        break;
-                                        case '.':
-                                            if (!isNumber) {
-                                                ongoing = static_cast<T*>(this)->literal(&str[nonWhitespaceCharacter], endOfWord - ongoingWord);
-                                                ongoing = static_cast<T*>(this)->dot();
-                                                ongoingWord = endOfWord+1;
-                                            } else {
-                                                if (hasPoint)
-                                                    isNumber = false;
-                                                else
-                                                    hasPoint = true;
-                                            }
-                                        break;
-                                        case '0':
-                                        case '1':
-                                        case '2':
-                                        case '3':
-                                        case '4':
-                                        case '5':
-                                        case '6':
-                                        case '7':
-                                        case '8':
-                                        case '9':
-                                        break;
-                                        default:
-                                            isNumber = false;
-                                        break;
-                                        case '}': {
-                                            if (state == State::CONTROL) {
-                                                if (str[endOfWord-1] == '%') {
-                                                    ongoing = static_cast<T*>(this)->endControlBlock(str[endOfWord-2] == '-');
-                                                    state = State::INITIAL;
-                                                    lastInitial = endOfWord+1;
-                                                }
-                                            } else {
-                                                if (str[endOfWord-1] == '}') {
-                                                    ongoing = static_cast<T*>(this)->endOutputBlock(str[endOfWord-2] == '-');
-                                                    state = State::INITIAL;
-                                                    lastInitial = endOfWord+1;
-                                                }
-                                            }
-                                        } break;
+                        bool isNumber = true;
+                        bool hasPoint = false;
+                        ongoingWord = nonWhitespaceCharacter;
+                        for (endOfWord = nonWhitespaceCharacter; endOfWord < size && !isWhitespace(str[endOfWord]); ++endOfWord) {
+                            switch (str[endOfWord]) {
+                                case '"': {
+                                    for (endOfWord = ongoingWord+1; endOfWord < size && (str[endOfWord] == '\\' || str[endOfWord] != '"'); ++endOfWord);
+                                    ongoing = static_cast<T*>(this)->string(&str[ongoingWord+1], endOfWord - ongoingWord - 1);
+                                    ongoingWord = endOfWord+1;
+                                } break;
+                                case '\'': {
+                                    for (endOfWord = ongoingWord+1; endOfWord < size && (str[endOfWord] == '\\' || str[endOfWord] != '\''); ++endOfWord);
+                                    ongoing = static_cast<T*>(this)->string(&str[ongoingWord+1], endOfWord - ongoingWord - 1);
+                                    ongoingWord = endOfWord+1;
+                                } break;
+                                case '-':
+                                    if (endOfWord != nonWhitespaceCharacter)
+                                        isNumber = false;
+                                break;
+                                case '[':
+                                case ']':
+                                case '(':
+                                case ')':
+                                case ':':
+                                case ',':
+                                    if (endOfWord - ongoingWord > 0) {
+                                        if (!isNumber)
+                                            ongoing = static_cast<T*>(this)->literal(&str[nonWhitespaceCharacter], endOfWord - ongoingWord);
+                                        else if (hasPoint)
+                                            ongoing = static_cast<T*>(this)->floating(atof(&str[ongoingWord]));
+                                        else
+                                            ongoing = static_cast<T*>(this)->integer(atoll(&str[ongoingWord]));
+                                        ongoingWord = endOfWord;
                                     }
-                                }
-                                if (state != State::INITIAL) {
-                                    size_t size = endOfWord - ongoingWord;
-                                    if (size > 0) {
-                                        if (isNumber && (size > 1 || str[ongoingWord] != '-')) {
-                                            char pulled = 0;
-                                            if (endOfWord < offset) {
-                                                pulled = str[endOfWord];
-                                                const_cast<char*>(str)[endOfWord] = 0;
-                                            }
-                                            if (hasPoint) {
-                                                ongoing = static_cast<T*>(this)->floating(atof(&str[ongoingWord]));
-                                            } else {
-                                                ongoing = static_cast<T*>(this)->integer(atoll(&str[ongoingWord]));
-                                            }
-                                            if (endOfWord < offset)
-                                                const_cast<char*>(str)[endOfWord] = pulled;
-                                        } else {
-                                            if (strncmp(&str[ongoingWord], "raw", 3) == 0) {
-                                                state = State::RAW;
-                                            } else {
-                                                ongoing = static_cast<T*>(this)->literal(&str[ongoingWord], size);
-                                            }
+                                    if (ongoing) {
+                                        switch (str[endOfWord]) {
+                                            case '[': ongoing = static_cast<T*>(this)->startVariableDereference(); ++ongoingWord; break;
+                                            case ']': ongoing = static_cast<T*>(this)->endVariableDereference(); ++ongoingWord; break;
+                                            case '(': ongoing = static_cast<T*>(this)->openParenthesis(); ++ongoingWord; break;
+                                            case ')': ongoing = static_cast<T*>(this)->closeParenthesis(); ++ongoingWord; break;
+                                            case ':': ongoing = static_cast<T*>(this)->colon(); ++ongoingWord; break;
+                                            case ',': ongoing = static_cast<T*>(this)->comma(); ++ongoingWord; break;
+                                        }
+                                        ++nonWhitespaceCharacter;
+                                    }
+                                break;
+                                case '.':
+                                    if (!isNumber) {
+                                        ongoing = static_cast<T*>(this)->literal(&str[nonWhitespaceCharacter], endOfWord - ongoingWord);
+                                        ongoing = static_cast<T*>(this)->dot();
+                                        ongoingWord = endOfWord+1;
+                                    } else {
+                                        if (hasPoint)
+                                            isNumber = false;
+                                        else
+                                            hasPoint = true;
+                                    }
+                                break;
+                                case '0':
+                                case '1':
+                                case '2':
+                                case '3':
+                                case '4':
+                                case '5':
+                                case '6':
+                                case '7':
+                                case '8':
+                                case '9':
+                                break;
+                                default:
+                                    isNumber = false;
+                                break;
+                                case '}': {
+                                    if (state == State::CONTROL) {
+                                        if (str[endOfWord-1] == '%') {
+                                            ongoing = static_cast<T*>(this)->endControlBlock(str[endOfWord-2] == '-');
+                                            state = State::INITIAL;
+                                            lastInitial = endOfWord+1;
+                                        }
+                                    } else {
+                                        if (str[endOfWord-1] == '}') {
+                                            ongoing = static_cast<T*>(this)->endOutputBlock(str[endOfWord-2] == '-');
+                                            state = State::INITIAL;
+                                            lastInitial = endOfWord+1;
                                         }
                                     }
-                                }
-                                offset = endOfWord;
-                            } break;
+                                } break;
+                            }
                         }
+                        if (state != State::INITIAL) {
+                            size_t size = endOfWord - ongoingWord;
+                            if (size > 0) {
+                                if (isNumber && (size > 1 || str[ongoingWord] != '-')) {
+                                    char pulled = 0;
+                                    if (endOfWord < offset) {
+                                        pulled = str[endOfWord];
+                                        const_cast<char*>(str)[endOfWord] = 0;
+                                    }
+                                    if (hasPoint) {
+                                        ongoing = static_cast<T*>(this)->floating(atof(&str[ongoingWord]));
+                                    } else {
+                                        ongoing = static_cast<T*>(this)->integer(atoll(&str[ongoingWord]));
+                                    }
+                                    if (endOfWord < offset)
+                                        const_cast<char*>(str)[endOfWord] = pulled;
+                                } else {
+                                    if (strncmp(&str[ongoingWord], "raw", 3) == 0) {
+                                        state = State::RAW;
+                                    } else {
+                                        ongoing = static_cast<T*>(this)->literal(&str[ongoingWord], size);
+                                    }
+                                }
+                            }
+                        }
+                        offset = endOfWord;
                     } break;
-                    break;
                     case State::RAW: {
 
                     } break;

@@ -101,6 +101,18 @@ TEST(sanity, parenthesis) {
 }
 
 
+
+TEST(sanity, dereference) {
+    CPPVariable variable, hash;
+    hash["b"] = 2;
+    variable["a"] = std::move(hash);
+    auto ast = getParser().parse("asdbfsdf {{ a[\"b\"] }} b");
+    auto str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf 2 b");
+}
+
+
+
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

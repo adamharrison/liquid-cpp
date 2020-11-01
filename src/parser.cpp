@@ -32,11 +32,32 @@ namespace Liquid {
                 return false;
             break;
         }
-        parser.popNode();
-        auto& argumentNode = parser.getArgumentNode();
-        argumentNode.children.push_back(nullptr);
+        if (!parser.popNodeUntil(NodeType::Type::ARGUMENTS)) {
+            parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, ","));
+            return false;
+        }
+        parser.nodes.back()->children.push_back(nullptr);
         return true;
     }
+
+    bool Parser::Lexer::dot() {
+        switch (parser.state) {
+            case Parser::State::NODE:
+                parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, "."));
+                return false;
+            break;
+            case Parser::State::ARGUMENT:
+                if (!parser.nodes.back()->type || parser.nodes.back()->type->type != NodeType::Type::VARIABLE) {
+                    parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
+                    return false;
+                }
+                parser.nodes.back()->children.push_back(nullptr);
+                return true;
+            break;
+        }
+        return true;
+    }
+
 
     bool Parser::Lexer::startVariableDereference() {
         switch (parser.state) {
@@ -45,22 +66,30 @@ namespace Liquid {
                 return false;
             break;
             case Parser::State::ARGUMENT:
-
+                if (!parser.nodes.back()->type || parser.nodes.back()->type->type != NodeType::Type::VARIABLE) {
+                    parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
+                    return false;
+                }
+                parser.nodes.back()->children.push_back(nullptr);
+                parser.nodes.push_back(make_unique<Node>(context.getGroupDereferenceNodeType()));
+                parser.nodes.back()->children.push_back(nullptr);
             break;
         }
         return true;
     }
 
     bool Parser::Lexer::endVariableDereference() {
-        if (--parser.dereferenceDepth < 0) {
-            parser.pushError(Error(*this, Error::Type::UNBALANCED_GROUP, "]"));
-            return false;
-        }
         switch (parser.state) {
             case Parser::State::NODE:
-            case Parser::State::ARGUMENT:
                 parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
                 return false;
+            break;
+            case Parser::State::ARGUMENT:
+                if (!parser.popNodeUntil(NodeType::Type::GROUP_DEREFERENCE)) {
+                    parser.pushError(Error(*this, Error::Type::UNBALANCED_GROUP));
+                    return false;
+                }
+                parser.popNode();
             break;
         }
         return true;
@@ -105,59 +134,28 @@ namespace Liquid {
         return true;
     }
 
-    bool Parser::Lexer::dot() {
-        switch (parser.state) {
-            case Parser::State::NODE:
-                parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
-                return false;
-            break;
-            case Parser::State::ARGUMENT:
-                if (!parser.nodes.back()->type || parser.nodes.back()->type->type != NodeType::Type::VARIABLE) {
-                    parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
-                    return false;
-                }
-                parser.nodes.back()->children.push_back(nullptr);
-                return true;
-            break;
-        }
-        return true;
-    }
-
-
-
-    Parser::Node& Parser::getArgumentNode() {
-        for (auto it = nodes.rbegin(); it != nodes.rend(); ++it) {
-            if ((*it)->type && (*it)->type->type == NodeType::Type::ARGUMENTS)
-                return **it;
-        }
-        assert(false);
-    }
-
     bool Parser::Lexer::literal(const char* str, size_t len) {
         switch (parser.state) {
             case Parser::State::NODE: {
                 switch (this->state) {
                     case SUPER::State::CONTROL: {
-                        //if (parser.argumentIdx == 0) {
-                            if (len > 3 && strncmp(str, "end", 3) == 0) {
-                                std::string typeName = std::string(&str[3], len - 3);
-                                const NodeType* type = SUPER::context.getTagType(typeName);
-                                if (!type) {
-                                    parser.pushError(Error(*this, Error::Type::UNKNOWN_TAG, std::string(str, len)));
-                                    return false;
-                                }
-                                parser.nodes.pop_back();
-                            } else {
-                                std::string typeName = std::string(str, len);
-                                const NodeType* type = SUPER::context.getTagType(typeName);
-                                if (!type) {
-                                    parser.pushError(Error(*this, Error::Type::UNKNOWN_TAG, typeName));
-                                    return false;
-                                }
-                                parser.nodes.push_back(std::make_unique<Node>(type));
+                        if (len > 3 && strncmp(str, "end", 3) == 0) {
+                            std::string typeName = std::string(&str[3], len - 3);
+                            const NodeType* type = SUPER::context.getTagType(typeName);
+                            if (!type) {
+                                parser.pushError(Error(*this, Error::Type::UNKNOWN_TAG, std::string(str, len)));
+                                return false;
                             }
-                        //} else {
-                        //}
+                            parser.nodes.pop_back();
+                        } else {
+                            std::string typeName = std::string(str, len);
+                            const NodeType* type = SUPER::context.getTagType(typeName);
+                            if (!type) {
+                                parser.pushError(Error(*this, Error::Type::UNKNOWN_TAG, typeName));
+                                return false;
+                            }
+                            parser.nodes.push_back(std::make_unique<Node>(type));
+                        }
                     } break;
                     case SUPER::State::OUTPUT:
                     case SUPER::State::RAW:
@@ -218,17 +216,11 @@ namespace Liquid {
         return true;
     }
     bool Parser::Lexer::closeParenthesis() {
-        while (true) {
-            auto& node = parser.nodes.back();
-            if (node->type && node->type->type == NodeType::Type::GROUP) {
-                parser.popNode();
-                break;
-            }
-            if (!parser.popNode()) {
-                parser.pushError(Error(*this, Error::Type::UNBALANCED_GROUP));
-                return false;
-            }
+        if (!parser.popNodeUntil(NodeType::Type::GROUP)) {
+            parser.pushError(Error(*this, Error::Type::UNBALANCED_GROUP));
+            return false;
         }
+        parser.popNode();
         return true;
     }
 
@@ -254,25 +246,28 @@ namespace Liquid {
         return true;
     }
 
+    bool Parser::popNodeUntil(int type) {
+        while (true) {
+            auto& node = nodes.back();
+            if (node->type && node->type->type == type)
+                return true;
+            if (!popNode())
+                return false;
+        }
+        return true;
+    }
+
     bool Parser::Lexer::endOutputBlock(bool suppress) {
         if (parser.state != Parser::State::ARGUMENT) {
             parser.pushError(Error(*this, Error::Type::UNEXPECTED_END));
             return false;
         }
-        while (true) {
-            auto& node = parser.nodes.back();
-            if (node->type && node->type->type == NodeType::Type::OUTPUT) {
-                unique_ptr<Node> outputBlock = move(node);
-                parser.nodes.pop_back();
-                assert(parser.nodes.back()->type && parser.nodes.back()->type == context.getConcatenationNodeType());
-                parser.nodes.back()->children.push_back(move(outputBlock));
-                break;
-            }
-            if (!parser.popNode()) {
-                parser.pushError(Error(*this, Error::Type::UNEXPECTED_END));
-                return false;
-            }
-        }
+        if (!parser.popNodeUntil(NodeType::Type::OUTPUT))
+            return false;
+        unique_ptr<Node> outputBlock = move(parser.nodes.back());
+        parser.nodes.pop_back();
+        assert(parser.nodes.back()->type && parser.nodes.back()->type == context.getConcatenationNodeType());
+        parser.nodes.back()->children.push_back(move(outputBlock));
         parser.state = Parser::State::NODE;
         return true;
     }

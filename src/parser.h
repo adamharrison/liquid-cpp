@@ -94,7 +94,6 @@ namespace Liquid {
 
             string getString();
 
-            bool canAcceptMoreChildren() const;
 
             Node& operator = (const Node& n) {
                 if (type)
@@ -187,11 +186,7 @@ namespace Liquid {
             NODE,
             ARGUMENT
         };
-
         State state = State::NODE;
-        int groupDepth = 0;
-        int dereferenceDepth = 0;
-
 
         vector<unique_ptr<Node>> nodes;
         vector<Error> errors;
@@ -226,15 +221,12 @@ namespace Liquid {
 
         Lexer lexer;
 
-        Parser(const Context& context) : context(context), lexer(context, *this) {
-
-        }
-
-        void appendOperandNode(unique_ptr<Node> node);
-        Node& getArgumentNode();
+        Parser(const Context& context) : context(context), lexer(context, *this) { }
 
         // Pops the last node in the stack, and then applies it as the last child of the node prior to it.
         bool popNode();
+        // Pops nodes until it reaches a node of the given type.
+        bool popNodeUntil(int type);
 
         Node parse(const char* buffer, size_t len);
         Node parse(const string& str) {

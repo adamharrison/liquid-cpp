@@ -26,11 +26,12 @@ namespace Liquid {
     };
 
     struct NodeType {
-        enum class Type {
+        enum Type {
             VARIABLE,
             TAG_ENCLOSED,
             TAG_FREE,
             GROUP,
+            GROUP_DEREFERENCE,
             OUTPUT,
             ARGUMENTS,
             OPERATOR
@@ -146,6 +147,17 @@ namespace Liquid {
                 return *it->get();
             }
         };
+        // These are purely for parsing purpose, and should not make their way to the rednerer.
+        struct GroupDereferenceNode : NodeType {
+            GroupDereferenceNode() : NodeType(Type::GROUP_DEREFERENCE) { }
+            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+                assert(node.children.size() == 1);
+                auto it = node.children.begin();
+                if ((*it)->type)
+                    return (*it)->type->render(context, *it->get(), store);
+                return *it->get();
+            }
+        };
         // Used exclusively for tags
         struct ArgumentNode : NodeType {
             ArgumentNode() : NodeType(Type::ARGUMENTS) { }
@@ -216,6 +228,7 @@ namespace Liquid {
         const NodeType* getVariableNodeType() const { static VariableNode variableNodeType; return &variableNodeType; }
         const NodeType* getNamedVariableNodeType() const { static NamedVariableNode namedVariableNodeType; return &namedVariableNodeType; }
         const NodeType* getGroupNodeType() const { static GroupNode groupNodeType; return &groupNodeType; }
+        const NodeType* getGroupDereferenceNodeType() const { static GroupDereferenceNode groupDereferenceNodeType; return &groupDereferenceNodeType; }
         const NodeType* getArgumentsNodeType() const { static ArgumentNode argumentNodeType; return &argumentNodeType; }
 
 
