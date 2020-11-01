@@ -234,7 +234,7 @@ namespace Liquid {
         Node& getArgumentNode();
 
         // Pops the last node in the stack, and then applies it as the last child of the node prior to it.
-        void popNode();
+        bool popNode();
 
         Node parse(const char* buffer, size_t len);
         Node parse(const string& str) {

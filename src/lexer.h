@@ -117,28 +117,31 @@ namespace Liquid {
                                         case ')':
                                         case ':':
                                         case ',':
-                                            if (!isNumber) {
-                                                if (endOfWord - ongoingWord > 0) {
+                                            if (endOfWord - ongoingWord > 0) {
+                                                if (!isNumber)
                                                     ongoing = static_cast<T*>(this)->literal(&str[nonWhitespaceCharacter], endOfWord - ongoingWord);
-                                                    ongoingWord = endOfWord+1;
-                                                }
+                                                else if (hasPoint)
+                                                    ongoing = static_cast<T*>(this)->floating(atof(&str[ongoingWord]));
+                                                else
+                                                    ongoing = static_cast<T*>(this)->integer(atoll(&str[ongoingWord]));
+                                                ongoingWord = endOfWord;
                                             }
                                             if (ongoing) {
                                                 switch (str[endOfWord]) {
-                                                    case '.': ongoing = static_cast<T*>(this)->dot(); break;
-                                                    case '[': ongoing = static_cast<T*>(this)->startVariableDereference(); break;
-                                                    case ']': ongoing = static_cast<T*>(this)->endVariableDereference(); break;
-                                                    case '(': ongoing = static_cast<T*>(this)->openParenthesis(); break;
-                                                    case ')': ongoing = static_cast<T*>(this)->closeParenthesis(); break;
-                                                    case ':': ongoing = static_cast<T*>(this)->colon(); break;
-                                                    case ',': ongoing = static_cast<T*>(this)->comma(); break;
+                                                    case '[': ongoing = static_cast<T*>(this)->startVariableDereference(); ++ongoingWord; break;
+                                                    case ']': ongoing = static_cast<T*>(this)->endVariableDereference(); ++ongoingWord; break;
+                                                    case '(': ongoing = static_cast<T*>(this)->openParenthesis(); ++ongoingWord; break;
+                                                    case ')': ongoing = static_cast<T*>(this)->closeParenthesis(); ++ongoingWord; break;
+                                                    case ':': ongoing = static_cast<T*>(this)->colon(); ++ongoingWord; break;
+                                                    case ',': ongoing = static_cast<T*>(this)->comma(); ++ongoingWord; break;
                                                 }
                                                 ++nonWhitespaceCharacter;
                                             }
                                         break;
                                         case '.':
                                             if (!isNumber) {
-                                                ongoing = static_cast<T*>(this)->literal(&str[nonWhitespaceCharacter], endOfWord - ongoingWord + 1);
+                                                ongoing = static_cast<T*>(this)->literal(&str[nonWhitespaceCharacter], endOfWord - ongoingWord);
+                                                ongoing = static_cast<T*>(this)->dot();
                                                 ongoingWord = endOfWord+1;
                                             } else {
                                                 if (hasPoint)
@@ -146,7 +149,6 @@ namespace Liquid {
                                                 else
                                                     hasPoint = true;
                                             }
-                                        break;
                                         break;
                                         case '0':
                                         case '1':
@@ -180,25 +182,27 @@ namespace Liquid {
                                     }
                                 }
                                 if (state != State::INITIAL) {
-                                    size_t size = endOfWord - nonWhitespaceCharacter;
-                                    if (isNumber && (size > 1 || str[nonWhitespaceCharacter] != '-')) {
-                                        char pulled = 0;
-                                        if (endOfWord < offset) {
-                                            pulled = str[endOfWord];
-                                            const_cast<char*>(str)[endOfWord] = 0;
-                                        }
-                                        if (hasPoint) {
-                                            ongoing = static_cast<T*>(this)->floating(atof(&str[nonWhitespaceCharacter]));
+                                    size_t size = endOfWord - ongoingWord;
+                                    if (size > 0) {
+                                        if (isNumber && (size > 1 || str[ongoingWord] != '-')) {
+                                            char pulled = 0;
+                                            if (endOfWord < offset) {
+                                                pulled = str[endOfWord];
+                                                const_cast<char*>(str)[endOfWord] = 0;
+                                            }
+                                            if (hasPoint) {
+                                                ongoing = static_cast<T*>(this)->floating(atof(&str[ongoingWord]));
+                                            } else {
+                                                ongoing = static_cast<T*>(this)->integer(atoll(&str[ongoingWord]));
+                                            }
+                                            if (endOfWord < offset)
+                                                const_cast<char*>(str)[endOfWord] = pulled;
                                         } else {
-                                            ongoing = static_cast<T*>(this)->integer(atoll(&str[nonWhitespaceCharacter]));
-                                        }
-                                        if (endOfWord < offset)
-                                            const_cast<char*>(str)[endOfWord] = pulled;
-                                    } else {
-                                        if (strncmp(&str[nonWhitespaceCharacter], "raw", 3) == 0) {
-                                            state = State::RAW;
-                                        } else {
-                                            ongoing = static_cast<T*>(this)->literal(&str[nonWhitespaceCharacter], size);
+                                            if (strncmp(&str[ongoingWord], "raw", 3) == 0) {
+                                                state = State::RAW;
+                                            } else {
+                                                ongoing = static_cast<T*>(this)->literal(&str[ongoingWord], size);
+                                            }
                                         }
                                     }
                                 }

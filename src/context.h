@@ -138,7 +138,13 @@ namespace Liquid {
         // These are purely for parsing purpose, and should not make their way to the rednerer.
         struct GroupNode : NodeType {
             GroupNode() : NodeType(Type::GROUP) { }
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const { assert(false); }
+            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+                assert(node.children.size() == 1);
+                auto it = node.children.begin();
+                if ((*it)->type)
+                    return (*it)->type->render(context, *it->get(), store);
+                return *it->get();
+            }
         };
         // Used exclusively for tags
         struct ArgumentNode : NodeType {
@@ -212,117 +218,6 @@ namespace Liquid {
         const NodeType* getGroupNodeType() const { static GroupNode groupNodeType; return &groupNodeType; }
         const NodeType* getArgumentsNodeType() const { static ArgumentNode argumentNodeType; return &argumentNodeType; }
 
-        struct CPPVariable : Variable {
-            union {
-                string s;
-                double f;
-                long long i;
-                vector<unique_ptr<CPPVariable>> a;
-                unordered_map<string, unique_ptr<CPPVariable>> d;
-            };
-            Type type;
-
-
-
-            CPPVariable() :type(Type::NIL) { }
-            CPPVariable(long long i) : i(i), type(Type::INT) { }
-            CPPVariable(int i) : CPPVariable((long long)i) { }
-            CPPVariable(double f) : f(f), type(Type::FLOAT) { }
-            CPPVariable(const string& s) : s(s), type(Type::STRING) { }
-            CPPVariable(const char* s) : CPPVariable(string(s)) { }
-            CPPVariable(void* nil) : type(Type::NIL) { }
-            ~CPPVariable() { clear(); }
-
-            void clear() {
-                switch (type) {
-                    case Type::STRING:
-                        s.~string();
-                    break;
-                    case Type::DICTIONARY:
-                        d.~unordered_map<string, unique_ptr<CPPVariable>>();
-                    break;
-                    case Type::ARRAY:
-                        a.~vector<unique_ptr<CPPVariable>>();
-                    break;
-                    default:
-                    break;
-                }
-                type = Type::NIL;
-            }
-
-            void assign(long long i) { clear(); this->i = i; type = Type::INT; }
-            void assign(int i) { assign((long long)i); }
-            void assign(double f) { clear(); this->f = f; type = Type::FLOAT; }
-            void assign(const string& s) { clear(); new(&this->s) string(); this->s = s; type = Type::STRING; }
-
-            CPPVariable& operator[](const string& s) {
-                if (type == Type::NIL) {
-                    new(&this->d) unordered_map<string, unique_ptr<CPPVariable>>();
-                    type = Type::DICTIONARY;
-                }
-                assert(type == Type::DICTIONARY);
-                auto it = d.find(s);
-                if (it != d.end())
-                    return *it->second.get();
-                return *d.emplace(s, make_unique<CPPVariable>()).first->second.get();
-            }
-            CPPVariable& operator[](size_t idx) {
-                if (type == Type::NIL) {
-                    new(&this->a) vector<unique_ptr<CPPVariable>>();
-                    type = Type::ARRAY;
-                }
-                assert(type == Type::ARRAY);
-                if (a.size() < idx+1) {
-                    size_t oldSize = a.size();
-                    a.resize(idx+1);
-                    for (size_t i = oldSize; i < idx+1; ++i)
-                        a[i] = make_unique<CPPVariable>();
-                }
-                return *a[idx].get();
-            }
-
-            CPPVariable& operator = (const std::string& s) { assign(s); return *this; }
-            CPPVariable& operator = (const char* s) { assign(s); return *this; }
-            CPPVariable& operator = (double f) { assign(f); return *this; }
-            CPPVariable& operator = (long long i) { assign(i); return *this; }
-            CPPVariable& operator = (int i) { assign(i); return *this; }
-
-
-            Type getType() {
-                return type;
-            }
-
-            bool getString(std::string& s) {
-                if (type != Type::STRING)
-                    return false;
-                s = this->s;
-                return true;
-            }
-            bool getInteger(long long& i) {
-                if (type != Type::INT)
-                    return false;
-                i = this->i;
-                return true;
-            }
-            bool getFloat(double& i) {
-                if (type != Type::FLOAT)
-                    return false;
-                f = this->f;
-                return true;
-            }
-            bool getDictionaryVariable(Variable*& variable, const std::string& key) {
-                if (type != Type::DICTIONARY)
-                    return false;
-                variable = &(*this)[key];
-                return true;
-            }
-            bool getArrayVariable(Variable*& variable, size_t idx) {
-                if (type != Type::ARRAY)
-                    return false;
-                variable = &(*this)[idx];
-                return true;
-            }
-        };
 
         void registerType(unique_ptr<NodeType> type) {
             switch (type->type) {

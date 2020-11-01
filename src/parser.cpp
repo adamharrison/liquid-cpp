@@ -15,15 +15,6 @@ namespace Liquid {
         return std::string();
     }
 
-    void Parser::appendOperandNode(unique_ptr<Node> node) {
-        auto& operatorArgumentNode = nodes.back();
-        assert(!operatorArgumentNode->children.back().get());
-        if (operatorArgumentNode->type && operatorArgumentNode->type->type == NodeType::Type::ARGUMENTS && operatorArgumentNode->children.size() == 0)
-            operatorArgumentNode->children.push_back(move(node));
-        else
-            operatorArgumentNode->children.back() = move(node);
-    }
-
     bool Parser::Lexer::colon() {
         if (parser.nodes.back()->type != context.getVariableNodeType() || parser.nodes.back()->children.size() != 1) {
             parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
@@ -82,7 +73,7 @@ namespace Liquid {
                 return false;
             break;
             case Parser::State::ARGUMENT:
-                parser.appendOperandNode(move(make_unique<Node>(Variant(std::string(str, len)))));
+                parser.nodes.push_back(move(make_unique<Node>(Variant(std::string(str, len)))));
             break;
         }
         return true;
@@ -95,7 +86,20 @@ namespace Liquid {
                 return false;
             break;
             case Parser::State::ARGUMENT: {
-                parser.appendOperandNode(move(make_unique<Node>(Variant(i))));
+                parser.nodes.push_back(move(make_unique<Node>(Variant(i))));
+            } break;
+        }
+        return true;
+    }
+
+    bool Parser::Lexer::floating(double f) {
+        switch (parser.state) {
+            case Parser::State::NODE:
+                parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
+                return false;
+            break;
+            case Parser::State::ARGUMENT: {
+                parser.nodes.push_back(move(make_unique<Node>(Variant(f))));
             } break;
         }
         return true;
@@ -108,10 +112,11 @@ namespace Liquid {
                 return false;
             break;
             case Parser::State::ARGUMENT:
-                if (parser.nodes.back()->type != context.getVariableNodeType()) {
+                if (!parser.nodes.back()->type || parser.nodes.back()->type->type != NodeType::Type::VARIABLE) {
                     parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
                     return false;
                 }
+                parser.nodes.back()->children.push_back(nullptr);
                 return true;
             break;
         }
@@ -119,18 +124,6 @@ namespace Liquid {
     }
 
 
-    bool Parser::Lexer::floating(double f) {
-        switch (parser.state) {
-            case Parser::State::NODE:
-                parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
-                return false;
-            break;
-            case Parser::State::ARGUMENT: {
-                parser.appendOperandNode(move(make_unique<Node>(Variant(f))));
-            } break;
-        }
-        return true;
-    }
 
     Parser::Node& Parser::getArgumentNode() {
         for (auto it = nodes.rbegin(); it != nodes.rend(); ++it) {
@@ -175,39 +168,41 @@ namespace Liquid {
                 }
             } break;
             case Parser::State::ARGUMENT: {
-                auto& argumentNode = parser.getArgumentNode();
                 auto& lastNode = parser.nodes.back();
-                if ((lastNode.get() == &argumentNode && (argumentNode.children.size() == 0 || !argumentNode.children.back().get()))) {
-                    unique_ptr<Node> node = make_unique<Node>(context.getVariableNodeType());
-                    // The nonary dot operator pops the last argument varaible back on to the stack.
-                    node->children.push_back(make_unique<Node>(Variant(std::string(str, len))));
-                    parser.nodes.push_back(move(node));
+                if (lastNode->type && lastNode->type->type == NodeType::Type::VARIABLE && !lastNode->children.back().get()) {
+                    lastNode->children.back() = move(make_unique<Node>(Variant(std::string(str, len))));
                 } else {
-                    // Check for operators.
-                    std::string opName = std::string(str, len);
-                    const OperatorNodeType* op = context.getOperatorType(opName);
-                    if (!op) {
-                        parser.pushError(Error(*this, Error::Type::UNKNOWN_OPERATOR, opName));
-                        return false;
-                    }
-                    assert(op->fixness == OperatorNodeType::Fixness::INFIX);
-                    auto operatorNode = make_unique<Node>(op);
-                    auto variableNode = move(parser.nodes.back());
-                    parser.nodes.pop_back();
-
-                    if (variableNode->type->type == NodeType::Type::OPERATOR &&
-                        static_cast<const OperatorNodeType*>(variableNode->type)->priority < op->priority) {
-                        // If we're of a lower priority, push operator and
-                        operatorNode->children.push_back(move(variableNode->children.back()));
-                        operatorNode->children.push_back(nullptr);
-                        variableNode->children.pop_back();
-                        parser.nodes.push_back(move(variableNode));
-                        parser.nodes.push_back(move(operatorNode));
-
+                    if (lastNode->type && !lastNode->children.back().get()) {
+                        unique_ptr<Node> node = make_unique<Node>(context.getVariableNodeType());
+                        node->children.push_back(make_unique<Node>(Variant(std::string(str, len))));
+                        parser.nodes.push_back(move(node));
                     } else {
-                        operatorNode->children.push_back(move(variableNode));
-                        operatorNode->children.push_back(nullptr);
-                        parser.nodes.push_back(move(operatorNode));
+                        // Check for operators.
+                        std::string opName = std::string(str, len);
+                        const OperatorNodeType* op = context.getOperatorType(opName);
+                        if (!op) {
+                            parser.pushError(Error(*this, Error::Type::UNKNOWN_OPERATOR, opName));
+                            return false;
+                        }
+                        assert(op->fixness == OperatorNodeType::Fixness::INFIX);
+                        auto operatorNode = make_unique<Node>(op);
+                        auto& parentNode = parser.nodes[parser.nodes.size()-2];
+
+                        assert(parentNode->type);
+                        if (parentNode->type->type == NodeType::Type::OPERATOR &&
+                            static_cast<const OperatorNodeType*>(parentNode->type)->priority >= op->priority) {
+                            // If we're of a lower priority, push operator and
+                            parser.popNode();
+                            unique_ptr<Node> rotatedOperator = move(parser.nodes.back());
+                            operatorNode->children.push_back(move(rotatedOperator));
+                            operatorNode->children.push_back(nullptr);
+                            parser.nodes.back() = move(operatorNode);
+                        } else {
+                            unique_ptr<Node> variableNode = move(parser.nodes.back());
+                            operatorNode->children.push_back(move(variableNode));
+                            operatorNode->children.push_back(nullptr);
+                            parser.nodes.back() = move(operatorNode);
+                        }
                     }
                 }
             } break;
@@ -217,9 +212,23 @@ namespace Liquid {
 
 
     bool Parser::Lexer::openParenthesis() {
+        unique_ptr<Node> node = make_unique<Node>(context.getGroupNodeType());
+        node->children.push_back(nullptr);
+        parser.nodes.push_back(move(node));
         return true;
     }
     bool Parser::Lexer::closeParenthesis() {
+        while (true) {
+            auto& node = parser.nodes.back();
+            if (node->type && node->type->type == NodeType::Type::GROUP) {
+                parser.popNode();
+                break;
+            }
+            if (!parser.popNode()) {
+                parser.pushError(Error(*this, Error::Type::UNBALANCED_GROUP));
+                return false;
+            }
+        }
         return true;
     }
 
@@ -227,14 +236,22 @@ namespace Liquid {
     bool Parser::Lexer::startOutputBlock(bool suppress) {
         parser.state = Parser::State::ARGUMENT;
         parser.nodes.push_back(std::make_unique<Node>(context.getOutputNodeType()));
+        parser.nodes.back()->children.push_back(nullptr);
         parser.nodes.push_back(std::make_unique<Node>(context.getArgumentsNodeType()));
+        parser.nodes.back()->children.push_back(nullptr);
         return true;
     }
 
-    void Parser::popNode() {
+    bool Parser::popNode() {
+        if (nodes.size() <= 1)
+            return false;
         unique_ptr<Node> argumentNode = move(nodes.back());
         nodes.pop_back();
-        nodes.back()->children.push_back(move(argumentNode));
+
+        if (nodes.back()->children.size() == 0 || nodes.back()->children.back().get())
+            return false;
+        nodes.back()->children.back() = move(argumentNode);
+        return true;
     }
 
     bool Parser::Lexer::endOutputBlock(bool suppress) {
@@ -244,11 +261,17 @@ namespace Liquid {
         }
         while (true) {
             auto& node = parser.nodes.back();
-            if (!node->type || node->type->type == NodeType::Type::OUTPUT) {
-                parser.popNode();
+            if (node->type && node->type->type == NodeType::Type::OUTPUT) {
+                unique_ptr<Node> outputBlock = move(node);
+                parser.nodes.pop_back();
+                assert(parser.nodes.back()->type && parser.nodes.back()->type == context.getConcatenationNodeType());
+                parser.nodes.back()->children.push_back(move(outputBlock));
                 break;
             }
-            parser.popNode();
+            if (!parser.popNode()) {
+                parser.pushError(Error(*this, Error::Type::UNEXPECTED_END));
+                return false;
+            }
         }
         parser.state = Parser::State::NODE;
         return true;

@@ -62,15 +62,13 @@
 		<Unit filename="src/context.h">
 			<Option target="executable" />
 		</Unit>
+		<Unit filename="src/cppvariable.h" />
 		<Unit filename="src/dialect.cpp" />
 		<Unit filename="src/dialect.h" />
 		<Unit filename="src/exception.h">
 			<Option target="executable" />
 		</Unit>
 		<Unit filename="src/interface.h" />
-		<Unit filename="src/lexer.cpp">
-			<Option target="executable" />
-		</Unit>
 		<Unit filename="src/lexer.h">
 			<Option target="executable" />
 		</Unit>
