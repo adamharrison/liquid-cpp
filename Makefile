@@ -10,10 +10,12 @@ CXXFLAGS=$(CFLAGS) -std=c++17
 LDFLAGS=
 AR=ar
 SOURCES=$(wildcard $(SDIR)/*.cpp) $(wildcard $(SDIR)/*.c) $(wildcard $(TDIR)/*.cpp)
+TESTSOURCES=$(wildcard $(TDIR)/*.cpp)
 OBJECTS=$(patsubst %.cpp,%.o,$(patsubst %.c,%.o,$(patsubst $(SDIR)/%,$(ODIR)/%,$(SOURCES))))
 EXECUTABLESOURCES=$(SDIR)/main.cpp
 EXECUTABLEOBJECTS=$(ODIR)/main.o
-LIBRARYSOURCES=$(filter-out $(SDIR)/main.cpp,$(SOURCES))
+NONLIBRARYSOURCES=$(EXECUTABLESOURCES) $(TESTSOURCES)
+LIBRARYSOURCES=$(filter-out $(NONLIBRARYSOURCES),$(SOURCES))
 LIBRARYOBJECTS=$(patsubst %.cpp,%.o,$(patsubst %.c,%.o,$(patsubst $(SDIR)/%,$(ODIR)/%,$(LIBRARYSOURCES))))
 LIBRARY = $(BDIR)/libliquid.a
 EXECUTABLE := $(BDIR)/liquid

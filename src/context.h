@@ -13,23 +13,30 @@ namespace Liquid {
             INT,
             STRING,
             ARRAY,
+            BOOL,
             DICTIONARY,
             OTHER
         };
 
-        virtual Type getType() { return Type::NIL; }
-        virtual bool getString(std::string& str) { return false; }
-        virtual bool getInteger(long long& i) { return false; }
-        virtual bool getFloat(double& i) { return false; }
-        virtual bool getDictionaryVariable(Variable*& variable, const std::string& key) { return false;  }
-        virtual bool getArrayVariable(Variable*& variable, size_t idx) { return false; }
+        virtual ~Variable() { }
+        virtual Type getType() const { return Type::NIL; }
+        virtual bool getBool(bool& b) const { return false; }
+        virtual bool getString(std::string& str) const { return false; }
+        virtual bool getInteger(long long& i) const { return false; }
+        virtual bool getFloat(double& i) const { return false; }
+        virtual bool getDictionaryVariable(Variable*& variable, const std::string& key, bool createOnNotExists) const { return false;  }
+        virtual bool getArrayVariable(Variable*& variable, size_t idx, bool createOnNotExists) const { return false; }
+        virtual void assign(const Variable& v) { }
+        virtual void assign(double f) { }
+        virtual void assign(long long i) { }
+        virtual void assign(std::string& s) { }
+        virtual void clear() { }
     };
 
     struct NodeType {
         enum Type {
             VARIABLE,
-            TAG_ENCLOSED,
-            TAG_FREE,
+            TAG,
             GROUP,
             GROUP_DEREFERENCE,
             OUTPUT,
@@ -63,10 +70,16 @@ namespace Liquid {
     };
 
     struct TagNodeType : NodeType {
+        enum class Composition {
+            FREE,
+            ENCLOSED
+        };
+
+        Composition composition;
         int minArguments;
         int maxArguments;
 
-        TagNodeType(Type type, string symbol, int minArguments = -1, int maxArguments = -1) : NodeType(type, symbol, -1), minArguments(minArguments), maxArguments(maxArguments) { }
+        TagNodeType(Composition composition, string symbol, int minArguments = -1, int maxArguments = -1) : NodeType(NodeType::Type::TAG, symbol, -1), composition(composition), minArguments(minArguments), maxArguments(maxArguments) { }
     };
 
     struct OperatorNodeType : NodeType {
@@ -105,18 +118,20 @@ namespace Liquid {
     };
 
     struct Context {
+
+        Parser::Node retrieveRenderedNode(const Parser::Node& node, Variable& store) const {
+            if (node.type)
+                return node.type->render(*this, node, store);
+            return node;
+        }
+
         struct ConcatenationNode : NodeType {
             ConcatenationNode() : NodeType(Type::OPERATOR) { }
 
             Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
                 string s;
-                for (auto it = node.children.begin(); it != node.children.end(); ++it) {
-                    if ((*it)->type) {
-                        s.append((*it)->type->render(context, *it->get(), store).getString());
-                    } else {
-                        s.append((*it)->getString());
-                    }
-                }
+                for (auto& child : node.children)
+                    s.append(context.retrieveRenderedNode(*child.get(), store).getString());
                 return Parser::Node(s);
             }
         };
@@ -136,9 +151,10 @@ namespace Liquid {
             }
         };
 
-        // These are purely for parsing purpose, and should not make their way to the rednerer.
-        struct GroupNode : NodeType {
-            GroupNode() : NodeType(Type::GROUP) { }
+        struct PassthruNode : NodeType {
+            PassthruNode(NodeType::Type type) :NodeType(type) { }
+            ~PassthruNode() { }
+
             Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
                 assert(node.children.size() == 1);
                 auto it = node.children.begin();
@@ -147,18 +163,16 @@ namespace Liquid {
                 return *it->get();
             }
         };
+
         // These are purely for parsing purpose, and should not make their way to the rednerer.
-        struct GroupDereferenceNode : NodeType {
-            GroupDereferenceNode() : NodeType(Type::GROUP_DEREFERENCE) { }
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-                assert(node.children.size() == 1);
-                auto it = node.children.begin();
-                if ((*it)->type)
-                    return (*it)->type->render(context, *it->get(), store);
-                return *it->get();
-            }
+        struct GroupNode : PassthruNode {
+            GroupNode() : PassthruNode(Type::GROUP) { }
         };
-        // Used exclusively for tags
+        // These are purely for parsing purpose, and should not make their way to the rednerer.
+        struct GroupDereferenceNode : PassthruNode {
+            GroupDereferenceNode() : PassthruNode(Type::GROUP_DEREFERENCE) { }
+        };
+        // Used exclusively for tags. Should be never be rendered by itself.
         struct ArgumentNode : NodeType {
             ArgumentNode() : NodeType(Type::ARGUMENTS) { }
             Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const { assert(false); }
@@ -167,19 +181,18 @@ namespace Liquid {
         struct VariableNode : NodeType {
             VariableNode() : NodeType(Type::VARIABLE) { }
 
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-                auto& chain = node.children;
+
+            Variable* getVariable(const Context& context, const Parser::Node& node, Variable& store, bool createIfNotExists) const {
                 Variable* storePointer = &store;
-                for (auto it = chain.begin(); it != chain.end(); ++it) {
-                    auto node = (*it)->type ? (*it)->type->render(context, *it->get(), store) : **it;
-                    assert(!node.type);
+                for (auto& link : node.children) {
+                    auto node = context.retrieveRenderedNode(*link.get(), store);
                     switch (node.variant.type) {
                         case Parser::Variant::Type::INT:
-                            if (!storePointer->getArrayVariable(storePointer, node.variant.i))
+                            if (!storePointer->getArrayVariable(storePointer, node.variant.i, createIfNotExists))
                                 storePointer = nullptr;
                         break;
                         case Parser::Variant::Type::STRING:
-                            if (!storePointer->getDictionaryVariable(storePointer, node.variant.s))
+                            if (!storePointer->getDictionaryVariable(storePointer, node.variant.s, createIfNotExists))
                                 storePointer = nullptr;
                         break;
                         default:
@@ -187,6 +200,11 @@ namespace Liquid {
                         break;
                     }
                 }
+                return storePointer;
+            }
+
+            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+                Variable* storePointer = getVariable(context, node, store, false);
                 if (!storePointer)
                     return Parser::Node(Parser::Variant());
                 switch (storePointer->getType()) {
@@ -234,8 +252,7 @@ namespace Liquid {
 
         void registerType(unique_ptr<NodeType> type) {
             switch (type->type) {
-                case NodeType::Type::TAG_ENCLOSED:
-                case NodeType::Type::TAG_FREE:
+                case NodeType::Type::TAG:
                     tagTypes[type->symbol] = move(type);
                 break;
                 case NodeType::Type::OPERATOR:

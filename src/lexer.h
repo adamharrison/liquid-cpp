@@ -75,6 +75,8 @@ namespace Liquid {
                             } break;
                             case '%': {
                                 if (str[offset-1] == '{') {
+                                    if (offset - lastInitial - 1 > 0)
+                                        static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial - 1);
                                     if (offset-1 < size && str[offset+1] == '-') {
                                         ongoing = static_cast<T*>(this)->startControlBlock(true);
                                         ++offset;
@@ -93,7 +95,7 @@ namespace Liquid {
                         bool isNumber = true;
                         bool hasPoint = false;
                         ongoingWord = nonWhitespaceCharacter;
-                        for (endOfWord = nonWhitespaceCharacter; endOfWord < size && !isWhitespace(str[endOfWord]); ++endOfWord) {
+                        for (endOfWord = nonWhitespaceCharacter; state != State::INITIAL && endOfWord < size && !isWhitespace(str[endOfWord]); ++endOfWord) {
                             switch (str[endOfWord]) {
                                 case '"': {
                                     for (endOfWord = ongoingWord+1; endOfWord < size && (str[endOfWord] == '\\' || str[endOfWord] != '"'); ++endOfWord);

@@ -12,9 +12,11 @@ namespace Liquid {
     struct Parser {
         const Context& context;
 
+        struct Variable;
 
         struct Variant {
             union {
+                bool b;
                 double f;
                 long long i;
                 string s;
@@ -22,9 +24,11 @@ namespace Liquid {
             };
             enum class Type {
                 NIL,
+                BOOL,
                 FLOAT,
                 INT,
                 STRING,
+                VARIABLE,
                 POINTER
             };
             Type type;
@@ -43,10 +47,12 @@ namespace Liquid {
                 else
                     f = v.f;
             }
+            Variant(bool b) : b(b), type(Type::BOOL) {  }
             Variant(double f) : f(f), type(Type::FLOAT) {  }
             Variant(long long i) : i(i), type(Type::INT) { }
             Variant(const string& s) : s(s), type(Type::STRING) { }
             Variant(const char* s) : s(s), type(Type::STRING) { }
+            Variant(Variable* p) : p(p), type(Type::VARIABLE) { }
             Variant(void* p) : p(p), type(Type::POINTER) { }
             ~Variant() { if (type == Type::STRING) s.~string(); }
 
@@ -187,6 +193,7 @@ namespace Liquid {
             ARGUMENT
         };
         State state = State::NODE;
+        bool endBlock = false;
 
         vector<unique_ptr<Node>> nodes;
         vector<Error> errors;
@@ -206,6 +213,7 @@ namespace Liquid {
 
             bool startOutputBlock(bool suppress);
             bool endOutputBlock(bool suppress);
+            bool endControlBlock(bool suppress);
 
             bool startVariableDereference();
             bool endVariableDereference();

@@ -146,7 +146,13 @@ namespace Liquid {
                                 parser.pushError(Error(*this, Error::Type::UNKNOWN_TAG, std::string(str, len)));
                                 return false;
                             }
-                            parser.nodes.pop_back();
+                            parser.popNodeUntil(NodeType::Type::TAG);
+                            if (parser.nodes.back()->type != type) {
+                                parser.pushError(Error(*this, Error::Type::UNEXPECTED_END, std::string(str, len)));
+                                return false;
+                            }
+                            parser.state = Parser::State::ARGUMENT;
+                            parser.endBlock = true;
                         } else {
                             std::string typeName = std::string(str, len);
                             const NodeType* type = SUPER::context.getTagType(typeName);
@@ -154,7 +160,11 @@ namespace Liquid {
                                 parser.pushError(Error(*this, Error::Type::UNKNOWN_TAG, typeName));
                                 return false;
                             }
+                            parser.state = Parser::State::ARGUMENT;
                             parser.nodes.push_back(std::make_unique<Node>(type));
+                            parser.nodes.back()->children.push_back(nullptr);
+                            parser.nodes.push_back(std::make_unique<Node>(context.getArgumentsNodeType()));
+                            parser.nodes.back()->children.push_back(nullptr);
                         }
                     } break;
                     case SUPER::State::OUTPUT:
@@ -269,6 +279,29 @@ namespace Liquid {
         assert(parser.nodes.back()->type && parser.nodes.back()->type == context.getConcatenationNodeType());
         parser.nodes.back()->children.push_back(move(outputBlock));
         parser.state = Parser::State::NODE;
+        return true;
+    }
+
+
+    bool Parser::Lexer::endControlBlock(bool suppress) {
+        if (parser.state != Parser::State::ARGUMENT) {
+            parser.pushError(Error(*this, Error::Type::UNEXPECTED_END));
+            return false;
+        }
+        if (!parser.popNodeUntil(NodeType::Type::TAG))
+            return false;
+        auto& controlBlock = parser.nodes.back();
+        if (parser.endBlock || static_cast<const TagNodeType*>(controlBlock->type)->composition == TagNodeType::Composition::FREE) {
+            unique_ptr<Node> controlNode = move(parser.nodes.back());
+            parser.nodes.pop_back();
+            assert(parser.nodes.back()->type && parser.nodes.back()->type == context.getConcatenationNodeType());
+            parser.nodes.back()->children.push_back(move(controlNode));
+        } else {
+            parser.nodes.back()->children.push_back(nullptr);
+            parser.nodes.push_back(make_unique<Node>(context.getConcatenationNodeType()));
+        }
+        parser.state = Parser::State::NODE;
+        parser.endBlock = false;
         return true;
     }
 

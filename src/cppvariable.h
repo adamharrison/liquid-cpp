@@ -7,6 +7,7 @@
 namespace Liquid {
     struct CPPVariable : Variable {
         union {
+            bool b;
             string s;
             double f;
             long long i;
@@ -16,6 +17,7 @@ namespace Liquid {
         Type type;
 
         CPPVariable() :type(Type::NIL) { }
+        CPPVariable(bool b) : b(b), type(Type::BOOL) { }
         CPPVariable(long long i) : i(i), type(Type::INT) { }
         CPPVariable(int i) : CPPVariable((long long)i) { }
         CPPVariable(double f) : f(f), type(Type::FLOAT) { }
@@ -53,6 +55,9 @@ namespace Liquid {
                 case Type::NIL:
                     type = v.type;
                 break;
+                case Type::BOOL:
+                    b = v.b;
+                break;
                 case Type::FLOAT:
                     f = v.f;
                 break;
@@ -77,6 +82,7 @@ namespace Liquid {
 
         void assign(long long i) { clear(); this->i = i; type = Type::INT; }
         void assign(int i) { assign((long long)i); }
+        void assign(bool b) { assign(b); }
         void assign(double f) { clear(); this->f = f; type = Type::FLOAT; }
         void assign(const string& s) { clear(); new(&this->s) string(); this->s = s; type = Type::STRING; }
         void assign(const vector<unique_ptr<CPPVariable>>& a) {
@@ -99,6 +105,9 @@ namespace Liquid {
             switch (v.type) {
                 case Type::NIL:
                     type = v.type;
+                break;
+                case Type::BOOL:
+                    assign(v.b);
                 break;
                 case Type::FLOAT:
                     assign(v.f);
@@ -149,44 +158,63 @@ namespace Liquid {
 
         CPPVariable& operator = (const std::string& s) { assign(s); return *this; }
         CPPVariable& operator = (double f) { assign(f); return *this; }
+        CPPVariable& operator = (bool b) { assign(b); return *this; }
         CPPVariable& operator = (long long i) { assign(i); return *this; }
         CPPVariable& operator = (int i) { assign(i); return *this; }
         CPPVariable& operator = (CPPVariable&& v) { move(std::move(v)); return *this; }
         /*CPPVariable& operator = (const CPPVariable& v) { assign(v); return *this; }*/
 
 
-        Type getType() {
+        Type getType() const  {
             return type;
         }
 
-        bool getString(std::string& s) {
+        bool getBool(bool& b) const {
+            if (type != Type::BOOL)
+                return false;
+            b = this->b;
+            return true;
+        }
+        bool getString(std::string& s) const  {
             if (type != Type::STRING)
                 return false;
             s = this->s;
             return true;
         }
-        bool getInteger(long long& i) {
+        bool getInteger(long long& i) const  {
             if (type != Type::INT)
                 return false;
             i = this->i;
             return true;
         }
-        bool getFloat(double& i) {
+        bool getFloat(double& f) const  {
             if (type != Type::FLOAT)
                 return false;
             f = this->f;
             return true;
         }
-        bool getDictionaryVariable(Variable*& variable, const std::string& key) {
+        bool getDictionaryVariable(Variable*& variable, const std::string& key, bool createOnNotExists) const  {
             if (type != Type::DICTIONARY)
                 return false;
-            variable = &(*this)[key];
+            auto it = d.find(key);
+            if (it == d.end()) {
+                if (!createOnNotExists)
+                    return false;
+                variable = &(*const_cast<CPPVariable*>(this))[key];
+            } else {
+                variable = it->second.get();
+            }
             return true;
         }
-        bool getArrayVariable(Variable*& variable, size_t idx) {
+        bool getArrayVariable(Variable*& variable, size_t idx, bool createOnNotExists) const  {
             if (type != Type::ARRAY)
                 return false;
-            variable = &(*this)[idx];
+            if (idx >= a.size()) {
+                if (!createOnNotExists)
+                    return false;
+                const_cast<CPPVariable*>(this)->a.resize(idx+1);
+            }
+            variable = &(*const_cast<CPPVariable*>(this))[idx];
             return true;
         }
     };

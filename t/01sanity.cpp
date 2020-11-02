@@ -112,6 +112,36 @@ TEST(sanity, dereference) {
 }
 
 
+TEST(sanity, ifstatement) {
+    CPPVariable variable, hash;
+    hash["b"] = 2;
+    variable["a"] = std::move(hash);
+    auto ast = getParser().parse("asdasdasd{% if a %}1{% endif %} dfgsdfg");
+    auto str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "asdasdasd1 dfgsdfg");
+}
+
+
+TEST(sanity, assignments) {
+    CPPVariable variable, hash;
+    hash["b"] = 2;
+    variable["a"] = std::move(hash);
+    Parser::Node ast;
+    std::string str;
+
+    ast = getParser().parse("{% assign a = 1 %} {{ a }}");
+    CPPVariable copyVariable(variable);
+    str = getContext().render(ast, copyVariable);
+    ASSERT_EQ(str, " 1");
+
+    ast = getParser().parse("{% assign a.b = 3 %} {{ a.b }}");
+    copyVariable = CPPVariable(variable);
+    str = getContext().render(ast, copyVariable);
+    ASSERT_EQ(str, " 3");
+
+
+}
+
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
