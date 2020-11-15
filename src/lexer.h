@@ -47,6 +47,17 @@ namespace Liquid {
         Lexer(const Context& context) : context(context) { }
         ~Lexer() { }
 
+        bool processControlChunk(const char* chunk, size_t size, bool isNumber, bool hasPoint) {
+            if (size > 0) {
+                if (!isNumber || (size == 1 && chunk[0] == '-'))
+                    return static_cast<T*>(this)->literal(chunk, size);
+                else if (hasPoint)
+                    return static_cast<T*>(this)->floating(atof(chunk));
+                return static_cast<T*>(this)->integer(atoll(chunk));
+            }
+            return true;
+        }
+
         // Must be a whole file, for now. Should be null-terminated.
         void parse(const char* str, size_t size) {
             size_t offset = 0;
@@ -90,66 +101,66 @@ namespace Liquid {
                     break;
                     case State::OUTPUT:
                     case State::CONTROL: {
-                        size_t nonWhitespaceCharacter, endOfWord, ongoingWord;
-                        for (nonWhitespaceCharacter = offset; isWhitespace(str[nonWhitespaceCharacter]) && nonWhitespaceCharacter < size; ++nonWhitespaceCharacter);
+                        for (; isWhitespace(str[offset]) && offset < size; ++offset);
+                        size_t startOfWord = offset, endOfWord;
                         bool isNumber = true;
+                        bool isSymbol = true;
+                        bool isWord = true;
                         bool hasPoint = false;
-                        ongoingWord = nonWhitespaceCharacter;
-                        for (endOfWord = nonWhitespaceCharacter; state != State::INITIAL && endOfWord < size && !isWhitespace(str[endOfWord]); ++endOfWord) {
-                            switch (str[endOfWord]) {
+                        bool processComplete = false;
+                        while (offset < size) {
+                            switch (str[offset]) {
                                 case '"': {
-                                    for (endOfWord = ongoingWord+1; endOfWord < size && (str[endOfWord] == '\\' || str[endOfWord] != '"'); ++endOfWord);
-                                    ongoing = static_cast<T*>(this)->string(&str[ongoingWord+1], endOfWord - ongoingWord - 1);
-                                    ongoingWord = endOfWord+1;
+                                    ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                    if (ongoing) {
+                                        for (endOfWord = offset+1; endOfWord < size && (str[endOfWord] == '\\' || str[endOfWord] != '"'); ++endOfWord);
+                                        ongoing = static_cast<T*>(this)->string(&str[offset+1], endOfWord - offset - 1);
+                                        offset = endOfWord+1;
+                                        processComplete = true;
+                                    }
                                 } break;
                                 case '\'': {
-                                    for (endOfWord = ongoingWord+1; endOfWord < size && (str[endOfWord] == '\\' || str[endOfWord] != '\''); ++endOfWord);
-                                    ongoing = static_cast<T*>(this)->string(&str[ongoingWord+1], endOfWord - ongoingWord - 1);
-                                    ongoingWord = endOfWord+1;
-                                } break;
-                                case '-':
-                                    if (endOfWord != nonWhitespaceCharacter)
-                                        isNumber = false;
-                                break;
-                                case '[':
-                                case ']':
-                                case '(':
-                                case ')':
-                                case ':':
-                                case ',':
-                                    if (endOfWord - ongoingWord > 0) {
-                                        if (!isNumber)
-                                            ongoing = static_cast<T*>(this)->literal(&str[nonWhitespaceCharacter], endOfWord - ongoingWord);
-                                        else if (hasPoint)
-                                            ongoing = static_cast<T*>(this)->floating(atof(&str[ongoingWord]));
-                                        else
-                                            ongoing = static_cast<T*>(this)->integer(atoll(&str[ongoingWord]));
-                                        ongoingWord = endOfWord;
-                                    }
+                                    ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
                                     if (ongoing) {
-                                        switch (str[endOfWord]) {
-                                            case '[': ongoing = static_cast<T*>(this)->startVariableDereference(); ++ongoingWord; break;
-                                            case ']': ongoing = static_cast<T*>(this)->endVariableDereference(); ++ongoingWord; break;
-                                            case '(': ongoing = static_cast<T*>(this)->openParenthesis(); ++ongoingWord; break;
-                                            case ')': ongoing = static_cast<T*>(this)->closeParenthesis(); ++ongoingWord; break;
-                                            case ':': ongoing = static_cast<T*>(this)->colon(); ++ongoingWord; break;
-                                            case ',': ongoing = static_cast<T*>(this)->comma(); ++ongoingWord; break;
-                                        }
-                                        ++nonWhitespaceCharacter;
+                                        for (endOfWord = offset+1; endOfWord < size && (str[endOfWord] == '\\' || str[endOfWord] != '\''); ++endOfWord);
+                                        ongoing = static_cast<T*>(this)->string(&str[offset+1], endOfWord - offset - 1);
+                                        offset = endOfWord+1;
+                                        processComplete = true;
+                                    }
+                                } break;
+                                case ' ':
+                                case '\t':
+                                case '\n':
+                                    ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                    processComplete = true;
+                                break;
+                                case '-':
+                                    if (offset != startOfWord) {
+                                        ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                        isNumber = false;
                                     }
                                 break;
                                 case '.':
                                     if (!isNumber) {
-                                        ongoing = static_cast<T*>(this)->literal(&str[nonWhitespaceCharacter], endOfWord - ongoingWord);
-                                        ongoing = static_cast<T*>(this)->dot();
-                                        ongoingWord = endOfWord+1;
+                                        ongoing = static_cast<T*>(this)->literal(&str[startOfWord], offset - startOfWord) && static_cast<T*>(this)->dot();
+                                        ++offset;
+                                        processComplete = true;
                                     } else {
-                                        if (hasPoint)
-                                            isNumber = false;
-                                        else
+                                        if (hasPoint) {
+                                            // Likely an operator, like '..'; treat as a literal. Back up 1, and treat the number as a number, and then start processing from its end.
+                                            ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                            --offset;
+                                            processComplete = true;
+                                        } else
                                             hasPoint = true;
                                     }
                                 break;
+                                case '[': ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint) && static_cast<T*>(this)->startVariableDereference(); processComplete = true;  ++offset; break;
+                                case ']': ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint) && static_cast<T*>(this)->endVariableDereference(); processComplete = true;  ++offset; break;
+                                case '(': ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint) && static_cast<T*>(this)->openParenthesis(); processComplete = true; ++offset; break;
+                                case ')': ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint) && static_cast<T*>(this)->closeParenthesis(); processComplete = true;  ++offset; break;
+                                case ':': ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint) && static_cast<T*>(this)->colon(); processComplete = true;  ++offset; break;
+                                case ',': ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint) && static_cast<T*>(this)->comma(); processComplete = true;  ++offset; break;
                                 case '0':
                                 case '1':
                                 case '2':
@@ -160,53 +171,55 @@ namespace Liquid {
                                 case '7':
                                 case '8':
                                 case '9':
+                                    if (!isNumber && !isWord) {
+                                        ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                        processComplete = true;
+                                    } else {
+                                        isSymbol = false;
+                                    }
                                 break;
                                 default:
+                                    // In the case where we change from symbol to word, word to symbol, or from number to either, we process a control chunk and split the thing up.
                                     isNumber = false;
+                                    if (isalpha(str[offset])) {
+                                        if (!isWord) {
+                                            ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                            processComplete = true;
+                                        } else {
+                                            isSymbol = false;
+                                        }
+                                    } else {
+                                        if (!isSymbol) {
+                                            ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                            processComplete = true;
+                                        } else {
+                                            isWord = false;
+                                        }
+                                    }
                                 break;
                                 case '}': {
                                     if (state == State::CONTROL) {
-                                        if (str[endOfWord-1] == '%') {
-                                            ongoing = static_cast<T*>(this)->endControlBlock(str[endOfWord-2] == '-');
+                                        if (str[offset-1] == '%') {
+                                            ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - (str[offset-2] == '-' ? 2 : 1), isNumber, hasPoint) && static_cast<T*>(this)->endControlBlock(str[offset-2] == '-');
                                             state = State::INITIAL;
-                                            lastInitial = endOfWord+1;
+                                            lastInitial = offset+1;
+                                            processComplete = true;
                                         }
                                     } else {
-                                        if (str[endOfWord-1] == '}') {
-                                            ongoing = static_cast<T*>(this)->endOutputBlock(str[endOfWord-2] == '-');
+                                        if (str[offset-1] == '}') {
+                                            ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - (str[offset-2] == '-' ? 2 : 1), isNumber, hasPoint) && static_cast<T*>(this)->endOutputBlock(str[offset-2] == '-');
                                             state = State::INITIAL;
-                                            lastInitial = endOfWord+1;
+                                            lastInitial = offset+1;
+                                            processComplete = true;
                                         }
                                     }
                                 } break;
                             }
+                            if (processComplete)
+                                break;
+                            else
+                                ++offset;
                         }
-                        if (state != State::INITIAL) {
-                            size_t size = endOfWord - ongoingWord;
-                            if (size > 0) {
-                                if (isNumber && (size > 1 || str[ongoingWord] != '-')) {
-                                    char pulled = 0;
-                                    if (endOfWord < offset) {
-                                        pulled = str[endOfWord];
-                                        const_cast<char*>(str)[endOfWord] = 0;
-                                    }
-                                    if (hasPoint) {
-                                        ongoing = static_cast<T*>(this)->floating(atof(&str[ongoingWord]));
-                                    } else {
-                                        ongoing = static_cast<T*>(this)->integer(atoll(&str[ongoingWord]));
-                                    }
-                                    if (endOfWord < offset)
-                                        const_cast<char*>(str)[endOfWord] = pulled;
-                                } else {
-                                    if (strncmp(&str[ongoingWord], "raw", 3) == 0) {
-                                        state = State::RAW;
-                                    } else {
-                                        ongoing = static_cast<T*>(this)->literal(&str[ongoingWord], size);
-                                    }
-                                }
-                            }
-                        }
-                        offset = endOfWord;
                     } break;
                     case State::RAW: {
 

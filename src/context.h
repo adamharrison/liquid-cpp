@@ -17,7 +17,6 @@ namespace Liquid {
             DICTIONARY,
             OTHER
         };
-
         virtual ~Variable() { }
         virtual Type getType() const { return Type::NIL; }
         virtual bool getBool(bool& b) const { return false; }
@@ -26,6 +25,7 @@ namespace Liquid {
         virtual bool getFloat(double& i) const { return false; }
         virtual bool getDictionaryVariable(Variable*& variable, const std::string& key, bool createOnNotExists) const { return false;  }
         virtual bool getArrayVariable(Variable*& variable, size_t idx, bool createOnNotExists) const { return false; }
+        virtual bool iterate(void(*)(Variable* variable, void* data),  void* data, int start = 0, int limit = -1) const { return false; }
         virtual void assign(const Variable& v) { }
         virtual void assign(double f) { }
         virtual void assign(long long i) { }
@@ -41,7 +41,8 @@ namespace Liquid {
             GROUP_DEREFERENCE,
             OUTPUT,
             ARGUMENTS,
-            OPERATOR
+            OPERATOR,
+            FILTER
         };
         Type type;
         string symbol;
@@ -56,6 +57,7 @@ namespace Liquid {
 
         // When a node is rendered, depending on its mode, it'll return a node.
         virtual Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const = 0;
+        virtual Parser::Error validate(const Context& context, const Parser::Node& node) const { return Parser::Error(); }
         virtual void optimize(const Context& context, Parser::Node& node, Variable& store) const { }
 
 
@@ -115,6 +117,13 @@ namespace Liquid {
                 break;
             }
         }
+    };
+
+    struct FilterNodeType : NodeType {
+        int minArguments;
+        int maxArguments;
+
+        FilterNodeType(string symbol, int minArguments = -1, int maxArguments = -1) : NodeType(NodeType::Type::FILTER, symbol, -1), minArguments(minArguments), maxArguments(maxArguments) { }
     };
 
     struct Context {
@@ -240,6 +249,7 @@ namespace Liquid {
 
         unordered_map<string, unique_ptr<NodeType>> tagTypes;
         unordered_map<string, unique_ptr<NodeType>> operatorTypes;
+        unordered_map<string, unique_ptr<NodeType>> filterTypes;
 
         const NodeType* getConcatenationNodeType() const { static ConcatenationNode concatenationNodeType; return &concatenationNodeType; }
         const NodeType* getOutputNodeType() const { static OutputNode outputNodeType; return &outputNodeType; }
@@ -258,12 +268,15 @@ namespace Liquid {
                 case NodeType::Type::OPERATOR:
                     operatorTypes[type->symbol] = move(type);
                 break;
+                case NodeType::Type::FILTER:
+                    filterTypes[type->symbol] = move(type);
+                break;
                 default:
                     assert(false);
                 break;
             }
-
         }
+        template <class T> void registerType() { registerType(make_unique<T>()); }
 
         const TagNodeType* getTagType(string symbol) const {
             auto it = tagTypes.find(symbol);
@@ -276,6 +289,13 @@ namespace Liquid {
             if (it == operatorTypes.end())
                 return nullptr;
             return static_cast<OperatorNodeType*>(it->second.get());
+        }
+
+        const FilterNodeType* getFilterType(string symbol) const {
+            auto it = filterTypes.find(symbol);
+            if (it == filterTypes.end())
+                return nullptr;
+            return static_cast<FilterNodeType*>(it->second.get());
         }
 
         void render(const Parser::Node& ast, Variable& store, void (*)(const char* chunk, size_t size, void* data), void* data);

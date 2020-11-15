@@ -8,11 +8,11 @@
 namespace Liquid {
 
     struct NodeType;
+    struct Variable;
 
     struct Parser {
         const Context& context;
 
-        struct Variable;
 
         struct Variant {
             union {
@@ -21,6 +21,11 @@ namespace Liquid {
                 long long i;
                 string s;
                 void* p;
+
+                struct {
+                    int start;
+                    int end;
+                };
             };
             enum class Type {
                 NIL,
@@ -56,6 +61,16 @@ namespace Liquid {
             Variant(void* p) : p(p), type(Type::POINTER) { }
             ~Variant() { if (type == Type::STRING) s.~string(); }
 
+            bool isTruthy() const {
+                return !(
+                    (type == Parser::Variant::Type::BOOL && !b) ||
+                    (type == Parser::Variant::Type::INT && !i) ||
+                    (type == Parser::Variant::Type::FLOAT && !f) ||
+                    (type == Parser::Variant::Type::POINTER && !p) ||
+                    (type == Parser::Variant::Type::NIL)
+                );
+            }
+
             Variant& operator = (const Variant& v) {
                 if (v.type == Type::STRING) {
                     i = 0;
@@ -66,6 +81,39 @@ namespace Liquid {
                     i = v.i;
                 }
                 return *this;
+            }
+        };
+
+        struct Error {
+            enum Type {
+                NONE,
+                // Self-explamatory.
+                UNKNOWN_TAG,
+                UNKNOWN_OPERATOR,
+                UNKNOWN_FILTER,
+                // Weird symbol in weird place.
+                INVALID_SYMBOL,
+                // Was expecting somthing else, i.e. {{ i + }}; was expecting a number there.
+                UNEXPECTED_END,
+                UNBALANCED_GROUP
+            };
+
+            Type type;
+            size_t column;
+            size_t row;
+            std::string message;
+
+            Error() : type(Type::NONE) { }
+            Error(const Error& error) = default;
+            Error(Error&& error) = default;
+
+            template <class T>
+            Error(T& lexer, Type type) : type(type), column(lexer.column), row(lexer.row) {
+
+            }
+            template <class T>
+            Error(T& lexer, Type type, const std::string& message) : type(type), column(lexer.column), row(lexer.row), message(message) {
+
             }
         };
 
@@ -100,6 +148,8 @@ namespace Liquid {
 
             string getString();
 
+            Error validate(const Context& context) const;
+
 
             Node& operator = (const Node& n) {
                 if (type)
@@ -129,32 +179,6 @@ namespace Liquid {
                 return *this;
             }
         };
-        struct Error {
-            enum Type {
-                // Self-explamatory.
-                UNKNOWN_TAG,
-                UNKNOWN_OPERATOR,
-                // Weird symbol in weird place.
-                INVALID_SYMBOL,
-                // Was expecting somthing else, i.e. {{ i + }}; was expecting a number there.
-                UNEXPECTED_END,
-                UNBALANCED_GROUP
-            };
-
-            Type type;
-            size_t column;
-            size_t row;
-            std::string message;
-
-            template <class T>
-            Error(T& lexer, Type type) : type(type), column(lexer.column), row(lexer.row) {
-
-            }
-            template <class T>
-            Error(T& lexer, Type type, const std::string& message) : type(type), column(lexer.column), row(lexer.row), message(message) {
-
-            }
-        };
 
         struct ParserException : std::exception {
             Error error;
@@ -162,11 +186,15 @@ namespace Liquid {
             ParserException(const Error& error) : error(error) {
                 char buffer[512];
                 switch (error.type) {
+                    case Error::Type::NONE: break;
                     case Error::Type::UNKNOWN_TAG:
                         sprintf(buffer, "Unknown tag '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
                     break;
                     case Error::Type::UNKNOWN_OPERATOR:
                         sprintf(buffer, "Unknown operator '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                    break;
+                    case Error::Type::UNKNOWN_FILTER:
+                        sprintf(buffer, "Unknown filter '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
                     break;
                     case Error::Type::INVALID_SYMBOL:
                         sprintf(buffer, "Invalid symbol '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
@@ -193,6 +221,14 @@ namespace Liquid {
             ARGUMENT
         };
         State state = State::NODE;
+        enum class EFilterState {
+            UNSET,
+            COLON,
+            NAME,
+            ARGUMENTS
+        };
+
+        EFilterState filterState = EFilterState::UNSET;
         bool endBlock = false;
 
         vector<unique_ptr<Node>> nodes;

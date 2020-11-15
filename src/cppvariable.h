@@ -26,6 +26,12 @@ namespace Liquid {
         CPPVariable(void* nil) : type(Type::NIL) { }
         CPPVariable(const CPPVariable& v) :type(Type::NIL) { assign(v); }
         CPPVariable(CPPVariable&& v) : type(Type::NIL) { this->move(std::move(v)); }
+        CPPVariable(std::initializer_list<CPPVariable> l) {
+            assign(vector<unique_ptr<CPPVariable>>());
+            a.reserve(l.size());
+            for (auto it = l.begin(); it != l.end(); ++it)
+                a.push_back(make_unique<CPPVariable>(*it));
+        }
 
 
         ~CPPVariable() { clear(); }
@@ -130,6 +136,10 @@ namespace Liquid {
             }
         }
 
+        void assign(const Variable& v) {
+            assign(static_cast<const CPPVariable&>(v));
+        }
+
         CPPVariable& operator[](const string& s) {
             if (type == Type::NIL) {
                 new(&this->d) unordered_map<string, unique_ptr<CPPVariable>>();
@@ -215,6 +225,18 @@ namespace Liquid {
                 const_cast<CPPVariable*>(this)->a.resize(idx+1);
             }
             variable = &(*const_cast<CPPVariable*>(this))[idx];
+            return true;
+        }
+
+        bool iterate(void (*callback)(Variable* variable, void* data), void* data, int start = 0, int limit = -1) const {
+            if (type != Type::ARRAY)
+                return false;
+            if (limit < 0)
+                limit = (int)a.size() + limit;
+            if (start < 0)
+                start = 0;
+            for (int i = start; i <= limit; ++i)
+                callback(a[i].get(), data);
             return true;
         }
     };

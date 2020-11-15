@@ -75,9 +75,14 @@ TEST(sanity, divide) {
 
 TEST(sanity, orderOfOperations) {
     CPPVariable variable;
+    Parser::Node ast;
+    std::string str;
     variable["a"] = 3;
-    auto ast = getParser().parse("asdbfsdf {{ a + 3 * 6 }} b");
-    auto str = getContext().render(ast, variable);
+    ast = getParser().parse("asdbfsdf {{ a+3 * 6 }} b");
+    str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf 21 b");
+    ast = getParser().parse("asdbfsdf {{ a + 3 * 6 }} b");
+    str = getContext().render(ast, variable);
     ASSERT_EQ(str, "asdbfsdf 21 b");
 }
 
@@ -114,11 +119,25 @@ TEST(sanity, dereference) {
 
 TEST(sanity, ifstatement) {
     CPPVariable variable, hash;
+    Parser::Node ast;
+    std::string str;
     hash["b"] = 2;
     variable["a"] = std::move(hash);
-    auto ast = getParser().parse("asdasdasd{% if a %}1{% endif %} dfgsdfg");
-    auto str = getContext().render(ast, variable);
+    ast = getParser().parse("asdasdasd{% if a %}1{% endif %} dfgsdfg");
+    str = getContext().render(ast, variable);
     ASSERT_EQ(str, "asdasdasd1 dfgsdfg");
+    variable["a"].clear();
+    str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "asdasdasd dfgsdfg");
+
+    variable["a"] = 2;
+    ast = getParser().parse("a{% if a > 1 %}1{% endif %} b");
+    str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "a1 b");
+
+    ast = getParser().parse("a{% if a > 2 %}1{% endif %} b");
+    str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "a b");
 }
 
 
@@ -138,10 +157,42 @@ TEST(sanity, assignments) {
     copyVariable = CPPVariable(variable);
     str = getContext().render(ast, copyVariable);
     ASSERT_EQ(str, " 3");
-
-
 }
 
+TEST(sanity, forloop) {
+    CPPVariable array = { 1, 5, 10, 20 };
+    CPPVariable hash = { };
+    hash["list"] = std::move(array);
+    Parser::Node ast;
+    std::string str;
+
+    ast = getParser().parse("{% for i in list %}{{ i }}{% endfor %}");
+    str = getContext().render(ast, hash);
+    ASSERT_EQ(str, "151020");
+}
+
+
+TEST(sanity, filters) {
+    CPPVariable hash = { };
+    hash["a"] = 1;
+    Parser::Node ast;
+    std::string str;
+
+    ast = getParser().parse("{% assign a = a | plus: 5 %}{{ a }}");
+    str = getContext().render(ast, hash);
+    ASSERT_EQ(str, "6");
+
+    hash["a"] = 1;
+    ast = getParser().parse("{% assign a = a | plus: 1 | plus: 6 %}{{ a }}");
+    str = getContext().render(ast, hash);
+    ASSERT_EQ(str, "8");
+
+
+    hash["a"] = 1;
+    ast = getParser().parse("{% assign a = a | plus: 1 | plus: 6 | minus: 3 %}{{ a }}");
+    str = getContext().render(ast, hash);
+    ASSERT_EQ(str, "5");
+}
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

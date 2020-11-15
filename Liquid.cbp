@@ -35,6 +35,7 @@
 				<Option output="bin/01sanity" prefix_auto="1" extension_auto="1" />
 				<Option type="1" />
 				<Option compiler="gcc" />
+				<Option parameters="--gtest_filter=sanity.filters" />
 			</Target>
 		</Build>
 		<Compiler>
