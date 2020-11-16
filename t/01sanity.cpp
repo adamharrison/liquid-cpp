@@ -175,6 +175,18 @@ TEST(sanity, ifstatement) {
     ASSERT_EQ(str, "a b");
 }
 
+TEST(sanity, casestatement) {
+    CPPVariable hash;
+    Parser::Node ast;
+    std::string str;
+    hash["b"] = 2;
+
+    ast = getParser().parse("{% case b %}{% when 1 %}3{% when 2 %}7{% else %}8{% endcase %}");
+    str = getContext().render(ast, hash);
+    ASSERT_EQ(str, "7");
+
+
+}
 
 TEST(sanity, assignments) {
     CPPVariable variable, hash;

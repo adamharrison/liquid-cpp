@@ -82,6 +82,24 @@ namespace Liquid {
                 }
                 return *this;
             }
+            bool operator == (const Variant& v) const {
+                if (type != v.type)
+                    return false;
+                switch (type) {
+                    case Type::STRING:
+                        return s == v.s;
+                    case Type::INT:
+                        return i == v.i;
+                    case Type::FLOAT:
+                        return f == v.f;
+                    case Type::NIL:
+                        return true;
+                    case Type::BOOL:
+                        return b == v.b;
+                    default:
+                        return p == v.p;
+                }
+            }
         };
 
         struct Error {
