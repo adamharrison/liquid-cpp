@@ -38,11 +38,62 @@ namespace Liquid {
             return Parser::Node();
         }
     };
+
     struct AssignOperator : OperatorNodeType {
         AssignOperator() : OperatorNodeType("=", Arity::BINARY, 0) { }
         Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
     };
 
+    struct CaptureNode : TagNodeType {
+        CaptureNode() : TagNodeType(Composition::ENCLOSED, "capture", 1, 1) { }
+
+        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            auto& argumentNode = node.children.front();
+            auto& variableNode = argumentNode->children.front();
+            if (variableNode->type->type == NodeType::VARIABLE) {
+                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(context, *variableNode.get(), store, true);
+                if (targetVariable)
+                    targetVariable->assign(context.retrieveRenderedNode(*node.children[1].get(), store).getString());
+            }
+            return Parser::Node();
+        }
+    };
+
+    struct IncrementNode : TagNodeType {
+        IncrementNode() : TagNodeType(Composition::FREE, "increment", 1, 1) { }
+
+        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            auto& argumentNode = node.children.front();
+            auto& variableNode = argumentNode->children.front();
+            if (variableNode->type->type == NodeType::VARIABLE) {
+                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(context, *variableNode.get(), store, true);
+                if (targetVariable) {
+                    long long i = -1;
+                    targetVariable->getInteger(i);
+                    targetVariable->assign(i+1);
+                }
+            }
+            return Parser::Node();
+        }
+    };
+
+     struct DecrementNode : TagNodeType {
+        DecrementNode() : TagNodeType(Composition::FREE, "decrement", 1, 1) { }
+
+        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            auto& argumentNode = node.children.front();
+            auto& variableNode = argumentNode->children.front();
+            if (variableNode->type->type == NodeType::VARIABLE) {
+                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(context, *variableNode.get(), store, true);
+                if (targetVariable) {
+                    long long i = 0;
+                    targetVariable->getInteger(i);
+                    targetVariable->assign(i-1);
+                }
+            }
+            return Parser::Node();
+        }
+    };
 
     template <bool Inverse>
     struct BranchNode : TagNodeType {
@@ -200,12 +251,12 @@ namespace Liquid {
                 const Parser::Node& node;
                 Variable& store;
                 Variable& targetVariable;
+                long long length;
                 string result;
                 long long idx = 0;
-                long long length = -1;
             };
 
-            ForLoopContext forLoopContext = { context, node, store, *targetVariable };
+            ForLoopContext forLoopContext = { context, node, store, *targetVariable, static_cast<Variable*>(result.variant.p)->getArraySize() };
             static_cast<Variable*>(result.variant.p)->iterate(+[](Variable* variable, void* data) {
                 ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
                 forLoopContext.targetVariable.assign(*variable);
@@ -239,7 +290,7 @@ namespace Liquid {
         CycleNode() : TagNodeType(Composition::FREE, "cycle", 2) { }
 
         Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-            assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
+            assert(node.children.size() == 1 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
             Variable* forloopVariable;
             if (store.getDictionaryVariable(forloopVariable, "forloop", false)) {
@@ -444,8 +495,8 @@ namespace Liquid {
 
         Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
             assert(node.children[1]->type && node.children[1]->type->type == NodeType::Type::ARGUMENTS);
-            Parser::Node op1 = context.retrieveRenderedNode(*node.children[0].get(), store);
-            Parser::Node op2 = context.retrieveRenderedNode(*node.children[1]->children[0].get(), store);
+            Parser::Node op1 = getOperand(context, node, store);
+            Parser::Node op2 = getArgument(context, node, store, 0);
             if (op1.type || op2.type)
                 return Parser::Node();
             switch (op1.variant.type) {
@@ -485,6 +536,19 @@ namespace Liquid {
     struct MultiplyFilterNode : ArithmeticFilterNode<std::multiplies<>> { MultiplyFilterNode() : ArithmeticFilterNode<std::multiplies<>>("times") { } };
     struct DivideFilterNode : ArithmeticFilterNode<std::divides<>> { DivideFilterNode() : ArithmeticFilterNode<std::divides<>>("divided_by") { } };
 
+    struct JoinFilterNode : FilterNodeType {
+        JoinFilterNode() : FilterNodeType("join", 1, 1) { }
+
+        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            assert(node.children[1]->type && node.children[1]->type->type == NodeType::Type::ARGUMENTS);
+            Parser::Node operand = getOperand(context, node, store);
+            if (operand.type || operand.variant.type != Parser::Variant::Type::VARIABLE) {
+
+            }
+            Parser::Node arg1 = getArgument(context, node, store, 0);
+        }
+    };
+
     void StandardDialect::implement(Context& context) {
         context.registerType<IfNode>();
         context.registerType<UnlessNode>();
@@ -493,6 +557,9 @@ namespace Liquid {
         context.registerType<CycleNode>();
         context.registerType<ForNode::InOperatorNode>();
         context.registerType<AssignNode>();
+        context.registerType<CaptureNode>();
+        context.registerType<IncrementNode>();
+        context.registerType<DecrementNode>();
 
         context.registerType<AssignOperator>();
         context.registerType<PlusOperatorNode>();

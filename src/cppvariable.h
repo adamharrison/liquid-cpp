@@ -246,6 +246,12 @@ namespace Liquid {
             return true;
         }
 
+        long long getArraySize() const {
+            if (type != Type::ARRAY)
+                return -1;
+            return a.size();
+        }
+
         bool iterate(void (*callback)(Variable* variable, void* data), void* data, int start = 0, int limit = -1) const {
             if (type != Type::ARRAY)
                 return false;

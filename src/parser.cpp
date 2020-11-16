@@ -37,16 +37,18 @@ namespace Liquid {
     bool Parser::Lexer::comma() {
         switch (parser.state) {
             case Parser::State::NODE:
-            case Parser::State::ARGUMENT:
                 parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, ","));
                 return false;
             break;
+            case Parser::State::ARGUMENT:
+                if (!parser.popNodeUntil(NodeType::Type::ARGUMENTS)) {
+                    parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, ","));
+                    return false;
+                }
+                parser.nodes.back()->children.push_back(nullptr);
+                return true;
+            break;
         }
-        if (!parser.popNodeUntil(NodeType::Type::ARGUMENTS)) {
-            parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, ","));
-            return false;
-        }
-        parser.nodes.back()->children.push_back(nullptr);
         return true;
     }
 

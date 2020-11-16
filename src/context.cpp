@@ -8,4 +8,11 @@ namespace Liquid {
         callback(s.data(), s.size(), data);
     }
 
+    Parser::Node FilterNodeType::getOperand(const Context& context, const Parser::Node& node, Variable& store) const {
+        return context.retrieveRenderedNode(*node.children[0].get(), store);
+    }
+
+    Parser::Node FilterNodeType::getArgument(const Context& context, const Parser::Node& node, Variable& store, int idx) const {
+        return context.retrieveRenderedNode(*node.children[1]->children[idx].get(), store);
+    }
 };

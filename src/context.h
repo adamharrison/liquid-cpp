@@ -27,11 +27,12 @@ namespace Liquid {
         virtual bool getDictionaryVariable(Variable*& variable, const std::string& key, bool createOnNotExists) { return false;  }
         virtual bool getArrayVariable(Variable*& variable, size_t idx, bool createOnNotExists) const { return false; }
         virtual bool iterate(void(*)(Variable* variable, void* data),  void* data, int start = 0, int limit = -1) const { return false; }
+        virtual long long getArraySize() { return -1; }
         virtual void assign(const Variable& v) { }
         virtual void assign(double f) { }
         virtual void assign(bool b) { }
         virtual void assign(long long i) { }
-        virtual void assign(std::string& s) { }
+        virtual void assign(const std::string& s) { }
         virtual void clear() { }
     };
 
@@ -127,6 +128,10 @@ namespace Liquid {
         int maxArguments;
 
         FilterNodeType(string symbol, int minArguments = -1, int maxArguments = -1) : NodeType(NodeType::Type::FILTER, symbol, -1), minArguments(minArguments), maxArguments(maxArguments) { }
+
+
+        Parser::Node getOperand(const Context& context, const Parser::Node& node, Variable& store) const;
+        Parser::Node getArgument(const Context& context, const Parser::Node& node, Variable& store, int idx) const;
     };
 
     struct Context {

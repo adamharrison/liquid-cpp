@@ -202,6 +202,11 @@ TEST(sanity, assignments) {
     copyVariable = CPPVariable(variable);
     str = getContext().render(ast, copyVariable);
     ASSERT_EQ(str, " 3");
+
+
+    ast = getParser().parse("{% capture d %}{{ 1 + 3 }}sdfsdfsdf{% endcapture %}dddd{{ d }}ggggg");
+    str = getContext().render(ast, copyVariable);
+    ASSERT_EQ(str, "dddd4sdfsdfsdfggggg");
 }
 
 TEST(sanity, forloop) {
@@ -218,6 +223,10 @@ TEST(sanity, forloop) {
     ast = getParser().parse("{% for i in list %}{{ forloop.index0 }}{% endfor %}");
     str = getContext().render(ast, hash);
     ASSERT_EQ(str, "0123");
+
+    ast = getParser().parse("{% for i in list %}{% cycle \"A\", \"B\" %}{% endfor %}");
+    str = getContext().render(ast, hash);
+    ASSERT_EQ(str, "ABAB");
 }
 
 
