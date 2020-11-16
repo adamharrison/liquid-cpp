@@ -201,17 +201,56 @@ namespace Liquid {
                 Variable& store;
                 Variable& targetVariable;
                 string result;
-                int idx = 0;
+                long long idx = 0;
+                long long length = -1;
             };
 
             ForLoopContext forLoopContext = { context, node, store, *targetVariable };
             static_cast<Variable*>(result.variant.p)->iterate(+[](Variable* variable, void* data) {
                 ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
                 forLoopContext.targetVariable.assign(*variable);
+
+                Variable* forLoopVariable;
+                Variable* index0, *index, *rindex, *rindex0, *first, *last, *length;
+                forLoopContext.store.getDictionaryVariable(forLoopVariable, "forloop", true);
+                forLoopVariable->getDictionaryVariable(index0, "index0", true);
+                forLoopVariable->getDictionaryVariable(index, "index", true);
+                forLoopVariable->getDictionaryVariable(rindex, "rindex", true);
+                forLoopVariable->getDictionaryVariable(rindex0, "rindex0", true);
+                forLoopVariable->getDictionaryVariable(first, "first", true);
+                forLoopVariable->getDictionaryVariable(last, "last", true);
+                forLoopVariable->getDictionaryVariable(length, "length", true);
+                index0->assign(forLoopContext.idx);
+                index->assign(forLoopContext.idx+1);
+                rindex0->assign(forLoopContext.length - forLoopContext.idx);
+                rindex->assign(forLoopContext.length - (forLoopContext.idx+1));
+                first->assign(forLoopContext.idx == 0);
+                last->assign(forLoopContext.idx == forLoopContext.length-1);
+                length->assign(forLoopContext.length);
+
                 forLoopContext.result.append(forLoopContext.context.retrieveRenderedNode(*forLoopContext.node.children[1].get(), forLoopContext.store).getString());
                 ++forLoopContext.idx;
             }, const_cast<void*>((void*)&forLoopContext));
             return Parser::Node(forLoopContext.result);
+        }
+    };
+
+    struct CycleNode : TagNodeType {
+        CycleNode() : TagNodeType(Composition::FREE, "cycle", 2) { }
+
+        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
+            auto& arguments = node.children.front();
+            Variable* forloopVariable;
+            if (store.getDictionaryVariable(forloopVariable, "forloop", false)) {
+                Variable* index0;
+                if (forloopVariable->getDictionaryVariable(index0, "index0", false)) {
+                    long long i;
+                    if (index0->getInteger(i))
+                        return context.retrieveRenderedNode(*arguments->children[i % arguments->children.size()].get(), store);
+                }
+            }
+            return Parser::Node();
         }
     };
 
@@ -451,6 +490,7 @@ namespace Liquid {
         context.registerType<UnlessNode>();
         context.registerType<CaseNode>();
         context.registerType<ForNode>();
+        context.registerType<CycleNode>();
         context.registerType<ForNode::InOperatorNode>();
         context.registerType<AssignNode>();
 

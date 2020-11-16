@@ -23,11 +23,13 @@ namespace Liquid {
         virtual bool getString(std::string& str) const { return false; }
         virtual bool getInteger(long long& i) const { return false; }
         virtual bool getFloat(double& i) const { return false; }
-        virtual bool getDictionaryVariable(Variable*& variable, const std::string& key, bool createOnNotExists) const { return false;  }
+        virtual bool getDictionaryVariable(Variable*& variable, const std::string& key) const { return false;  }
+        virtual bool getDictionaryVariable(Variable*& variable, const std::string& key, bool createOnNotExists) { return false;  }
         virtual bool getArrayVariable(Variable*& variable, size_t idx, bool createOnNotExists) const { return false; }
         virtual bool iterate(void(*)(Variable* variable, void* data),  void* data, int start = 0, int limit = -1) const { return false; }
         virtual void assign(const Variable& v) { }
         virtual void assign(double f) { }
+        virtual void assign(bool b) { }
         virtual void assign(long long i) { }
         virtual void assign(std::string& s) { }
         virtual void clear() { }
@@ -209,6 +211,8 @@ namespace Liquid {
                             storePointer = nullptr;
                         break;
                     }
+                    if (!storePointer)
+                        return nullptr;
                 }
                 return storePointer;
             }

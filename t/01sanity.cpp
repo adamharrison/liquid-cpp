@@ -184,8 +184,6 @@ TEST(sanity, casestatement) {
     ast = getParser().parse("{% case b %}{% when 1 %}3{% when 2 %}7{% else %}8{% endcase %}");
     str = getContext().render(ast, hash);
     ASSERT_EQ(str, "7");
-
-
 }
 
 TEST(sanity, assignments) {
@@ -216,6 +214,10 @@ TEST(sanity, forloop) {
     ast = getParser().parse("{% for i in list %}{{ i }}{% endfor %}");
     str = getContext().render(ast, hash);
     ASSERT_EQ(str, "151020");
+
+    ast = getParser().parse("{% for i in list %}{{ forloop.index0 }}{% endfor %}");
+    str = getContext().render(ast, hash);
+    ASSERT_EQ(str, "0123");
 }
 
 

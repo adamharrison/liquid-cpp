@@ -205,19 +205,35 @@ namespace Liquid {
             f = this->f;
             return true;
         }
-        bool getDictionaryVariable(Variable*& variable, const std::string& key, bool createOnNotExists) const  {
+        bool getDictionaryVariable(Variable*& variable, const std::string& key) const  {
             if (type != Type::DICTIONARY)
                 return false;
             auto it = d.find(key);
             if (it == d.end()) {
-                if (!createOnNotExists)
-                    return false;
-                variable = &(*const_cast<CPPVariable*>(this))[key];
+                return false;
             } else {
                 variable = it->second.get();
             }
             return true;
         }
+
+        bool getDictionaryVariable(Variable*& variable, const std::string& key, bool createOnNotExists)  {
+            if (type != Type::DICTIONARY) {
+                if (type != Type::NIL)
+                    return false;
+                assign(unordered_map<string, unique_ptr<CPPVariable>>());
+            }
+            auto it = d.find(key);
+            if (it == d.end()) {
+                if (!createOnNotExists)
+                    return false;
+                variable = &(*this)[key];
+            } else {
+                variable = it->second.get();
+            }
+            return true;
+        }
+
         bool getArrayVariable(Variable*& variable, size_t idx, bool createOnNotExists) const  {
             if (type != Type::ARRAY)
                 return false;
