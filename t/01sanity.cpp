@@ -122,6 +122,14 @@ TEST(sanity, ifstatement) {
     Parser::Node ast;
     std::string str;
     hash["b"] = 2;
+
+    variable["a"] = "test";
+    ast = getParser().parse("a{% if a == \"test2\" %}1{% else %}5{% endif %} b");
+    str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "a5 b");
+
+
+
     variable["a"] = std::move(hash);
     ast = getParser().parse("asdasdasd{% if a %}1{% endif %} dfgsdfg");
     str = getContext().render(ast, variable);
@@ -136,6 +144,33 @@ TEST(sanity, ifstatement) {
     ASSERT_EQ(str, "a1 b");
 
     ast = getParser().parse("a{% if a > 2 %}1{% endif %} b");
+    str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "a b");
+
+
+    ast = getParser().parse("a{% if a == 2 %}1{% endif %} b");
+    str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "a1 b");
+
+    variable["a"] = "test";
+    ast = getParser().parse("a{% if a == \"test\" %}1{% endif %} b");
+    str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "a1 b");
+
+    ast = getParser().parse("a{% if a == \"test2\" %}1{% endif %} b");
+    str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "a b");
+
+
+    ast = getParser().parse("a{% if a == \"test2\" %}1{% elsif a == \"test\" %}2{% endif %} b");
+    str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "a2 b");
+
+    ast = getParser().parse("a{% unless a == \"test2\" %}1{% endunless %} b");
+    str = getContext().render(ast, variable);
+    ASSERT_EQ(str, "a1 b");
+
+    ast = getParser().parse("a{% unless a == \"test\" %}1{% endunless %} b");
     str = getContext().render(ast, variable);
     ASSERT_EQ(str, "a b");
 }

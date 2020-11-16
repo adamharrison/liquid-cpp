@@ -152,6 +152,7 @@ namespace Liquid {
                         if (len > 3 && strncmp(str, "end", 3) == 0) {
                             std::string typeName = std::string(&str[3], len - 3);
                             const NodeType* type = SUPER::context.getTagType(typeName);
+
                             if (!type) {
                                 parser.pushError(Error(*this, Error::Type::UNKNOWN_TAG, std::string(str, len)));
                                 return false;
@@ -162,10 +163,25 @@ namespace Liquid {
                                 return false;
                             }
                             parser.state = Parser::State::ARGUMENT;
-                            parser.endBlock = true;
+                            parser.blockType = Parser::EBlockType::END;
                         } else {
                             std::string typeName = std::string(str, len);
                             const NodeType* type = SUPER::context.getTagType(typeName);
+                            if (!type && parser.nodes.size() > 0) {
+                                for (auto it = parser.nodes.rbegin(); it != parser.nodes.rend(); ++it) {
+                                    if ((*it)->type && (*it)->type->type == NodeType::Type::TAG) {
+                                        auto& intermediates = static_cast<const TagNodeType*>((*it)->type)->intermediates;
+                                        auto it = intermediates.find(typeName);
+                                        if (it != intermediates.end()) {
+                                            type = it->second.get();
+                                            // Pop off the concatenation node, and apply this as the next arugment in the parent node.
+                                            parser.popNode();
+                                            parser.blockType = Parser::EBlockType::INTERMEDIATE;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
                             if (!type) {
                                 parser.pushError(Error(*this, Error::Type::UNKNOWN_TAG, typeName));
                                 return false;
@@ -330,17 +346,21 @@ namespace Liquid {
         if (!parser.popNodeUntil(NodeType::Type::TAG))
             return false;
         auto& controlBlock = parser.nodes.back();
-        if (parser.endBlock || static_cast<const TagNodeType*>(controlBlock->type)->composition == TagNodeType::Composition::FREE) {
+        if (parser.blockType != Parser::EBlockType::NONE || static_cast<const TagNodeType*>(controlBlock->type)->composition == TagNodeType::Composition::FREE) {
             unique_ptr<Node> controlNode = move(parser.nodes.back());
             parser.nodes.pop_back();
-            assert(parser.nodes.back()->type && parser.nodes.back()->type == context.getConcatenationNodeType());
             parser.nodes.back()->children.push_back(move(controlNode));
+            if (parser.blockType == Parser::EBlockType::INTERMEDIATE) {
+                parser.nodes.back()->children.push_back(nullptr);
+                parser.nodes.push_back(make_unique<Node>(context.getConcatenationNodeType()));
+            }
+            assert(parser.nodes.back()->type && parser.nodes.back()->type == context.getConcatenationNodeType());
         } else {
             parser.nodes.back()->children.push_back(nullptr);
             parser.nodes.push_back(make_unique<Node>(context.getConcatenationNodeType()));
         }
         parser.state = Parser::State::NODE;
-        parser.endBlock = false;
+        parser.blockType = Parser::EBlockType::NONE;
         return true;
     }
 

@@ -44,33 +44,79 @@ namespace Liquid {
     };
 
 
-
-    struct IfNode : TagNodeType {
-        struct ElseNode : TagNodeType {
-            ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-                return Parser::Node();
-            }
-        };
-
-        IfNode() : TagNodeType(Composition::ENCLOSED, "if", 1, 1) {
-            intermediates["else"] = make_unique<ElseNode>();
-        }
-
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+    template <bool Inverse>
+    struct BranchNode : TagNodeType {
+        static Parser::Node internalRender(const Context& context, const Parser::Node& node, Variable& store) {
             assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
             auto result = context.retrieveRenderedNode(*arguments->children.front().get(), store);
             assert(result.type == nullptr);
 
-            if (result.variant.isTruthy())
+            bool truthy = result.variant.isTruthy();
+            if (Inverse)
+                truthy = !truthy;
+
+            if (truthy)
                 return context.retrieveRenderedNode(*node.children[1].get(), store);
             else {
-                if (node.children.size() > 2)
-                    return context.retrieveRenderedNode(*node.children[2].get(), store);
+                // Loop through the elsifs and elses, and anything that's true, run the next concatenation.
+                for (size_t i = 2; i < node.children.size()-1; i += 2) {
+                    auto conditionalResult = context.retrieveRenderedNode(*node.children[i].get(), store);
+                    if (!conditionalResult.type && conditionalResult.variant.isTruthy())
+                        return context.retrieveRenderedNode(*node.children[i+1].get(), store);
+                }
                 return Parser::Node();
             }
         }
+
+
+        struct ElsifNode : TagNodeType {
+            ElsifNode() : TagNodeType(Composition::FREE, "elsif", 1, 1) { }
+            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+                auto& arguments = node.children.front();
+                return context.retrieveRenderedNode(*arguments->children.front().get(), store);
+            }
+        };
+
+        struct ElseNode : TagNodeType {
+            ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
+            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+                return Parser::Node(Parser::Variant(true));
+            }
+        };
+
+        BranchNode(const std::string symbol) : TagNodeType(Composition::ENCLOSED, symbol, 1, 1) {
+            intermediates["elsif"] = make_unique<ElsifNode>();
+            intermediates["else"] = make_unique<ElseNode>();
+        }
+
+
+        Parser::Error validate(const Context& context, const Parser::Node& node) const {
+            auto elseNode = intermediates.find("else")->second.get();
+            auto elsifNode = intermediates.find("elsif")->second.get();
+            for (size_t i = 1; i < node.children.size(); ++i) {
+                if (((i - 1) % 2) == 0) {
+                    if (node.children[i]->type != elseNode && node.children[i]->type != elsifNode)
+                        return Parser::Error(Parser::Error::Type::INVALID_SYMBOL);
+                }
+            }
+            return Parser::Error();
+        }
+
+
+        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            return BranchNode<Inverse>::internalRender(context, node, store);
+        }
+    };
+
+
+
+    struct IfNode : BranchNode<false> {
+        IfNode() : BranchNode<false>("if") { }
+    };
+
+    struct UnlessNode : BranchNode<true> {
+        UnlessNode() : BranchNode<true>("unless") { }
     };
 
     struct ForNode : TagNodeType {
@@ -228,10 +274,62 @@ namespace Liquid {
         }
     };
 
+    template <class Function>
+    struct QualitativeComparaisonOperatorNode : OperatorNodeType {
+        QualitativeComparaisonOperatorNode(const std::string& symbol, int priority) : OperatorNodeType(symbol, Arity::BINARY, priority) { }
+
+        template <class A, class B>
+        bool operate(A a, B b) const { return Function()(a, b); }
+
+        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            Parser::Node op1 = context.retrieveRenderedNode(*node.children[0].get(), store);
+            Parser::Node op2 = context.retrieveRenderedNode(*node.children[1].get(), store);
+            if (op1.type || op2.type)
+                return Parser::Node();
+            switch (op1.variant.type) {
+                return Parser::Node();
+                case Parser::Variant::Type::INT:
+                    switch (op2.variant.type) {
+                        case Parser::Variant::Type::INT:
+                            return Parser::Node(Parser::Variant(operate(op1.variant.i, op2.variant.i)));
+                        break;
+                        case Parser::Variant::Type::FLOAT:
+                            return Parser::Node(Parser::Variant(operate(op1.variant.i, op2.variant.f)));
+                        break;
+                        default:
+                        break;
+                    }
+                break;
+                case Parser::Variant::Type::FLOAT:
+                    switch (op2.variant.type) {
+                        case Parser::Variant::Type::INT:
+                            return Parser::Node(Parser::Variant(operate(op1.variant.f, op2.variant.i)));
+                        break;
+                        case Parser::Variant::Type::FLOAT:
+                            return Parser::Node(Parser::Variant(operate(op1.variant.f, op2.variant.f)));
+                        break;
+                        default:
+                        break;
+                    }
+                break;
+                case Parser::Variant::Type::STRING:
+                    if (op2.variant.type != Parser::Variant::Type::STRING)
+                        return Parser::Node(Parser::Variant(false));
+                    return Parser::Node(Parser::Variant(operate(op1.variant.s, op2.variant.s)));
+                break;
+                default:
+                break;
+            }
+            return Parser::Node();
+        }
+    };
+
     struct LessThanOperatorNode : NumericalComparaisonOperatorNode<std::less<>> { LessThanOperatorNode() : NumericalComparaisonOperatorNode<std::less<>>("<", 2) {  } };
     struct LessThanEqualOperatorNode : NumericalComparaisonOperatorNode<std::less_equal<>> { LessThanEqualOperatorNode() : NumericalComparaisonOperatorNode<std::less_equal<>>("<=", 2) {  } };
     struct GreaterThanOperatorNode : NumericalComparaisonOperatorNode<std::greater<>> { GreaterThanOperatorNode() : NumericalComparaisonOperatorNode<std::greater<>>(">", 2) {  } };
     struct GreaterThanEqualOperatorNode : NumericalComparaisonOperatorNode<std::greater_equal<>> { GreaterThanEqualOperatorNode() : NumericalComparaisonOperatorNode<std::greater_equal<>>(">=", 2) {  } };
+    struct EqualOperatorNode : QualitativeComparaisonOperatorNode<std::equal_to<>> { EqualOperatorNode() : QualitativeComparaisonOperatorNode<std::equal_to<>>("==", 2) {  } };
+    struct NotEqualOperatorNode : QualitativeComparaisonOperatorNode<std::not_equal_to<>> { NotEqualOperatorNode() : QualitativeComparaisonOperatorNode<std::not_equal_to<>>("!=", 2) {  } };
 
     template <class Function>
     struct ArithmeticFilterNode : FilterNodeType {
@@ -287,6 +385,7 @@ namespace Liquid {
 
     void StandardDialect::implement(Context& context) {
         context.registerType<IfNode>();
+        context.registerType<UnlessNode>();
         context.registerType<ForNode>();
         context.registerType<ForNode::InOperatorNode>();
         context.registerType<AssignNode>();
@@ -301,6 +400,9 @@ namespace Liquid {
         context.registerType<LessThanEqualOperatorNode>();
         context.registerType<GreaterThanOperatorNode>();
         context.registerType<GreaterThanEqualOperatorNode>();
+
+        context.registerType<EqualOperatorNode>();
+        context.registerType<NotEqualOperatorNode>();
 
         context.registerType<PlusFilterNode>();
         context.registerType<MinusFilterNode>();

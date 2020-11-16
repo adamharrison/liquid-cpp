@@ -115,6 +115,12 @@ namespace Liquid {
             Error(T& lexer, Type type, const std::string& message) : type(type), column(lexer.column), row(lexer.row), message(message) {
 
             }
+            Error(Type type) : type(type), column(0), row(0) {
+
+            }
+            Error(Type type, const std::string& message) : type(type), column(0), row(0), message(message) {
+
+            }
         };
 
         struct Node {
@@ -229,7 +235,14 @@ namespace Liquid {
         };
 
         EFilterState filterState = EFilterState::UNSET;
-        bool endBlock = false;
+
+        enum class EBlockType {
+            NONE,
+            INTERMEDIATE,
+            END
+        };
+
+        EBlockType blockType = EBlockType::NONE;
 
         vector<unique_ptr<Node>> nodes;
         vector<Error> errors;

@@ -47,8 +47,6 @@ namespace Liquid {
         Type type;
         string symbol;
         int maxChildren;
-        // For things like if/else, and whatnot. else is a free tag that sits inside the if statement.
-        unordered_map<string, unique_ptr<NodeType>> intermediates;
 
         NodeType(Type type, string symbol = "", int maxChildren = -1) : type(type), symbol(symbol), maxChildren(maxChildren) { }
         NodeType(const NodeType&) = default;
@@ -76,6 +74,9 @@ namespace Liquid {
             FREE,
             ENCLOSED
         };
+
+        // For things like if/else, and whatnot. else is a free tag that sits inside the if statement.
+        unordered_map<string, unique_ptr<NodeType>> intermediates;
 
         Composition composition;
         int minArguments;
@@ -234,6 +235,11 @@ namespace Liquid {
                         long long i;
                         storePointer->getInteger(i);
                         return Parser::Node(Parser::Variant(i));
+                    } break;
+                    case Variable::Type::BOOL: {
+                        bool b;
+                        storePointer->getBool(b);
+                        return Parser::Node(Parser::Variant(b));
                     } break;
                     default:
                         return Parser::Node(Parser::Variant(storePointer));
