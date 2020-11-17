@@ -2,7 +2,6 @@ ODIR=obj
 SDIR=src
 BDIR=bin
 TDIR=t
-LDIR=logs
 CXX=g++
 CC=gcc
 CFLAGS=-Wall -fexceptions -fPIC -g
@@ -56,14 +55,12 @@ $(ODIR)/%.o: $(SDIR)/%.c $(ODIR)/%.d
 
 library: $(LIBRARY)
 
-directories: $(ODIR) $(BDIR) $(LDIR) $(TDIR)
+directories: $(ODIR) $(BDIR) $(TDIR)
 
 executable: $(EXECUTABLE)
 cleanexecutable: clean
 cleantest: clean
 
-$(LDIR):
-	mkdir -p $(LDIR)
 $(ODIR):
 	mkdir -p $(ODIR)
 $(BDIR):
