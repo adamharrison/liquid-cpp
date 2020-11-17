@@ -1,7 +1,7 @@
 
 ## Introduction
 
-Is a soon-to-be fully featured C++ renderer for Liquid; Shopify's templating language.
+Is a soon-to-be fully featured C++17 renderer for Liquid; Shopify's templating language.
 
 ## Status
 
