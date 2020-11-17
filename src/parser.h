@@ -3,7 +3,6 @@
 
 #include "common.h"
 #include "lexer.h"
-#include "context.h"
 
 namespace Liquid {
 
@@ -14,19 +13,9 @@ namespace Liquid {
         const Context& context;
 
 
+        // Represents everything that can be addressed by textual liquid.
         struct Variant {
-            union {
-                bool b;
-                double f;
-                long long i;
-                string s;
-                void* p;
 
-                struct {
-                    int start;
-                    int end;
-                };
-            };
             enum class Type {
                 NIL,
                 BOOL,
@@ -35,6 +24,15 @@ namespace Liquid {
                 STRING,
                 VARIABLE,
                 POINTER
+            };
+
+
+            union {
+                bool b;
+                double f;
+                long long i;
+                string s;
+                void* p;
             };
             Type type;
 

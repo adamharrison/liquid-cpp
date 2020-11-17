@@ -3,38 +3,11 @@
 
 #include "common.h"
 #include "parser.h"
+#include "renderer.h"
 
 namespace Liquid {
 
-    struct Variable {
-        enum class Type {
-            NIL,
-            FLOAT,
-            INT,
-            STRING,
-            ARRAY,
-            BOOL,
-            DICTIONARY,
-            OTHER
-        };
-        virtual ~Variable() { }
-        virtual Type getType() const { return Type::NIL; }
-        virtual bool getBool(bool& b) const { return false; }
-        virtual bool getString(std::string& str) const { return false; }
-        virtual bool getInteger(long long& i) const { return false; }
-        virtual bool getFloat(double& i) const { return false; }
-        virtual bool getDictionaryVariable(Variable*& variable, const std::string& key) const { return false;  }
-        virtual bool getDictionaryVariable(Variable*& variable, const std::string& key, bool createOnNotExists) { return false;  }
-        virtual bool getArrayVariable(Variable*& variable, size_t idx, bool createOnNotExists) const { return false; }
-        virtual bool iterate(void(*)(Variable* variable, void* data),  void* data, int start = 0, int limit = -1) const { return false; }
-        virtual long long getArraySize() { return -1; }
-        virtual void assign(const Variable& v) { }
-        virtual void assign(double f) { }
-        virtual void assign(bool b) { }
-        virtual void assign(long long i) { }
-        virtual void assign(const std::string& s) { }
-        virtual void clear() { }
-    };
+    struct Renderer;
 
     struct NodeType {
         enum Type {
@@ -57,14 +30,14 @@ namespace Liquid {
         ~NodeType() { }
 
         // When a node is rendered, depending on its mode, it'll return a node.
-        virtual Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const = 0;
+        virtual Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const = 0;
         virtual Parser::Error validate(const Context& context, const Parser::Node& node) const { return Parser::Error(); }
         virtual void optimize(const Context& context, Parser::Node& node, Variable& store) const { }
 
 
-        Parser::Node (*renderFunction)(const Context& context, const Parser::Node& node, Variable& store) =
-            +[](const Context& context, const Parser::Node& node, Variable& store) {
-                return node.type->render(context, node, store);
+        Parser::Node (*renderFunction)(Renderer& renderer, const Parser::Node& node, Variable& store) =
+            +[](Renderer& renderer, const Parser::Node& node, Variable& store) {
+                return node.type->render(renderer, node, store);
             };
         void (*optimizeFunction)(const Context& context, Parser::Node& node, Variable& store) =
             +[](const Context& context, Parser::Node& node, Variable& store) {
@@ -86,6 +59,13 @@ namespace Liquid {
         int maxArguments;
 
         TagNodeType(Composition composition, string symbol, int minArguments = -1, int maxArguments = -1) : NodeType(NodeType::Type::TAG, symbol, -1), composition(composition), minArguments(minArguments), maxArguments(maxArguments) { }
+    };
+
+    struct EnclosedNodeType : TagNodeType {
+        EnclosedNodeType(string symbol, int minArguments = -1, int maxArguments = -1) : TagNodeType(Composition::ENCLOSED, symbol, minArguments, maxArguments) { }
+
+        // I don't like doing this, but
+        #define assignEnclosedRender(result, context, node, store) result = context.retrieveRenderedNode(node, store); if (!result.type && result.varaint.type == Parser::Variant::Type::CONTROL) return result;
     };
 
     struct OperatorNodeType : NodeType {
@@ -130,40 +110,30 @@ namespace Liquid {
         FilterNodeType(string symbol, int minArguments = -1, int maxArguments = -1) : NodeType(NodeType::Type::FILTER, symbol, -1), minArguments(minArguments), maxArguments(maxArguments) { }
 
 
-        Parser::Node getOperand(const Context& context, const Parser::Node& node, Variable& store) const;
-        Parser::Node getArgument(const Context& context, const Parser::Node& node, Variable& store, int idx) const;
+        Parser::Node getOperand(Renderer& renderer, const Parser::Node& node, Variable& store) const;
+        Parser::Node getArgument(Renderer& renderer, const Parser::Node& node, Variable& store, int idx) const;
     };
 
     struct Context {
 
-        Parser::Node retrieveRenderedNode(const Parser::Node& node, Variable& store) const {
-            if (node.type)
-                return node.type->render(*this, node, store);
-            return node;
-        }
 
         struct ConcatenationNode : NodeType {
             ConcatenationNode() : NodeType(Type::OPERATOR) { }
 
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-                string s;
-                for (auto& child : node.children)
-                    s.append(context.retrieveRenderedNode(*child.get(), store).getString());
-                return Parser::Node(s);
-            }
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const;
         };
 
         struct OutputNode : NodeType {
             OutputNode() : NodeType(Type::OUTPUT) { }
 
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
                 assert(node.children.size() == 1);
 
                 auto& argumentNode = node.children.front();
                 assert(argumentNode->children.size() == 1);
                 auto it = argumentNode->children.begin();
                 if ((*it)->type)
-                    return (*it)->type->render(context, *it->get(), store);
+                    return (*it)->type->render(renderer, *it->get(), store);
                 return *it->get();
             }
         };
@@ -172,11 +142,11 @@ namespace Liquid {
             PassthruNode(NodeType::Type type) :NodeType(type) { }
             ~PassthruNode() { }
 
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
                 assert(node.children.size() == 1);
                 auto it = node.children.begin();
                 if ((*it)->type)
-                    return (*it)->type->render(context, *it->get(), store);
+                    return (*it)->type->render(renderer, *it->get(), store);
                 return *it->get();
             }
         };
@@ -192,17 +162,17 @@ namespace Liquid {
         // Used exclusively for tags. Should be never be rendered by itself.
         struct ArgumentNode : NodeType {
             ArgumentNode() : NodeType(Type::ARGUMENTS) { }
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const { assert(false); }
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { assert(false); }
         };
 
         struct VariableNode : NodeType {
             VariableNode() : NodeType(Type::VARIABLE) { }
 
 
-            Variable* getVariable(const Context& context, const Parser::Node& node, Variable& store, bool createIfNotExists) const {
+            Variable* getVariable(Renderer& renderer, const Parser::Node& node, Variable& store, bool createIfNotExists) const {
                 Variable* storePointer = &store;
                 for (auto& link : node.children) {
-                    auto node = context.retrieveRenderedNode(*link.get(), store);
+                    auto node = renderer.retrieveRenderedNode(*link.get(), store);
                     switch (node.variant.type) {
                         case Parser::Variant::Type::INT:
                             if (!storePointer->getArrayVariable(storePointer, node.variant.i, createIfNotExists))
@@ -222,8 +192,8 @@ namespace Liquid {
                 return storePointer;
             }
 
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-                Variable* storePointer = getVariable(context, node, store, false);
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+                Variable* storePointer = getVariable(renderer, node, store, false);
                 if (!storePointer)
                     return Parser::Node(Parser::Variant());
                 switch (storePointer->getType()) {
@@ -313,17 +283,9 @@ namespace Liquid {
             return static_cast<FilterNodeType*>(it->second.get());
         }
 
-        void render(const Parser::Node& ast, Variable& store, void (*)(const char* chunk, size_t size, void* data), void* data);
         void optimize(Parser::Node& ast, Variable& store);
 
-        string render(const Parser::Node& ast, Variable& store) {
-            string accumulator;
-            render(ast, store, +[](const char* chunk, size_t size, void* data){
-                string* accumulator = (string*)data;
-                accumulator->append(chunk, size);
-            }, &accumulator);
-            return accumulator;
-        }
+
     };
 }
 

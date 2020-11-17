@@ -6,15 +6,15 @@ namespace Liquid {
     struct AssignNode : TagNodeType {
         AssignNode() : TagNodeType(Composition::FREE, "assign", 1, 1) { }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
             auto& argumentNode = node.children.front();
             auto& assignmentNode = argumentNode->children.front();
             auto& variableNode = assignmentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(context, *variableNode.get(), store, true);
+                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode.get(), store, true);
                 if (targetVariable) {
                     auto& operandNode = assignmentNode->children.back();
-                    Parser::Node node = context.retrieveRenderedNode(*operandNode.get(), store);
+                    Parser::Node node = renderer.retrieveRenderedNode(*operandNode.get(), store);
                     assert(!node.type);
                     switch (node.variant.type) {
                         case Liquid::Parser::Variant::Type::FLOAT:
@@ -41,19 +41,19 @@ namespace Liquid {
 
     struct AssignOperator : OperatorNodeType {
         AssignOperator() : OperatorNodeType("=", Arity::BINARY, 0) { }
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
     };
 
     struct CaptureNode : TagNodeType {
         CaptureNode() : TagNodeType(Composition::ENCLOSED, "capture", 1, 1) { }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
             auto& argumentNode = node.children.front();
             auto& variableNode = argumentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(context, *variableNode.get(), store, true);
+                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode.get(), store, true);
                 if (targetVariable)
-                    targetVariable->assign(context.retrieveRenderedNode(*node.children[1].get(), store).getString());
+                    targetVariable->assign(renderer.retrieveRenderedNode(*node.children[1].get(), store).getString());
             }
             return Parser::Node();
         }
@@ -62,11 +62,11 @@ namespace Liquid {
     struct IncrementNode : TagNodeType {
         IncrementNode() : TagNodeType(Composition::FREE, "increment", 1, 1) { }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
             auto& argumentNode = node.children.front();
             auto& variableNode = argumentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(context, *variableNode.get(), store, true);
+                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode.get(), store, true);
                 if (targetVariable) {
                     long long i = -1;
                     targetVariable->getInteger(i);
@@ -80,11 +80,11 @@ namespace Liquid {
      struct DecrementNode : TagNodeType {
         DecrementNode() : TagNodeType(Composition::FREE, "decrement", 1, 1) { }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
             auto& argumentNode = node.children.front();
             auto& variableNode = argumentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(context, *variableNode.get(), store, true);
+                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode.get(), store, true);
                 if (targetVariable) {
                     long long i = 0;
                     targetVariable->getInteger(i);
@@ -97,10 +97,10 @@ namespace Liquid {
 
     template <bool Inverse>
     struct BranchNode : TagNodeType {
-        static Parser::Node internalRender(const Context& context, const Parser::Node& node, Variable& store) {
+        static Parser::Node internalRender(Renderer& renderer, const Parser::Node& node, Variable& store) {
             assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
-            auto result = context.retrieveRenderedNode(*arguments->children.front().get(), store);
+            auto result = renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
             assert(result.type == nullptr);
 
             bool truthy = result.variant.isTruthy();
@@ -108,13 +108,13 @@ namespace Liquid {
                 truthy = !truthy;
 
             if (truthy)
-                return context.retrieveRenderedNode(*node.children[1].get(), store);
+                return renderer.retrieveRenderedNode(*node.children[1].get(), store);
             else {
                 // Loop through the elsifs and elses, and anything that's true, run the next concatenation.
                 for (size_t i = 2; i < node.children.size()-1; i += 2) {
-                    auto conditionalResult = context.retrieveRenderedNode(*node.children[i].get(), store);
+                    auto conditionalResult = renderer.retrieveRenderedNode(*node.children[i].get(), store);
                     if (!conditionalResult.type && conditionalResult.variant.isTruthy())
-                        return context.retrieveRenderedNode(*node.children[i+1].get(), store);
+                        return renderer.retrieveRenderedNode(*node.children[i+1].get(), store);
                 }
                 return Parser::Node();
             }
@@ -123,15 +123,15 @@ namespace Liquid {
 
         struct ElsifNode : TagNodeType {
             ElsifNode() : TagNodeType(Composition::FREE, "elsif", 1, 1) { }
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
                 auto& arguments = node.children.front();
-                return context.retrieveRenderedNode(*arguments->children.front().get(), store);
+                return renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
             }
         };
 
         struct ElseNode : TagNodeType {
             ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
                 return Parser::Node(Parser::Variant(true));
             }
         };
@@ -155,8 +155,8 @@ namespace Liquid {
         }
 
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-            return BranchNode<Inverse>::internalRender(context, node, store);
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            return BranchNode<Inverse>::internalRender(renderer, node, store);
         }
     };
 
@@ -174,13 +174,13 @@ namespace Liquid {
         struct WhenNode : TagNodeType {
             WhenNode() : TagNodeType(Composition::FREE, "when", 1, 1) { }
 
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-                return context.retrieveRenderedNode(*node.children[0]->children[0].get(), store);
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+                return renderer.retrieveRenderedNode(*node.children[0]->children[0].get(), store);
             }
         };
         struct ElseNode : TagNodeType {
             ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
         };
 
         CaseNode() : TagNodeType(Composition::ENCLOSED, "case", 1, 1) {
@@ -188,21 +188,21 @@ namespace Liquid {
             intermediates["else"] = make_unique<ElseNode>();
         }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
             assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
-            auto result = context.retrieveRenderedNode(*arguments->children.front().get(), store);
+            auto result = renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
             assert(result.type == nullptr);
             auto whenNodeType = intermediates.find("when")->second.get();
             // Loop through the whens and elses.
             // Skip the first concatenation; it's not needed.
             for (size_t i = 2; i < node.children.size()-1; i += 2) {
                 if (node.children[i]->type == whenNodeType) {
-                    auto conditionalResult = context.retrieveRenderedNode(*node.children[i].get(), store);
+                    auto conditionalResult = renderer.retrieveRenderedNode(*node.children[i].get(), store);
                     if (conditionalResult.variant == result.variant)
-                        return context.retrieveRenderedNode(*node.children[i+1].get(), store);
+                        return renderer.retrieveRenderedNode(*node.children[i+1].get(), store);
                 } else {
-                    return context.retrieveRenderedNode(*node.children[i+1].get(), store);
+                    return renderer.retrieveRenderedNode(*node.children[i+1].get(), store);
                 }
             }
             return Parser::Node();
@@ -212,12 +212,26 @@ namespace Liquid {
     struct ForNode : TagNodeType {
         struct InOperatorNode : OperatorNodeType {
             InOperatorNode() :  OperatorNodeType("in", Arity::BINARY, 0) { }
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
         };
 
         struct ElseNode : TagNodeType {
             ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
-            Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
+        };
+
+        struct BreakNode : TagNodeType {
+            BreakNode() : TagNodeType(Composition::FREE, "break", 0, 0) { }
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+                renderer.control = Renderer::Control::BREAK;
+                return Parser::Node();
+            }
+        };
+
+        struct ContinueNode : TagNodeType {
+            ContinueNode() : TagNodeType(Composition::FREE, "continue", 0, 0) { }
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+                renderer.control = Renderer::Control::CONTINUE;
                 return Parser::Node();
             }
         };
@@ -226,7 +240,7 @@ namespace Liquid {
             intermediates["else"] = make_unique<ElseNode>();
         }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
             assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
             assert(arguments->children.size() >= 1);
@@ -237,26 +251,27 @@ namespace Liquid {
             assert(arguments->children[0]->children.size() == 2);
 
             auto& variableNode = arguments->children[0]->children[0];
-            Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(context, *variableNode, store, true);
+            Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode, store, true);
             assert(targetVariable);
 
-            context.retrieveRenderedNode(*arguments->children[0]->children[0].get(), store);
-            Parser::Node result = context.retrieveRenderedNode(*arguments->children[0]->children[1].get(), store);
+            renderer.retrieveRenderedNode(*arguments->children[0]->children[0].get(), store);
+            Parser::Node result = renderer.retrieveRenderedNode(*arguments->children[0]->children[1].get(), store);
 
             if (result.type != nullptr || result.variant.type != Parser::Variant::Type::VARIABLE)
                 return Parser::Node();
 
             struct ForLoopContext {
-                const Context& context;
+                Renderer& renderer;
                 const Parser::Node& node;
                 Variable& store;
                 Variable& targetVariable;
                 long long length;
                 string result;
                 long long idx = 0;
+                bool broken = false;
             };
 
-            ForLoopContext forLoopContext = { context, node, store, *targetVariable, static_cast<Variable*>(result.variant.p)->getArraySize() };
+            ForLoopContext forLoopContext = { renderer, node, store, *targetVariable, static_cast<Variable*>(result.variant.p)->getArraySize() };
             static_cast<Variable*>(result.variant.p)->iterate(+[](Variable* variable, void* data) {
                 ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
                 forLoopContext.targetVariable.assign(*variable);
@@ -278,9 +293,16 @@ namespace Liquid {
                 first->assign(forLoopContext.idx == 0);
                 last->assign(forLoopContext.idx == forLoopContext.length-1);
                 length->assign(forLoopContext.length);
-
-                forLoopContext.result.append(forLoopContext.context.retrieveRenderedNode(*forLoopContext.node.children[1].get(), forLoopContext.store).getString());
+                forLoopContext.result.append(forLoopContext.renderer.retrieveRenderedNode(*forLoopContext.node.children[1].get(), forLoopContext.store).getString());
+                if (forLoopContext.renderer.control != Renderer::Control::NONE)  {
+                    if (forLoopContext.renderer.control == Renderer::Control::BREAK) {
+                        forLoopContext.renderer.control = Renderer::Control::NONE;
+                        return false;
+                    } else
+                        forLoopContext.renderer.control = Renderer::Control::NONE;
+                }
                 ++forLoopContext.idx;
+                return true;
             }, const_cast<void*>((void*)&forLoopContext));
             return Parser::Node(forLoopContext.result);
         }
@@ -289,7 +311,7 @@ namespace Liquid {
     struct CycleNode : TagNodeType {
         CycleNode() : TagNodeType(Composition::FREE, "cycle", 2) { }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
             assert(node.children.size() == 1 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
             Variable* forloopVariable;
@@ -298,7 +320,7 @@ namespace Liquid {
                 if (forloopVariable->getDictionaryVariable(index0, "index0", false)) {
                     long long i;
                     if (index0->getInteger(i))
-                        return context.retrieveRenderedNode(*arguments->children[i % arguments->children.size()].get(), store);
+                        return renderer.retrieveRenderedNode(*arguments->children[i % arguments->children.size()].get(), store);
                 }
             }
             return Parser::Node();
@@ -317,9 +339,9 @@ namespace Liquid {
         double operate(long long v1, double v2) const { return Function()(v1, v2); }
         long long operate(long long v1, long long v2) const { return Function()(v1, v2); }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-            Parser::Node op1 = context.retrieveRenderedNode(*node.children[0].get(), store);
-            Parser::Node op2 = context.retrieveRenderedNode(*node.children[1].get(), store);
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             if (op1.type || op2.type)
                 return Parser::Node();
             switch (op1.variant.type) {
@@ -366,9 +388,9 @@ namespace Liquid {
         template <class A, class B>
         bool operate(A a, B b) const { return Function()(a, b); }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-            Parser::Node op1 = context.retrieveRenderedNode(*node.children[0].get(), store);
-            Parser::Node op2 = context.retrieveRenderedNode(*node.children[1].get(), store);
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             if (op1.type || op2.type)
                 return Parser::Node();
             switch (op1.variant.type) {
@@ -411,9 +433,9 @@ namespace Liquid {
         template <class A, class B>
         bool operate(A a, B b) const { return Function()(a, b); }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-            Parser::Node op1 = context.retrieveRenderedNode(*node.children[0].get(), store);
-            Parser::Node op2 = context.retrieveRenderedNode(*node.children[1].get(), store);
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             if (op1.type || op2.type)
                 return Parser::Node();
             switch (op1.variant.type) {
@@ -464,22 +486,22 @@ namespace Liquid {
     struct AndOperatorNode : OperatorNodeType {
         AndOperatorNode() : OperatorNodeType("and", Arity::BINARY, 1) { }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-            Parser::Node op1 = context.retrieveRenderedNode(*node.children[0].get(), store);
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             if (!op1.type || !op1.variant.isTruthy())
                 return Parser::Node(Parser::Variant(false));
-            Parser::Node op2 = context.retrieveRenderedNode(*node.children[1].get(), store);
+            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             return Parser::Node(Parser::Variant(op2.type && op2.variant.isTruthy()));
         }
     };
     struct OrOperatorNode : OperatorNodeType {
         OrOperatorNode() : OperatorNodeType("or", Arity::BINARY, 1) { }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
-            Parser::Node op1 = context.retrieveRenderedNode(*node.children[0].get(), store);
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             if (op1.type && op1.variant.isTruthy())
                 return Parser::Node(Parser::Variant(true));
-            Parser::Node op2 = context.retrieveRenderedNode(*node.children[1].get(), store);
+            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             return Parser::Node(Parser::Variant(op2.type && op2.variant.isTruthy()));
         }
     };
@@ -493,10 +515,10 @@ namespace Liquid {
         double operate(long long v1, double v2) const { return Function()(v1, v2); }
         long long operate(long long v1, long long v2) const { return Function()(v1, v2); }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
             assert(node.children[1]->type && node.children[1]->type->type == NodeType::Type::ARGUMENTS);
-            Parser::Node op1 = getOperand(context, node, store);
-            Parser::Node op2 = getArgument(context, node, store, 0);
+            Parser::Node op1 = getOperand(renderer, node, store);
+            Parser::Node op2 = getArgument(renderer, node, store, 0);
             if (op1.type || op2.type)
                 return Parser::Node();
             switch (op1.variant.type) {
@@ -539,13 +561,13 @@ namespace Liquid {
     struct JoinFilterNode : FilterNodeType {
         JoinFilterNode() : FilterNodeType("join", 1, 1) { }
 
-        Parser::Node render(const Context& context, const Parser::Node& node, Variable& store) const {
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
             assert(node.children[1]->type && node.children[1]->type->type == NodeType::Type::ARGUMENTS);
-            Parser::Node operand = getOperand(context, node, store);
+            Parser::Node operand = getOperand(renderer, node, store);
             if (operand.type || operand.variant.type != Parser::Variant::Type::VARIABLE) {
 
             }
-            Parser::Node arg1 = getArgument(context, node, store, 0);
+            Parser::Node arg1 = getArgument(renderer, node, store, 0);
         }
     };
 
@@ -556,6 +578,8 @@ namespace Liquid {
         context.registerType<ForNode>();
         context.registerType<CycleNode>();
         context.registerType<ForNode::InOperatorNode>();
+        context.registerType<ForNode::BreakNode>();
+        context.registerType<ForNode::ContinueNode>();
         context.registerType<AssignNode>();
         context.registerType<CaptureNode>();
         context.registerType<IncrementNode>();
@@ -582,5 +606,6 @@ namespace Liquid {
         context.registerType<MinusFilterNode>();
         context.registerType<MultiplyFilterNode>();
         context.registerType<DivideFilterNode>();
+
     }
 }

@@ -62,6 +62,7 @@ namespace Liquid {
         void parse(const char* str, size_t size) {
             size_t offset = 0;
             size_t lastInitial = 0;
+            size_t i;
             bool ongoing = true;
             while (ongoing && offset < size) {
                 ++column;
@@ -74,25 +75,35 @@ namespace Liquid {
                             } break;
                             case '{': {
                                 if (str[offset-1] == '{') {
-                                    if (offset - lastInitial - 1 > 0)
-                                        static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial - 1);
                                     if (offset-1 < size && str[offset+1] == '-') {
+                                        if (offset - lastInitial - 1 > 0) {
+                                            for (i = offset-2; isWhitespace(str[i]); --i);
+                                            static_cast<T*>(this)->literal(&str[lastInitial], i - lastInitial + 1);
+                                        }
                                         ongoing = static_cast<T*>(this)->startOutputBlock(true);
                                         ++offset;
-                                    } else
+                                    } else {
+                                        if (offset - lastInitial - 1 > 0)
+                                            static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial - 1);
                                         ongoing = static_cast<T*>(this)->startOutputBlock(false);
+                                    }
                                     state = State::OUTPUT;
                                 }
                             } break;
                             case '%': {
                                 if (str[offset-1] == '{') {
-                                    if (offset - lastInitial - 1 > 0)
-                                        static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial - 1);
                                     if (offset-1 < size && str[offset+1] == '-') {
+                                        if (offset - lastInitial - 1 > 0) {
+                                            for (i = offset-2; isWhitespace(str[i]); --i);
+                                            static_cast<T*>(this)->literal(&str[lastInitial], i - lastInitial + 1);
+                                        }
                                         ongoing = static_cast<T*>(this)->startControlBlock(true);
                                         ++offset;
-                                    } else
+                                    } else {
+                                        if (offset - lastInitial - 1 > 0)
+                                            static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial - 1);
                                         ongoing = static_cast<T*>(this)->startControlBlock(false);
+                                    }
                                     state = State::CONTROL;
                                 }
                             } break;
@@ -202,14 +213,22 @@ namespace Liquid {
                                         if (str[offset-1] == '%') {
                                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - (str[offset-2] == '-' ? 2 : 1), isNumber, hasPoint) && static_cast<T*>(this)->endControlBlock(str[offset-2] == '-');
                                             state = State::INITIAL;
-                                            lastInitial = offset+1;
+                                            if (str[offset-2] == '-')
+                                                for (offset = offset+1; isWhitespace(str[offset]) && offset < size; ++offset);
+                                            else
+                                                ++offset;
+                                            lastInitial = offset;
                                             processComplete = true;
                                         }
                                     } else {
                                         if (str[offset-1] == '}') {
                                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - (str[offset-2] == '-' ? 2 : 1), isNumber, hasPoint) && static_cast<T*>(this)->endOutputBlock(str[offset-2] == '-');
                                             state = State::INITIAL;
-                                            lastInitial = offset+1;
+                                            if (str[offset-2] == '-')
+                                                for (offset = offset+1; isWhitespace(str[offset]) && offset < size; ++offset);
+                                            else
+                                                ++offset;
+                                            lastInitial = offset;
                                             processComplete = true;
                                         }
                                     }

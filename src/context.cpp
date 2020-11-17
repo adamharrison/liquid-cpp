@@ -1,18 +1,22 @@
 #include "context.h"
 
 namespace Liquid {
-    void Context::render(const Parser::Node& ast, Variable& store, void (*callback)(const char* chunk, size_t size, void* data), void* data) {
-        Parser::Node node = ast.type->render(*this, ast, store);
-        assert(node.type == nullptr);
-        auto s = node.getString();
-        callback(s.data(), s.size(), data);
+
+    Parser::Node FilterNodeType::getOperand(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        return renderer.retrieveRenderedNode(*node.children[0].get(), store);
     }
 
-    Parser::Node FilterNodeType::getOperand(const Context& context, const Parser::Node& node, Variable& store) const {
-        return context.retrieveRenderedNode(*node.children[0].get(), store);
+    Parser::Node FilterNodeType::getArgument(Renderer& renderer, const Parser::Node& node, Variable& store, int idx) const {
+        return renderer.retrieveRenderedNode(*node.children[1]->children[idx].get(), store);
     }
 
-    Parser::Node FilterNodeType::getArgument(const Context& context, const Parser::Node& node, Variable& store, int idx) const {
-        return context.retrieveRenderedNode(*node.children[1]->children[idx].get(), store);
+    Parser::Node Context::ConcatenationNode::render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        string s;
+        for (auto& child : node.children) {
+            s.append(renderer.retrieveRenderedNode(*child.get(), store).getString());
+            if (renderer.control != Renderer::Control::NONE)
+                return Parser::Node(s);
+        }
+        return Parser::Node(s);
     }
 };
