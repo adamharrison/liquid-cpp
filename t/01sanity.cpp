@@ -270,9 +270,6 @@ TEST(sanity, forloop) {
     ast = getParser().parse("{% for i in list %}{{ i }}{% continue %}2{% endfor %}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "151020");
-
-
-
 }
 
 
@@ -296,6 +293,27 @@ TEST(sanity, filters) {
     ast = getParser().parse("{% assign a = a | plus: 1 | plus: 6 | minus: 3 %}{{ a }}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "5");
+
+    hash["a"] = "A B C";
+    ast = getParser().parse("{% assign a = a | split: \" \" %}{{ a | size }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "3");
+}
+
+TEST(sanity, error) {
+    CPPVariable hash = { };
+    hash["a"] = 1;
+    Parser::Node ast;
+    std::string str;
+
+    ASSERT_THROW({
+        ast = getParser().parse("{% assign a = a | plus: 5");
+    }, Parser::Exception);
+
+    ASSERT_THROW({
+        ast = getParser().parse("{% assign a a | plus: 5 %}");
+    }, Parser::Exception);
+
 }
 
 int main(int argc, char **argv) {

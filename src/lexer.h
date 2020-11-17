@@ -19,9 +19,40 @@ namespace Liquid {
             OUTPUT
         };
 
-        size_t column = 0;
-        size_t row = 1;
-        State state = State::INITIAL;
+
+        struct Error {
+            enum Type {
+                NONE,
+                UNEXPECTED_END
+            };
+
+            Type type;
+            size_t column;
+            size_t row;
+            std::string message;
+
+            Error() : type(Type::NONE) { }
+            Error(const Error& error) = default;
+            Error(Error&& error) = default;
+
+            Error(Lexer& lexer, Type type) : type(type), column(lexer.column), row(lexer.row) {
+
+            }
+            Error(Lexer& lexer, Type type, const std::string& message) : type(type), column(lexer.column), row(lexer.row), message(message) {
+
+            }
+            Error(Type type) : type(type), column(0), row(0) {
+
+            }
+            Error(Type type, const std::string& message) : type(type), column(0), row(0), message(message) {
+
+            }
+        };
+
+
+        size_t column;
+        size_t row;
+        State state;
 
         bool startOutputBlock(bool suppress) { return true; }
         bool endOutputBlock(bool suppress) { return true; }
@@ -59,11 +90,14 @@ namespace Liquid {
         }
 
         // Must be a whole file, for now. Should be null-terminated.
-        void parse(const char* str, size_t size) {
+        Error parse(const char* str, size_t size) {
             size_t offset = 0;
             size_t lastInitial = 0;
             size_t i;
             bool ongoing = true;
+            row = 1;
+            column = 0;
+            state = State::INITIAL;
             while (ongoing && offset < size) {
                 ++column;
                 switch (state) {
@@ -252,11 +286,15 @@ namespace Liquid {
                 }
             }
             if (ongoing) {
-                assert(state == State::INITIAL);
-                if (offset > lastInitial) {
-                    static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial);
+                if (state != State::INITIAL) {
+                    return Error(*this, Error::Type::UNEXPECTED_END);
+                } else {
+                    if (offset > lastInitial) {
+                        static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial);
+                    }
                 }
             }
+            return Error();
         }
     };
 }

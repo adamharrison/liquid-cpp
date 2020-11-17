@@ -75,12 +75,12 @@ namespace Liquid {
             Variant(double f) : f(f), type(Type::FLOAT) {  }
             Variant(long long i) : i(i), type(Type::INT) { }
             Variant(const string& s) : s(s), type(Type::STRING) { }
-            Variant(string&& s) : s(s), type(Type::STRING) { }
+            Variant(string&& s) : s(std::move(s)), type(Type::STRING) { }
             Variant(const char* s) : s(s), type(Type::STRING) { }
             Variant(Variable* p) : p(p), type(Type::VARIABLE) { }
             Variant(void* p) : p(p), type(Type::POINTER) { }
             Variant(const vector<Variant>& a) : a(a), type(Type::ARRAY) { }
-            Variant(vector<Variant>&& a) : a(a), type(Type::ARRAY) { }
+            Variant(vector<Variant>&& a) : a(std::move(a)), type(Type::ARRAY) { }
             Variant(std::initializer_list<Variant> list) : a(list), type(Type::ARRAY) { }
             ~Variant() {
                 switch (type) {
@@ -198,6 +198,7 @@ namespace Liquid {
                         variable.assign(i);
                     break;
                     case Type::ARRAY: {
+                        variable.clear();
                         for (size_t i = 0; i < a.size(); ++i) {
                             Variable* target;
                             if (!variable.getArrayVariable(target, i, true))
@@ -360,6 +361,7 @@ namespace Liquid {
                 }
             }
             Node(const Variant& v) : type(nullptr), variant(v) { }
+            Node(Variant&& v) : type(nullptr), variant(std::move(v)) { }
             Node(Node&& node) :type(node.type) {
                 if (type) {
                     new(&children) vector<unique_ptr<Node>>(std::move(node.children));
@@ -409,47 +411,12 @@ namespace Liquid {
             }
         };
 
-        struct ParserException : std::exception {
-            Error error;
-            std::string message;
-            ParserException(const Error& error) : error(error) {
-                char buffer[512];
-                switch (error.type) {
-                    case Error::Type::NONE: break;
-                    case Error::Type::UNKNOWN_TAG:
-                        sprintf(buffer, "Unknown tag '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
-                    break;
-                    case Error::Type::UNKNOWN_OPERATOR:
-                        sprintf(buffer, "Unknown operator '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
-                    break;
-                    case Error::Type::UNKNOWN_FILTER:
-                        sprintf(buffer, "Unknown filter '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
-                    break;
-                    case Error::Type::INVALID_SYMBOL:
-                        sprintf(buffer, "Invalid symbol '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
-                    break;
-                    case Error::Type::UNEXPECTED_END:
-                        sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.row, error.column);
-                    break;
-                    case Error::Type::UNBALANCED_GROUP:
-                        sprintf(buffer, "Unbalanced end to group on line %lu, column %lu.", error.row, error.column);
-                    break;
-                }
-                message = buffer;
-            }
-
-            const char* what() const noexcept {
-               return message.data();
-            }
-        };
-
 
 
         enum class State {
             NODE,
             ARGUMENT
         };
-        State state = State::NODE;
         enum class EFilterState {
             UNSET,
             COLON,
@@ -457,7 +424,6 @@ namespace Liquid {
             ARGUMENTS
         };
 
-        EFilterState filterState = EFilterState::UNSET;
 
         enum class EBlockType {
             NONE,
@@ -465,8 +431,9 @@ namespace Liquid {
             END
         };
 
-        EBlockType blockType = EBlockType::NONE;
-
+        State state;
+        EFilterState filterState;
+        EBlockType blockType;
         vector<unique_ptr<Node>> nodes;
         vector<Error> errors;
 
@@ -498,6 +465,54 @@ namespace Liquid {
 
             Lexer(const Context& context, Parser& parser) : Liquid::Lexer<Lexer>(context), parser(parser) { }
         };
+
+
+        struct Exception : std::exception {
+            Parser::Error parserError;
+            Lexer::Error lexerError;
+            std::string message;
+            Exception(const Parser::Error& error) : parserError(error) {
+                char buffer[512];
+                switch (parserError.type) {
+                    case Parser::Error::Type::NONE: break;
+                    case Parser::Error::Type::UNKNOWN_TAG:
+                        sprintf(buffer, "Unknown tag '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                    break;
+                    case Parser::Error::Type::UNKNOWN_OPERATOR:
+                        sprintf(buffer, "Unknown operator '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                    break;
+                    case Parser::Error::Type::UNKNOWN_FILTER:
+                        sprintf(buffer, "Unknown filter '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                    break;
+                    case Parser::Error::Type::INVALID_SYMBOL:
+                        sprintf(buffer, "Invalid symbol '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                    break;
+                    case Parser::Error::Type::UNEXPECTED_END:
+                        sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.row, error.column);
+                    break;
+                    case Parser::Error::Type::UNBALANCED_GROUP:
+                        sprintf(buffer, "Unbalanced end to group on line %lu, column %lu.", error.row, error.column);
+                    break;
+                }
+                message = buffer;
+            }
+
+            Exception(const Lexer::Error& error) : lexerError(error) {
+                char buffer[512];
+                switch (lexerError.type) {
+                    case Lexer::Error::Type::NONE: break;
+                    case Lexer::Error::Type::UNEXPECTED_END:
+                        sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.row, error.column);
+                    break;
+                }
+                message = buffer;
+            }
+
+            const char* what() const noexcept {
+               return message.data();
+            }
+        };
+
 
         Lexer lexer;
 

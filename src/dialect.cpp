@@ -19,23 +19,7 @@ namespace Liquid {
                     auto& operandNode = assignmentNode->children.back();
                     Parser::Node node = renderer.retrieveRenderedNode(*operandNode.get(), store);
                     assert(!node.type);
-                    switch (node.variant.type) {
-                        case Liquid::Parser::Variant::Type::FLOAT:
-                            targetVariable->assign(node.variant.f);
-                        break;
-                        case Liquid::Parser::Variant::Type::INT:
-                            targetVariable->assign(node.variant.i);
-                        break;
-                        case Liquid::Parser::Variant::Type::STRING:
-                            targetVariable->assign(node.variant.s);
-                        break;
-                        case Liquid::Parser::Variant::Type::VARIABLE:
-                            targetVariable->assign(*(Variable*)node.variant.p);
-                        break;
-                        default:
-                            targetVariable->clear();
-                        break;
-                    }
+                    node.variant.inject(*targetVariable);
                 }
             }
             return Parser::Node();
@@ -944,7 +928,6 @@ namespace Liquid {
                 if (idx > start)
                     result.a.push_back(Parser::Variant(str.substr(start, idx - start)));
                 start = idx + splitter.size();
-                break;
             }
             result.a.push_back(str.substr(start, str.size() - start));
             return Parser::Variant(std::move(result));
@@ -1423,7 +1406,7 @@ namespace Liquid {
 
         Parser::Node variableOperate(Renderer& renderer, const Parser::Node& node, Variable& store, const Variable& operand) const {
             Variable* v;
-            if (!operand.getArrayVariable(v, 0, false))
+            if (!operand.getArrayVariable(v, 0))
                 return Parser::Node();
             return Parser::Node(v);
         }
@@ -1441,7 +1424,7 @@ namespace Liquid {
         Parser::Node variableOperate(Renderer& renderer, const Parser::Node& node, Variable& store, const Variable& operand) const {
             Variable* v;
             long long size = operand.getArraySize();
-            if (size == -1 || !operand.getArrayVariable(v, 0, false))
+            if (size == -1 || !operand.getArrayVariable(v, 0))
                 return Parser::Node();
             return Parser::Node(v);
         }
@@ -1462,7 +1445,7 @@ namespace Liquid {
             if (!argument.type)
                 return Parser::Node();
             int idx = argument.variant.i;
-            if (!operand.getArrayVariable(v, idx, false))
+            if (!operand.getArrayVariable(v, idx))
                 return Parser::Node();
             return Parser::Node(v);
         }
@@ -1510,6 +1493,18 @@ namespace Liquid {
             if (operand.type != Parser::Variant::Type::ARRAY || idx >= (long long)operand.a.size())
                 return Parser::Node();
             return operand.a[idx];
+        }
+    };
+
+
+    struct DefaultFilterNode : FilterNodeType {
+        DefaultFilterNode() : FilterNodeType("default", 1, 1) { }
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            auto operand = getOperand(renderer, node, store);
+            auto argument = getArgument(renderer, node, store, 0);
+            if (operand.type || operand.variant.isTruthy())
+                return operand;
+            return argument;
         }
     };
 
@@ -1607,5 +1602,7 @@ namespace Liquid {
         context.registerType<WhereFilterNode>();
         context.registerType<UniqFilterNode>();
 
+        // Other filters.
+        context.registerType<DefaultFilterNode>();
     }
 }

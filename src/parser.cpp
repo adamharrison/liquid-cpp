@@ -15,7 +15,7 @@ namespace Liquid {
             return true;
         }
         if (parser.nodes.back()->type != context.getVariableNodeType() || parser.nodes.back()->children.size() != 1) {
-            parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, ":"));
+            parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL, ":"));
             return false;
         }
         parser.nodes.back()->type = context.getNamedVariableNodeType();
@@ -25,12 +25,12 @@ namespace Liquid {
     bool Parser::Lexer::comma() {
         switch (parser.state) {
             case Parser::State::NODE:
-                parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, ","));
+                parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL, ","));
                 return false;
             break;
             case Parser::State::ARGUMENT:
                 if (!parser.popNodeUntil(NodeType::Type::ARGUMENTS)) {
-                    parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, ","));
+                    parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL, ","));
                     return false;
                 }
                 parser.nodes.back()->children.push_back(nullptr);
@@ -43,12 +43,12 @@ namespace Liquid {
     bool Parser::Lexer::dot() {
         switch (parser.state) {
             case Parser::State::NODE:
-                parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, "."));
+                parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL, "."));
                 return false;
             break;
             case Parser::State::ARGUMENT:
                 if (!parser.nodes.back()->type || parser.nodes.back()->type->type != NodeType::Type::VARIABLE) {
-                    parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, "."));
+                    parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL, "."));
                     return false;
                 }
                 parser.nodes.back()->children.push_back(nullptr);
@@ -62,12 +62,12 @@ namespace Liquid {
     bool Parser::Lexer::startVariableDereference() {
         switch (parser.state) {
             case Parser::State::NODE:
-                parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
+                parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL));
                 return false;
             break;
             case Parser::State::ARGUMENT:
                 if (!parser.nodes.back()->type || parser.nodes.back()->type->type != NodeType::Type::VARIABLE) {
-                    parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, "["));
+                    parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL, "["));
                     return false;
                 }
                 parser.nodes.back()->children.push_back(nullptr);
@@ -81,12 +81,12 @@ namespace Liquid {
     bool Parser::Lexer::endVariableDereference() {
         switch (parser.state) {
             case Parser::State::NODE:
-                parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, "]"));
+                parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL, "]"));
                 return false;
             break;
             case Parser::State::ARGUMENT:
                 if (!parser.popNodeUntil(NodeType::Type::GROUP_DEREFERENCE)) {
-                    parser.pushError(Error(*this, Error::Type::UNBALANCED_GROUP));
+                    parser.pushError(Parser::Error(*this, Parser::Error::Type::UNBALANCED_GROUP));
                     return false;
                 }
                 parser.popNode();
@@ -98,7 +98,7 @@ namespace Liquid {
     bool Parser::Lexer::string(const char* str, size_t len) {
         switch (parser.state) {
             case Parser::State::NODE:
-                parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
+                parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL));
                 return false;
             break;
             case Parser::State::ARGUMENT:
@@ -111,7 +111,7 @@ namespace Liquid {
     bool Parser::Lexer::integer(long long i) {
         switch (parser.state) {
             case Parser::State::NODE:
-                parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
+                parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL));
                 return false;
             break;
             case Parser::State::ARGUMENT: {
@@ -124,7 +124,7 @@ namespace Liquid {
     bool Parser::Lexer::floating(double f) {
         switch (parser.state) {
             case Parser::State::NODE:
-                parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL));
+                parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL));
                 return false;
             break;
             case Parser::State::ARGUMENT: {
@@ -144,12 +144,12 @@ namespace Liquid {
                             const NodeType* type = SUPER::context.getTagType(typeName);
 
                             if (!type) {
-                                parser.pushError(Error(*this, Error::Type::UNKNOWN_TAG, std::string(str, len)));
+                                parser.pushError(Parser::Error(*this, Parser::Error::Type::UNKNOWN_TAG, std::string(str, len)));
                                 return false;
                             }
                             parser.popNodeUntil(NodeType::Type::TAG);
                             if (parser.nodes.back()->type != type) {
-                                parser.pushError(Error(*this, Error::Type::UNEXPECTED_END, std::string(str, len)));
+                                parser.pushError(Parser::Error(*this, Parser::Error::Type::UNEXPECTED_END, std::string(str, len)));
                                 return false;
                             }
                             parser.state = Parser::State::ARGUMENT;
@@ -173,7 +173,7 @@ namespace Liquid {
                                 }
                             }
                             if (!type) {
-                                parser.pushError(Error(*this, Error::Type::UNKNOWN_TAG, typeName));
+                                parser.pushError(Parser::Error(*this, Parser::Error::Type::UNKNOWN_TAG, typeName));
                                 return false;
                             }
                             parser.state = Parser::State::ARGUMENT;
@@ -196,7 +196,7 @@ namespace Liquid {
                 if (lastNode->type && lastNode->type->type == NodeType::Type::VARIABLE && !lastNode->children.back().get()) {
                     lastNode->children.back() = move(make_unique<Node>(Variant(std::string(str, len))));
                 } else {
-                    if (lastNode->type && !lastNode->children.back().get()) {
+                    if (lastNode->type && lastNode->children.size() > 0 && !lastNode->children.back().get()) {
                         unique_ptr<Node> node = make_unique<Node>(context.getVariableNodeType());
                         node->children.push_back(make_unique<Node>(Variant(std::string(str, len))));
                         parser.nodes.push_back(move(node));
@@ -205,7 +205,7 @@ namespace Liquid {
                         std::string opName = std::string(str, len);
                         if (opName == "|") {
                             if (parser.filterState != Parser::EFilterState::UNSET && parser.filterState != Parser::EFilterState::ARGUMENTS) {
-                                parser.pushError(Error(*this, Error::Type::INVALID_SYMBOL, opName));
+                                parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL, opName));
                                 return false;
                             }
                             parser.filterState = Parser::EFilterState::NAME;
@@ -215,7 +215,7 @@ namespace Liquid {
                             parser.filterState = Parser::EFilterState::COLON;
                             const FilterNodeType* op = context.getFilterType(opName);
                             if (!op) {
-                                parser.pushError(Error(*this, Error::Type::UNKNOWN_FILTER, opName));
+                                parser.pushError(Parser::Error(*this, Parser::Error::Type::UNKNOWN_FILTER, opName));
                                 return false;
                             }
                             auto operatorNode = make_unique<Node>(op);
@@ -230,7 +230,7 @@ namespace Liquid {
                         } else {
                             const OperatorNodeType* op = context.getOperatorType(opName);
                             if (!op) {
-                                parser.pushError(Error(*this, Error::Type::UNKNOWN_OPERATOR, opName));
+                                parser.pushError(Parser::Error(*this, Parser::Error::Type::UNKNOWN_OPERATOR, opName));
                                 return false;
                             }
                             assert(op->fixness == OperatorNodeType::Fixness::INFIX);
@@ -269,7 +269,7 @@ namespace Liquid {
     }
     bool Parser::Lexer::closeParenthesis() {
         if (!parser.popNodeUntil(NodeType::Type::GROUP)) {
-            parser.pushError(Error(*this, Error::Type::UNBALANCED_GROUP));
+            parser.pushError(Parser::Error(*this, Parser::Error::Type::UNBALANCED_GROUP));
             return false;
         }
         parser.popNode();
@@ -313,7 +313,7 @@ namespace Liquid {
     bool Parser::Lexer::endOutputBlock(bool suppress) {
         parser.filterState = Parser::EFilterState::UNSET;
         if (parser.state != Parser::State::ARGUMENT) {
-            parser.pushError(Error(*this, Error::Type::UNEXPECTED_END));
+            parser.pushError(Parser::Error(*this, Parser::Error::Type::UNEXPECTED_END));
             return false;
         }
         if (!parser.popNodeUntil(NodeType::Type::OUTPUT))
@@ -330,7 +330,7 @@ namespace Liquid {
     bool Parser::Lexer::endControlBlock(bool suppress) {
         parser.filterState = Parser::EFilterState::UNSET;
         if (parser.state != Parser::State::ARGUMENT) {
-            parser.pushError(Error(*this, Error::Type::UNEXPECTED_END));
+            parser.pushError(Parser::Error(*this, Parser::Error::Type::UNEXPECTED_END));
             return false;
         }
         if (!parser.popNodeUntil(NodeType::Type::TAG))
@@ -355,10 +355,18 @@ namespace Liquid {
     }
 
     Parser::Node Parser::parse(const char* buffer, size_t len) {
+        errors.clear();
+        nodes.clear();
+        filterState = EFilterState::UNSET;
+        blockType = EBlockType::NONE;
+        state = State::NODE;
+
         nodes.push_back(std::make_unique<Node>(context.getConcatenationNodeType()));
-        lexer.parse(buffer, len);
+        Lexer::Error error = lexer.parse(buffer, len);
         if (errors.size() > 0)
-            throw ParserException(errors[0]);
+            throw Exception(errors[0]);
+        if (error.type != Lexer::Error::Type::NONE)
+            throw Exception(error);
         assert(nodes.size() > 0);
         Node node = move(*nodes[nodes.size()-1]);
         nodes.clear();

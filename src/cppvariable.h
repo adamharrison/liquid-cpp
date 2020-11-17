@@ -234,15 +234,29 @@ namespace Liquid {
             return true;
         }
 
-        bool getArrayVariable(Variable*& variable, size_t idx, bool createOnNotExists) const  {
+        bool getArrayVariable(Variable*& variable, size_t idx) const {
             if (type != Type::ARRAY)
                 return false;
+            if (idx >= a.size())
+                return false;
+            variable = &(*const_cast<CPPVariable*>(this))[idx];
+            return true;
+        }
+
+        bool getArrayVariable(Variable*& variable, size_t idx, bool createOnNotExists)  {
+            if (type != Type::ARRAY) {
+                if (type != Type::NIL)
+                    return false;
+                assign(vector<unique_ptr<CPPVariable>>());
+            }
             if (idx >= a.size()) {
                 if (!createOnNotExists)
                     return false;
-                const_cast<CPPVariable*>(this)->a.resize(idx+1);
+                a.resize(idx+1);
             }
-            variable = &(*const_cast<CPPVariable*>(this))[idx];
+            if (!a[idx].get())
+                a[idx] = make_unique<CPPVariable>();
+            variable = a[idx].get();
             return true;
         }
 
