@@ -9,18 +9,6 @@ namespace Liquid {
         return Error();
     }
 
-    // Performs implicit conversion.
-    string Parser::Node::getString() {
-        assert(type == nullptr);
-        if (variant.type == Variant::Type::STRING)
-            return variant.s;
-        else if (variant.type == Variant::Type::FLOAT)
-            return std::to_string(variant.f);
-        else if (variant.type == Variant::Type::INT)
-            return std::to_string(variant.i);
-        return std::string();
-    }
-
     bool Parser::Lexer::colon() {
         if (parser.filterState == Parser::EFilterState::COLON) {
             parser.filterState = Parser::EFilterState::ARGUMENTS;

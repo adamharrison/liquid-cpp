@@ -35,6 +35,7 @@ namespace Liquid {
         virtual ~Variable() { }
         virtual Type getType() const { return Type::NIL; }
         virtual bool getBool(bool& b) const { return false; }
+        virtual bool getTruthy() const { return false; }
         virtual bool getString(std::string& str) const { return false; }
         virtual bool getInteger(long long& i) const { return false; }
         virtual bool getFloat(double& i) const { return false; }
@@ -42,13 +43,14 @@ namespace Liquid {
         virtual bool getDictionaryVariable(Variable*& variable, const std::string& key, bool createOnNotExists) { return false;  }
         virtual bool getArrayVariable(Variable*& variable, size_t idx, bool createOnNotExists) const { return false; }
         virtual bool iterate(bool(*)(Variable* variable, void* data),  void* data, int start = 0, int limit = -1) const { return false; }
-        virtual long long getArraySize() { return -1; }
+        virtual long long getArraySize() const { return -1; }
         virtual void assign(const Variable& v) { }
         virtual void assign(double f) { }
         virtual void assign(bool b) { }
         virtual void assign(long long i) { }
         virtual void assign(const std::string& s) { }
         virtual void clear() { }
+        virtual int compare(Variable& v) const { return 0; }
     };
 
 }

@@ -7,6 +7,8 @@ namespace Liquid {
     }
 
     Parser::Node FilterNodeType::getArgument(Renderer& renderer, const Parser::Node& node, Variable& store, int idx) const {
+        if (idx >= (int)node.children[1]->children.size())
+            return Parser::Node();
         return renderer.retrieveRenderedNode(*node.children[1]->children[idx].get(), store);
     }
 

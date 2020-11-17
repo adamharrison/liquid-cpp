@@ -13,6 +13,9 @@ This is what I'm aiming for at any rate.
 
 * Fully compatible with both `Liquid`, Shopify's ruby gem, and `WWW::Shopify::Liquid`, the perl implementation.
 * Togglable extra features, such as real operators, parentheses, etc..
+* Ability to partially render content, then spit back out the remaining liquid that genreated it.
+* Line accurate, and helpful error messages.
+* Includes a standard dialect that contains all array, string and math filters by default, as well as all normal operators, and all control flow, iteration and variable tags.
 * Significant speedup over ruby-based liquid.
 * Significantly less memory usage than ruby-based liquid.
 * Ability to set limits on memory consumed, and time spent rendering.

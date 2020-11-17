@@ -75,10 +75,13 @@ namespace Liquid {
             Variant(double f) : f(f), type(Type::FLOAT) {  }
             Variant(long long i) : i(i), type(Type::INT) { }
             Variant(const string& s) : s(s), type(Type::STRING) { }
+            Variant(string&& s) : s(s), type(Type::STRING) { }
             Variant(const char* s) : s(s), type(Type::STRING) { }
             Variant(Variable* p) : p(p), type(Type::VARIABLE) { }
             Variant(void* p) : p(p), type(Type::POINTER) { }
             Variant(const vector<Variant>& a) : a(a), type(Type::ARRAY) { }
+            Variant(vector<Variant>&& a) : a(a), type(Type::ARRAY) { }
+            Variant(std::initializer_list<Variant> list) : a(list), type(Type::ARRAY) { }
             ~Variant() {
                 switch (type) {
                     case Type::STRING:
@@ -151,6 +154,41 @@ namespace Liquid {
                 }
             }
 
+            string getString() const {
+                switch (type) {
+                    case Type::STRING:
+                        return s;
+                    case Type::FLOAT:
+                        return std::to_string(f);
+                    case Type::INT:
+                        return std::to_string(i);
+                    default:
+                        return string();
+                }
+            }
+
+            long long getInt() const {
+                switch (type) {
+                    case Type::INT:
+                        return i;
+                    case Type::FLOAT:
+                        return (long long)f;
+                    default:
+                        return 0;
+                }
+            }
+
+            double getFloat() const {
+                switch (type) {
+                    case Type::INT:
+                        return (double)i;
+                    case Type::FLOAT:
+                        return f;
+                    default:
+                        return 0.0;
+                }
+            }
+
             void inject(Variable& variable) {
                 switch (type) {
                     case Type::STRING:
@@ -183,6 +221,80 @@ namespace Liquid {
                         variable.assign(p);
                     break;
                 }
+            }
+
+            static Variant parse(Variable& variable) {
+                switch (variable.getType()) {
+                    case Variable::Type::OTHER:
+                    case Variable::Type::DICTIONARY:
+                    case Variable::Type::ARRAY:
+                        return Variant(&variable);
+                    break;
+                    case Variable::Type::BOOL: {
+                        bool b;
+                        if (variable.getBool(b))
+                            return Variant(b);
+                    } break;
+                    case Variable::Type::INT: {
+                        long long i;
+                        if (variable.getInteger(i))
+                            return Variant(i);
+                    } break;
+                    case Variable::Type::FLOAT: {
+                        double f;
+                        if (variable.getFloat(f))
+                            return Variant(f);
+                    } break;
+                    case Variable::Type::STRING: {
+                        string s;
+                        if (variable.getString(s))
+                            return Variant(move(s));
+                    } break;
+                    case Variable::Type::NIL:
+                        return Variant();
+                }
+                return Variant();
+            }
+
+            size_t hash() const {
+                switch (type) {
+                    case Type::STRING:
+                        return std::hash<string>{}(s);
+                    case Type::INT:
+                        return std::hash<long long>{}(i);
+                    case Type::ARRAY:
+                        return 0;
+                    case Type::FLOAT:
+                        return std::hash<double>{}(f);
+                    case Type::NIL:
+                        return 0;
+                    case Type::BOOL:
+                        return std::hash<bool>{}(b);
+                    case Type::VARIABLE:
+                        return std::hash<Variable*>{}(v);
+                    default:
+                        return std::hash<void*>{}(p);
+                }
+            }
+
+            bool operator < (const Variant& v) const {
+                switch (type) {
+                    case Type::INT:
+                        return i < v.getInt();
+                    break;
+                    case Type::FLOAT:
+                        return f < v.getFloat();
+                    break;
+                    case Type::STRING:
+                        if (v.type == Type::STRING)
+                            return s < v.s;
+                        return s < v.getString();
+                    break;
+                    default:
+                        return p < v.p;
+                    break;
+                }
+                return false;
             }
         };
 
@@ -260,7 +372,10 @@ namespace Liquid {
                     children.~vector<unique_ptr<Node>>();
             }
 
-            string getString();
+            string getString() const {
+                assert(!type);
+                return variant.getString();
+            }
 
             Error validate(const Context& context) const;
 
