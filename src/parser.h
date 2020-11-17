@@ -22,6 +22,7 @@ namespace Liquid {
                 FLOAT,
                 INT,
                 STRING,
+                ARRAY,
                 VARIABLE,
                 POINTER
             };
@@ -33,22 +34,42 @@ namespace Liquid {
                 long long i;
                 string s;
                 void* p;
+                Variable* v;
+                vector<Variant> a;
             };
             Type type;
 
             Variant() : type(Type::NIL) { }
 
-            Variant(const Variant& v) : s(), type(v.type) {
-                if (type == Type::STRING)
-                    s = v.s;
-                else
-                    f = v.f;
+            Variant(const Variant& v) : type(v.type) {
+                switch (type) {
+                    case Type::STRING:
+                        new(&s) string;
+                        s = v.s;
+                    break;
+                    case Type::ARRAY:
+                        new(&a) vector<Variant>();
+                        a = v.a;
+                    break;
+                    default:
+                        f = v.f;
+                    break;
+                }
             }
-            Variant(Variant&& v) : s(), type(v.type) {
-                if (type == Type::STRING)
-                    s = std::move(v.s);
-                else
-                    f = v.f;
+            Variant(Variant&& v) : type(v.type) {
+                switch (type) {
+                    case Type::STRING:
+                        new(&s) string;
+                        s = std::move(v.s);
+                    break;
+                    case Type::ARRAY:
+                        new(&a) vector<Variant>();
+                        a = std::move(v.a);
+                    break;
+                    default:
+                        f = v.f;
+                    break;
+                }
             }
             Variant(bool b) : b(b), type(Type::BOOL) {  }
             Variant(double f) : f(f), type(Type::FLOAT) {  }
@@ -57,7 +78,19 @@ namespace Liquid {
             Variant(const char* s) : s(s), type(Type::STRING) { }
             Variant(Variable* p) : p(p), type(Type::VARIABLE) { }
             Variant(void* p) : p(p), type(Type::POINTER) { }
-            ~Variant() { if (type == Type::STRING) s.~string(); }
+            Variant(const vector<Variant>& a) : a(a), type(Type::ARRAY) { }
+            ~Variant() {
+                switch (type) {
+                    case Type::STRING:
+                        s.~string();
+                    break;
+                    case Type::ARRAY:
+                        a.~vector<Variant>();
+                    break;
+                    default:
+                    break;
+                }
+            }
 
             bool isTruthy() const {
                 return !(
@@ -70,13 +103,30 @@ namespace Liquid {
             }
 
             Variant& operator = (const Variant& v) {
-                if (v.type == Type::STRING) {
-                    i = 0;
-                    s = v.s;
-                } else {
-                    if (type == Type::STRING)
-                        s.~string();
-                    i = v.i;
+                switch (v.type) {
+                    case Type::STRING:
+                        if (type != Type::STRING) {
+                            if (v.type == Type::ARRAY)
+                                a.~vector<Variant>();
+                            else
+                                i = 0;
+                            new(&s) string;
+                        }
+                        s = v.s;
+                    break;
+                    case Type::ARRAY:
+                        if (type != Type::ARRAY) {
+                            if (v.type == Type::STRING)
+                                s.~string();
+                            else
+                                i = 0;
+                            new(&a) vector<Variant>();
+                        }
+                        a = v.a;
+                    break;
+                    default:
+                        f = v.f;
+                    break;
                 }
                 return *this;
             }
@@ -88,6 +138,8 @@ namespace Liquid {
                         return s == v.s;
                     case Type::INT:
                         return i == v.i;
+                    case Type::ARRAY:
+                        return a == v.a;
                     case Type::FLOAT:
                         return f == v.f;
                     case Type::NIL:
@@ -96,6 +148,40 @@ namespace Liquid {
                         return b == v.b;
                     default:
                         return p == v.p;
+                }
+            }
+
+            void inject(Variable& variable) {
+                switch (type) {
+                    case Type::STRING:
+                        variable.assign(s);
+                    break;
+                    case Type::INT:
+                        variable.assign(i);
+                    break;
+                    case Type::ARRAY: {
+                        for (size_t i = 0; i < a.size(); ++i) {
+                            Variable* target;
+                            if (!variable.getArrayVariable(target, i, true))
+                                break;
+                            a[i].inject(*target);
+                        }
+                    } break;
+                    case Type::FLOAT:
+                        variable.assign(f);
+                    break;
+                    case Type::NIL:
+                        variable.clear();
+                    break;
+                    case Type::BOOL:
+                        variable.assign(b);
+                    break;
+                    case Type::VARIABLE:
+                        variable.assign(*v);
+                    break;
+                    default:
+                        variable.assign(p);
+                    break;
                 }
             }
         };
@@ -162,7 +248,13 @@ namespace Liquid {
                 }
             }
             Node(const Variant& v) : type(nullptr), variant(v) { }
-            Node(Node&& node) :type(node.type), children(std::move(node.children)) { }
+            Node(Node&& node) :type(node.type) {
+                if (type) {
+                    new(&children) vector<unique_ptr<Node>>(std::move(node.children));
+                } else {
+                    new(&variant) Variant(std::move(node.variant));
+                }
+            }
             ~Node() {
                 if (type)
                     children.~vector<unique_ptr<Node>>();

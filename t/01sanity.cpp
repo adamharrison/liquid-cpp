@@ -245,6 +245,10 @@ TEST(sanity, forloop) {
     Parser::Node ast;
     std::string str;
 
+    ast = getParser().parse("{% for i in (3..5) %}{{ i }}{% endfor %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "345");
+
     ast = getParser().parse("{% for i in list %}{{ i }}{% endfor %}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "151020");
@@ -258,9 +262,16 @@ TEST(sanity, forloop) {
     ASSERT_EQ(str, "ABAB");
 
 
-    ast = getParser().parse("{% for i in list %}{{ i }}{% break %}{% endfor %}");
+    ast = getParser().parse("{% for i in list %}{{ i }}{% break %}3{% endfor %}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "1");
+
+
+    ast = getParser().parse("{% for i in list %}{{ i }}{% continue %}2{% endfor %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "151020");
+
+
 
 }
 

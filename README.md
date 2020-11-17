@@ -15,6 +15,7 @@ This is what I'm aiming for at any rate.
 * Togglable extra features, such as real operators, parentheses, etc..
 * Significant speedup over ruby-based liquid.
 * Significantly less memory usage than ruby-based liquid.
+* Ability to set limits on memory consumed, and time spent rendering.
 * Contextualized set of filters, operators, and tags per liquid object instantaited; no global state as in the regular Shopify gem, easily allowing for many flavours of liquid in the same process.
 * Ability to easily specify additions of filters, operators, and tags called `Dialects`, which can be mixed and matched.
 * Built-in optimizer that will do things like loop unrolling, conditional elimiation, etc...

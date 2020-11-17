@@ -55,6 +55,7 @@
 		<Unit filename="Makefile">
 			<Option target="executable" />
 		</Unit>
+		<Unit filename="README.md" />
 		<Unit filename="src/common.h" />
 		<Unit filename="src/context.cpp">
 			<Option target="executable" />
@@ -79,6 +80,7 @@
 		<Unit filename="src/parser.h">
 			<Option target="executable" />
 		</Unit>
+		<Unit filename="src/renderer.cpp" />
 		<Unit filename="src/renderer.h">
 			<Option target="executable" />
 		</Unit>

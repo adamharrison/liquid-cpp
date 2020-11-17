@@ -74,7 +74,7 @@ namespace Liquid {
                                 column = 0;
                             } break;
                             case '{': {
-                                if (str[offset-1] == '{') {
+                                if (offset > 0 && str[offset-1] == '{') {
                                     if (offset-1 < size && str[offset+1] == '-') {
                                         if (offset - lastInitial - 1 > 0) {
                                             for (i = offset-2; isWhitespace(str[i]); --i);
@@ -91,7 +91,7 @@ namespace Liquid {
                                 }
                             } break;
                             case '%': {
-                                if (str[offset-1] == '{') {
+                                if (offset > 0 && str[offset-1] == '{') {
                                     if (offset-1 < size && str[offset+1] == '-') {
                                         if (offset - lastInitial - 1 > 0) {
                                             for (i = offset-2; isWhitespace(str[i]); --i);
@@ -159,9 +159,15 @@ namespace Liquid {
                                     } else {
                                         if (hasPoint) {
                                             // Likely an operator, like '..'; treat as a literal. Back up 1, and treat the number as a number, and then start processing from its end.
-                                            ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
-                                            --offset;
-                                            processComplete = true;
+                                            if (str[startOfWord] != '.') {
+                                                hasPoint = false;
+                                                ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - 1, isNumber, hasPoint);
+                                                --offset;
+                                                processComplete = true;
+                                            } else {
+                                                isNumber = false;
+                                                isWord = false;
+                                            }
                                         } else
                                             hasPoint = true;
                                     }

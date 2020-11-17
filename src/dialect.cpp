@@ -254,10 +254,9 @@ namespace Liquid {
             Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode, store, true);
             assert(targetVariable);
 
-            renderer.retrieveRenderedNode(*arguments->children[0]->children[0].get(), store);
             Parser::Node result = renderer.retrieveRenderedNode(*arguments->children[0]->children[1].get(), store);
 
-            if (result.type != nullptr || result.variant.type != Parser::Variant::Type::VARIABLE)
+            if (result.type != nullptr || (result.variant.type != Parser::Variant::Type::VARIABLE && result.variant.type != Parser::Variant::Type::ARRAY))
                 return Parser::Node();
 
             struct ForLoopContext {
@@ -265,17 +264,12 @@ namespace Liquid {
                 const Parser::Node& node;
                 Variable& store;
                 Variable& targetVariable;
+                bool (*iterator)(ForLoopContext& forloopContext);
                 long long length;
                 string result;
                 long long idx = 0;
-                bool broken = false;
             };
-
-            ForLoopContext forLoopContext = { renderer, node, store, *targetVariable, static_cast<Variable*>(result.variant.p)->getArraySize() };
-            static_cast<Variable*>(result.variant.p)->iterate(+[](Variable* variable, void* data) {
-                ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
-                forLoopContext.targetVariable.assign(*variable);
-
+            auto iterator = +[](ForLoopContext& forLoopContext) {
                 Variable* forLoopVariable;
                 Variable* index0, *index, *rindex, *rindex0, *first, *last, *length;
                 forLoopContext.store.getDictionaryVariable(forLoopVariable, "forloop", true);
@@ -303,7 +297,25 @@ namespace Liquid {
                 }
                 ++forLoopContext.idx;
                 return true;
-            }, const_cast<void*>((void*)&forLoopContext));
+            };
+
+            ForLoopContext forLoopContext = { renderer, node, store, *targetVariable, iterator };
+            if (result.variant.type == Parser::Variant::Type::ARRAY) {
+                forLoopContext.length = result.variant.a.size();
+                for (auto it = result.variant.a.begin(); it != result.variant.a.end(); ++it) {
+                    forLoopContext.targetVariable.clear();
+                    it->inject(forLoopContext.targetVariable);
+                    if (!forLoopContext.iterator(forLoopContext))
+                        break;
+                }
+            } else {
+                forLoopContext.length = static_cast<Variable*>(result.variant.p)->getArraySize();
+                static_cast<Variable*>(result.variant.p)->iterate(+[](Variable* variable, void* data) {
+                    ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
+                    forLoopContext.targetVariable.assign(*variable);
+                    return forLoopContext.iterator(forLoopContext);
+                }, const_cast<void*>((void*)&forLoopContext));
+            }
             return Parser::Node(forLoopContext.result);
         }
     };
@@ -506,6 +518,27 @@ namespace Liquid {
         }
     };
 
+    struct RangeOperatorNode : OperatorNodeType {
+        RangeOperatorNode() : OperatorNodeType("..", Arity::BINARY, 10) { }
+
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+            // Requires integers.
+            if (op1.type || op2.type || op1.variant.type != Parser::Variant::Type::INT || op2.variant.type != Parser::Variant::Type::INT)
+                return Parser::Node();
+            auto result = Parser::Node(Parser::Variant(vector<Parser::Variant>()));
+            // TODO: This can allocate a lot of memory. Short-circuit that; but should be plugge dinto the allocator.
+            long long size = op2.variant.i - op1.variant.i;
+            if (size > 1000)
+                return Parser::Node();
+            result.variant.a.reserve(size);
+            for (long long i = op1.variant.i; i <= op2.variant.i; ++i)
+                result.variant.a.push_back(Parser::Variant(i));
+            return result;
+        }
+    };
+
     template <class Function>
     struct ArithmeticFilterNode : FilterNodeType {
         ArithmeticFilterNode(const string& symbol) : FilterNodeType(symbol, 1, 1) { }
@@ -601,6 +634,8 @@ namespace Liquid {
 
         context.registerType<AndOperatorNode>();
         context.registerType<OrOperatorNode>();
+
+        context.registerType<RangeOperatorNode>();
 
         context.registerType<PlusFilterNode>();
         context.registerType<MinusFilterNode>();

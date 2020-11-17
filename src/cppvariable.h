@@ -26,7 +26,7 @@ namespace Liquid {
         CPPVariable(void* nil) : type(Type::NIL) { }
         CPPVariable(const CPPVariable& v) :type(Type::NIL) { assign(v); }
         CPPVariable(CPPVariable&& v) : type(Type::NIL) { this->move(std::move(v)); }
-        CPPVariable(std::initializer_list<CPPVariable> l) {
+        CPPVariable(std::initializer_list<CPPVariable> l) : type(Type::NIL) {
             assign(vector<unique_ptr<CPPVariable>>());
             a.reserve(l.size());
             for (auto it = l.begin(); it != l.end(); ++it)
