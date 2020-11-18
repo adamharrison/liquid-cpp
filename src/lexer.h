@@ -302,7 +302,8 @@ namespace Liquid {
                                 for (; isWhitespace(str[target]); --target);
                                 if (strncmp("endraw", &str[target-5], 6) == 0) {
                                     for (target = target-6; isWhitespace(str[target]); --target);
-                                    if (str[target-1] == '-')
+                                    bool hasSuppressed = str[target-1] == '-';
+                                    if (hasSuppressed)
                                         --target;
                                     if (str[target] == '%' && str[target-1] == '{') {
                                         target -= 2;
@@ -310,6 +311,8 @@ namespace Liquid {
                                             static_cast<T*>(this)->literal(&str[lastInitial], target - lastInitial + 1);
                                         state = State::INITIAL;
                                         ++offset;
+                                        if (hasSuppressed)
+                                            for (; isWhitespace(str[offset]) && offset < size; ++offset);
                                         lastInitial = offset;
                                         break;
                                     }
