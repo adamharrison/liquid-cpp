@@ -131,14 +131,26 @@ namespace Liquid {
                                             for (i = offset-2; isWhitespace(str[i]); --i);
                                             static_cast<T*>(this)->literal(&str[lastInitial], i - lastInitial + 1);
                                         }
-                                        ongoing = static_cast<T*>(this)->startControlBlock(true);
                                         ++offset;
                                     } else {
                                         if (offset - lastInitial - 1 > 0)
                                             static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial - 1);
-                                        ongoing = static_cast<T*>(this)->startControlBlock(false);
                                     }
-                                    state = State::CONTROL;
+
+                                    // Check for the raw tag. This is a special lexing halter.
+                                    for (i = offset+1; i < size && isWhitespace(str[i]); ++i);
+                                    if (i < size - 4 && strncmp("raw", &str[i], 3) == 0) {
+                                        for (i = i + 4; i < size && isWhitespace(str[i]); ++i);
+                                        if (i < size && str[i] == '-')
+                                            ++i;
+                                        if (i >= size - 2 || str[i] != '%' || str[i+1] != '}')
+                                            return Lexer::Error(*this, Lexer::Error::Type::UNEXPECTED_END);
+                                        lastInitial = i+2;
+                                        state = State::RAW;
+                                    } else {
+                                        ongoing = static_cast<T*>(this)->startControlBlock(false);
+                                        state = State::CONTROL;
+                                    }
                                 }
                             } break;
                         }
@@ -281,7 +293,31 @@ namespace Liquid {
                         }
                     } break;
                     case State::RAW: {
-
+                        // Go until the next raw tag;
+                        do {
+                            if (str[offset] == '}' && str[offset-1] == '%') {
+                                size_t target = offset - 2;
+                                if (str[target] == '-')
+                                    --target;
+                                for (; isWhitespace(str[target]); --target);
+                                if (strncmp("endraw", &str[target-5], 6) == 0) {
+                                    for (target = target-6; isWhitespace(str[target]); --target);
+                                    if (str[target-1] == '-')
+                                        --target;
+                                    if (str[target] == '%' && str[target-1] == '{') {
+                                        target -= 2;
+                                        if (target - lastInitial - 1 > 0)
+                                            static_cast<T*>(this)->literal(&str[lastInitial], target - lastInitial + 1);
+                                        state = State::INITIAL;
+                                        ++offset;
+                                        lastInitial = offset;
+                                        break;
+                                    }
+                                }
+                            }
+                        } while (++offset < size);
+                        if (state == State::RAW)
+                            return Lexer::Error(*this, Lexer::Error::Type::UNEXPECTED_END, "raw");
                     } break;
                 }
             }

@@ -494,9 +494,12 @@ namespace Liquid {
                     case Parser::Error::Type::INVALID_SYMBOL:
                         sprintf(buffer, "Invalid symbol '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
                     break;
-                    case Parser::Error::Type::UNEXPECTED_END:
-                        sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.row, error.column);
-                    break;
+                    case Parser::Error::Type::UNEXPECTED_END: {
+                        if (!error.message.empty())
+                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                        else
+                            sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.row, error.column);
+                    } break;
                     case Parser::Error::Type::UNBALANCED_GROUP:
                         sprintf(buffer, "Unbalanced end to group on line %lu, column %lu.", error.row, error.column);
                     break;
@@ -509,7 +512,10 @@ namespace Liquid {
                 switch (lexerError.type) {
                     case Lexer::Error::Type::NONE: break;
                     case Lexer::Error::Type::UNEXPECTED_END:
-                        sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.row, error.column);
+                        if (!error.message.empty())
+                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                        else
+                            sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.row, error.column);
                     break;
                 }
                 message = buffer;

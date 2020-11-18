@@ -6,6 +6,7 @@
 #include "../src/cppvariable.h"
 
 #include <gtest/gtest.h>
+#include <sys/time.h>
 
 using namespace std;
 using namespace Liquid;
@@ -108,6 +109,14 @@ TEST(sanity, parenthesis) {
     auto ast = getParser().parse("asdbfsdf {{ a - (1 + 2) }} b");
     auto str = getRenderer().render(ast, variable);
     ASSERT_EQ(str, "asdbfsdf 0 b");
+}
+
+TEST(sanity, raw) {
+    CPPVariable variable;
+    variable["a"] = 3;
+    auto ast = getParser().parse("asdbfsdf {% raw %}{{ a - (1 + 2) }}{% endraw %} b");
+    auto str = getRenderer().render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf {{ a - (1 + 2) }} b");
 }
 
 

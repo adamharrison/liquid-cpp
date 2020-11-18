@@ -82,6 +82,11 @@ namespace Liquid {
         }
     };
 
+    struct CommentNode : EnclosedNodeType {
+        CommentNode() : EnclosedNodeType("comment", 0, 0) { }
+        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
+    };
+
     template <bool Inverse>
     struct BranchNode : TagNodeType {
         static Parser::Node internalRender(Renderer& renderer, const Parser::Node& node, Variable& store) {
@@ -254,6 +259,8 @@ namespace Liquid {
             Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode, store, true);
             assert(targetVariable);
 
+            // TODO: Should have an optimization for when the operand from "in" ia s sequence; so that it doesn't render out to a ridiclous thing, it
+            // simply loops through the existing stuff.
             Parser::Node result = renderer.retrieveRenderedNode(*arguments->children[0]->children[1].get(), store);
 
             if (result.type != nullptr || (result.variant.type != Parser::Variant::Type::VARIABLE && result.variant.type != Parser::Variant::Type::ARRAY)) {
@@ -594,8 +601,8 @@ namespace Liquid {
                 return Parser::Node();
             auto result = Parser::Node(Parser::Variant(vector<Parser::Variant>()));
             // TODO: This can allocate a lot of memory. Short-circuit that; but should be plugge dinto the allocator.
-            long long size = op2.variant.i - op1.variant.i;
-            if (size > 1000)
+            long long size = op2.variant.i - op1.variant.i + 1;
+            if (size > 10000)
                 return Parser::Node();
             result.variant.a.reserve(size);
             for (long long i = op1.variant.i; i <= op2.variant.i; ++i)
@@ -1593,6 +1600,9 @@ namespace Liquid {
         context.registerType<CaptureNode>();
         context.registerType<IncrementNode>();
         context.registerType<DecrementNode>();
+
+        // Other tags.
+        context.registerType<CommentNode>();
 
         // Standard set of operators.
         context.registerType<AssignOperator>();
