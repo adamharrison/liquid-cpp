@@ -153,6 +153,9 @@ namespace Liquid {
                         return p == v.p;
                 }
             }
+            bool isNumeric() const {
+                return type == Type::INT || type == Type::FLOAT;
+            }
 
             string getString() const {
                 switch (type) {
@@ -305,6 +308,7 @@ namespace Liquid {
                 // Self-explamatory.
                 UNKNOWN_TAG,
                 UNKNOWN_OPERATOR,
+                UNKNOWN_OPERATOR_OR_QUALIFIER,
                 UNKNOWN_FILTER,
                 // Weird symbol in weird place.
                 INVALID_SYMBOL,
@@ -480,6 +484,9 @@ namespace Liquid {
                     break;
                     case Parser::Error::Type::UNKNOWN_OPERATOR:
                         sprintf(buffer, "Unknown operator '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                    break;
+                    case Parser::Error::Type::UNKNOWN_OPERATOR_OR_QUALIFIER:
+                        sprintf(buffer, "Unknown operator, or qualifier '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
                     break;
                     case Parser::Error::Type::UNKNOWN_FILTER:
                         sprintf(buffer, "Unknown filter '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);

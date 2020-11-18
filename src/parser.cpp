@@ -228,10 +228,36 @@ namespace Liquid {
                             parser.nodes.push_back(std::make_unique<Node>(context.getArgumentsNodeType()));
                             parser.nodes.back()->children.push_back(nullptr);
                         } else {
+                            // It's either an operator, or, if we're part of a tag, a qualifier. Check both. Operators first.
                             const OperatorNodeType* op = context.getOperatorType(opName);
                             if (!op) {
-                                parser.pushError(Parser::Error(*this, Parser::Error::Type::UNKNOWN_OPERATOR, opName));
-                                return false;
+                                // If no operator found, check for a specified qualifier.
+                                const TagNodeType::QualifierNodeType* qualifier = nullptr;
+                                bool hasTag = false;
+                                if (parser.nodes.size() > 0) {
+                                    for (auto it = parser.nodes.rbegin(); it != parser.nodes.rend(); ++it) {
+                                        if ((*it)->type == context.getConcatenationNodeType())
+                                            break;
+                                        if ((*it)->type && (*it)->type->type == NodeType::Type::TAG) {
+                                            hasTag = true;
+                                            auto& qualifiers = static_cast<const TagNodeType*>((*it)->type)->qualifiers;
+                                            auto it = qualifiers.find(opName);
+                                            if (it != qualifiers.end())
+                                                qualifier = static_cast<TagNodeType::QualifierNodeType*>(it->second.get());
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (!qualifier) {
+                                    parser.pushError(Parser::Error(*this, hasTag ? Parser::Error::Type::UNKNOWN_OPERATOR_OR_QUALIFIER : Parser::Error::Type::UNKNOWN_OPERATOR, opName));
+                                    return false;
+                                }
+                                parser.popNodeUntil(NodeType::Type::ARGUMENTS);
+                                parser.nodes.back()->children.push_back(nullptr);
+                                parser.nodes.push_back(std::make_unique<Node>(qualifier));
+                                if (qualifier->arity == TagNodeType::QualifierNodeType::Arity::UNARY)
+                                    parser.nodes.back()->children.push_back(nullptr);
+                                return true;
                             }
                             assert(op->fixness == OperatorNodeType::Fixness::INFIX);
                             auto operatorNode = make_unique<Node>(op);

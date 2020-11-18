@@ -223,8 +223,21 @@ namespace Liquid {
             }
         };
 
+        struct ReverseQualifierNode : TagNodeType::QualifierNodeType {
+            ReverseQualifierNode() : TagNodeType::QualifierNodeType("reversed", TagNodeType::QualifierNodeType::Arity::NONARY) { }
+        };
+        struct LimitQualifierNode : TagNodeType::QualifierNodeType {
+            LimitQualifierNode() : TagNodeType::QualifierNodeType("limit", TagNodeType::QualifierNodeType::Arity::UNARY) { }
+        };
+        struct OffsetQualifierNode : TagNodeType::QualifierNodeType {
+            OffsetQualifierNode() : TagNodeType::QualifierNodeType("offset", TagNodeType::QualifierNodeType::Arity::UNARY) { }
+        };
+
         ForNode() : TagNodeType(Composition::ENCLOSED, "for") {
-            intermediates["else"] = make_unique<ElseNode>();
+            registerType<ElseNode>();
+            registerType<ReverseQualifierNode>();
+            registerType<LimitQualifierNode>();
+            registerType<OffsetQualifierNode>();
         }
 
         Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
@@ -243,8 +256,43 @@ namespace Liquid {
 
             Parser::Node result = renderer.retrieveRenderedNode(*arguments->children[0]->children[1].get(), store);
 
-            if (result.type != nullptr || (result.variant.type != Parser::Variant::Type::VARIABLE && result.variant.type != Parser::Variant::Type::ARRAY))
+            if (result.type != nullptr || (result.variant.type != Parser::Variant::Type::VARIABLE && result.variant.type != Parser::Variant::Type::ARRAY)) {
+                if (node.children.size() >= 4) {
+                    // Run the else statement if there is one.
+                    return renderer.retrieveRenderedNode(*node.children[3].get(), store);
+                }
                 return Parser::Node();
+            }
+
+            bool reversed = false;
+            int start = 0;
+            int limit = -1;
+            bool hasLimit = false;
+
+            const NodeType* reversedQualifier = qualifiers.find("reversed")->second.get();
+            const NodeType* limitQualifier = qualifiers.find("limit")->second.get();
+            const NodeType* offsetQualifier = qualifiers.find("offset")->second.get();
+
+            for (size_t i = 1; i < arguments->children.size(); ++i) {
+                Parser::Node* child = arguments->children[i].get();
+                if (child->type && child->type->type == NodeType::Type::QUALIFIER) {
+                    const NodeType* argumentType = arguments->children[i]->type;
+                    if (reversedQualifier == argumentType)
+                        reversed = true;
+                    else if (limitQualifier == argumentType) {
+                        auto result = renderer.retrieveRenderedNode(*child->children[0].get(), store);
+                        if (!result.type && result.variant.isNumeric()) {
+                            limit = (int)result.variant.getInt();
+                            hasLimit = true;
+                        }
+                    } else if (offsetQualifier == argumentType) {
+                        auto result = renderer.retrieveRenderedNode(*child->children[0].get(), store);
+                        if (!result.type && result.variant.isNumeric())
+                            start = std::max((int)result.variant.getInt(), 0);
+                    }
+                }
+            }
+
 
             struct ForLoopContext {
                 Renderer& renderer;
@@ -275,6 +323,7 @@ namespace Liquid {
                 last->assign(forLoopContext.idx == forLoopContext.length-1);
                 length->assign(forLoopContext.length);
                 forLoopContext.result.append(forLoopContext.renderer.retrieveRenderedNode(*forLoopContext.node.children[1].get(), forLoopContext.store).getString());
+                ++forLoopContext.idx;
                 if (forLoopContext.renderer.control != Renderer::Control::NONE)  {
                     if (forLoopContext.renderer.control == Renderer::Control::BREAK) {
                         forLoopContext.renderer.control = Renderer::Control::NONE;
@@ -282,26 +331,43 @@ namespace Liquid {
                     } else
                         forLoopContext.renderer.control = Renderer::Control::NONE;
                 }
-                ++forLoopContext.idx;
                 return true;
             };
 
             ForLoopContext forLoopContext = { renderer, node, store, *targetVariable, iterator };
+
+            forLoopContext.length = result.variant.type == Parser::Variant::Type::ARRAY ? result.variant.a.size() : static_cast<Variable*>(result.variant.p)->getArraySize();
+            if (!hasLimit)
+                limit = forLoopContext.length;
+            else if (limit < 0)
+                limit = std::max((int)(limit+forLoopContext.length), 0);
             if (result.variant.type == Parser::Variant::Type::ARRAY) {
-                forLoopContext.length = result.variant.a.size();
-                for (auto it = result.variant.a.begin(); it != result.variant.a.end(); ++it) {
-                    forLoopContext.targetVariable.clear();
-                    it->inject(forLoopContext.targetVariable);
-                    if (!forLoopContext.iterator(forLoopContext))
-                        break;
+                int endIndex = std::min(limit+start-1, (int)forLoopContext.length-1);
+                if (reversed) {
+                    for (int i = endIndex; i >= start; --i) {
+                        forLoopContext.targetVariable.clear();
+                        result.variant.a[i].inject(forLoopContext.targetVariable);
+                        if (!forLoopContext.iterator(forLoopContext))
+                            break;
+                    }
+                } else {
+                    for (int i = start; i <= endIndex; ++i) {
+                        forLoopContext.targetVariable.clear();
+                        result.variant.a[i].inject(forLoopContext.targetVariable);
+                        if (!forLoopContext.iterator(forLoopContext))
+                            break;
+                    }
                 }
             } else {
-                forLoopContext.length = static_cast<Variable*>(result.variant.p)->getArraySize();
                 static_cast<Variable*>(result.variant.p)->iterate(+[](Variable* variable, void* data) {
                     ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
                     forLoopContext.targetVariable.assign(*variable);
                     return forLoopContext.iterator(forLoopContext);
-                }, const_cast<void*>((void*)&forLoopContext));
+                }, const_cast<void*>((void*)&forLoopContext), start, limit, reversed);
+            }
+            if (forLoopContext.idx == 0 && node.children.size() >= 4) {
+                // Run the else statement if there is one.
+                return renderer.retrieveRenderedNode(*node.children[3].get(), store);
             }
             return Parser::Node(forLoopContext.result);
         }

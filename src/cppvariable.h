@@ -266,16 +266,24 @@ namespace Liquid {
             return a.size();
         }
 
-        bool iterate(bool (*callback)(Variable* variable, void* data), void* data, int start = 0, int limit = -1) const {
+        bool iterate(bool (*callback)(Variable* variable, void* data), void* data, int start = 0, int limit = -1, bool reverse = false) const {
             if (type != Type::ARRAY)
                 return false;
             if (limit < 0)
                 limit = (int)a.size() + limit;
             if (start < 0)
                 start = 0;
-            for (int i = start; i <= limit; ++i) {
-                if (!callback(a[i].get(), data))
-                    break;
+            int endIndex = std::min(start+limit-1, (int)a.size());
+            if (reverse) {
+                for (int i = endIndex; i >= start; --i) {
+                    if (!callback(a[i].get(), data))
+                        break;
+                }
+            } else {
+                for (int i = start; i <= endIndex; ++i) {
+                    if (!callback(a[i].get(), data))
+                        break;
+                }
             }
             return true;
         }

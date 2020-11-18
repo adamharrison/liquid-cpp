@@ -17,6 +17,7 @@ namespace Liquid {
             GROUP_DEREFERENCE,
             OUTPUT,
             ARGUMENTS,
+            QUALIFIER,
             OPERATOR,
             FILTER
         };
@@ -51,14 +52,45 @@ namespace Liquid {
             ENCLOSED
         };
 
+        // This is insanely stupid.
+        struct QualifierNodeType : NodeType {
+            enum class Arity {
+                NONARY,
+                UNARY
+            };
+            Arity arity;
+
+            QualifierNodeType(const string& symbol, Arity arity) : NodeType(NodeType::Type::QUALIFIER, symbol, 1) { }
+            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
+        };
+
         // For things like if/else, and whatnot. else is a free tag that sits inside the if statement.
         unordered_map<string, unique_ptr<NodeType>> intermediates;
+        // For things for the forloop; like reversed, limit, etc... Super stupid, but Shopify threw them in, and there you are.
+        unordered_map<string, unique_ptr<NodeType>> qualifiers;
 
         Composition composition;
         int minArguments;
         int maxArguments;
 
         TagNodeType(Composition composition, string symbol, int minArguments = -1, int maxArguments = -1) : NodeType(NodeType::Type::TAG, symbol, -1), composition(composition), minArguments(minArguments), maxArguments(maxArguments) { }
+
+        // Used for registering intermedaites and qualiifers.
+        template <class T>
+        void registerType() {
+            auto nodeType = make_unique<T>();
+            switch (nodeType->type) {
+                case NodeType::Type::TAG:
+                    intermediates[nodeType->symbol] = std::move(nodeType);
+                break;
+                case NodeType::Type::QUALIFIER:
+                    qualifiers[nodeType->symbol] = std::move(nodeType);
+                break;
+                default:
+                    assert(false);
+                break;
+            }
+        }
     };
 
     struct EnclosedNodeType : TagNodeType {
