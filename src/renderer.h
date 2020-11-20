@@ -20,9 +20,9 @@ namespace Liquid {
 
         Renderer(const Context& context) : context(context) { }
 
-        void render(const Parser::Node& ast, Variable& store, void (*)(const char* chunk, size_t size, void* data), void* data);
-        string render(const Parser::Node& ast, Variable& store);
-        Parser::Node retrieveRenderedNode(const Parser::Node& node, Variable& store);
+        void render(const Node& ast, Variable store, void (*)(const char* chunk, size_t size, void* data), void* data);
+        string render(const Node& ast, Variable store);
+        Node retrieveRenderedNode(const Node& node, Variable store);
     };
 }
 

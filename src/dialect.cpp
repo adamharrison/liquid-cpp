@@ -9,87 +9,90 @@ namespace Liquid {
     struct AssignNode : TagNodeType {
         AssignNode() : TagNodeType(Composition::FREE, "assign", 1, 1) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto& argumentNode = node.children.front();
             auto& assignmentNode = argumentNode->children.front();
             auto& variableNode = assignmentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode.get(), store, true);
-                if (targetVariable) {
+                Variable targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode.get(), store, true);
+                if (targetVariable.exists()) {
                     auto& operandNode = assignmentNode->children.back();
-                    Parser::Node node = renderer.retrieveRenderedNode(*operandNode.get(), store);
+                    Node node = renderer.retrieveRenderedNode(*operandNode.get(), store);
                     assert(!node.type);
-                    node.variant.inject(*targetVariable);
+                    renderer.context.inject(targetVariable, node.variant);
                 }
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
     struct AssignOperator : OperatorNodeType {
         AssignOperator() : OperatorNodeType("=", Arity::BINARY, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
+        Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
     };
 
     struct CaptureNode : TagNodeType {
         CaptureNode() : TagNodeType(Composition::ENCLOSED, "capture", 1, 1) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto& argumentNode = node.children.front();
             auto& variableNode = argumentNode->children.front();
+            const Context::VariableNode* variableTypeNode = static_cast<const Context::VariableNode*>(variableNode->type);
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode.get(), store, true);
-                if (targetVariable)
-                    targetVariable->assign(renderer.retrieveRenderedNode(*node.children[1].get(), store).getString());
+                Variable targetVariable = variableTypeNode->getVariable(renderer, *variableNode.get(), store, true);
+                if (targetVariable.exists())
+                    variableTypeNode->setVariable(targetVariable, renderer.retrieveRenderedNode(*node.children[1].get(), store));
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
     struct IncrementNode : TagNodeType {
         IncrementNode() : TagNodeType(Composition::FREE, "increment", 1, 1) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto& argumentNode = node.children.front();
             auto& variableNode = argumentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode.get(), store, true);
-                if (targetVariable) {
+                const Context::VariableNode* variableNodeType = static_cast<const Context::VariableNode*>(variableNode->type);
+                Variable targetVariable = variableNodeType->getVariable(renderer, *variableNode.get(), store, true);
+                if (targetVariable.exists()) {
                     long long i = -1;
-                    targetVariable->getInteger(i);
-                    targetVariable->assign(i+1);
+                    if (variableNodeType->resolver.getInteger(targetVariable,&i))
+                        variableNodeType->resolver.setInteger(targetVariable,i+1);
                 }
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
      struct DecrementNode : TagNodeType {
         DecrementNode() : TagNodeType(Composition::FREE, "decrement", 1, 1) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto& argumentNode = node.children.front();
             auto& variableNode = argumentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode.get(), store, true);
-                if (targetVariable) {
+                const Context::VariableNode* variableNodeType = static_cast<const Context::VariableNode*>(variableNode->type);
+                Variable targetVariable = variableNodeType->getVariable(renderer, *variableNode.get(), store, true);
+                if (targetVariable.exists()) {
                     long long i = 0;
-                    targetVariable->getInteger(i);
-                    targetVariable->assign(i-1);
+                    if (variableNodeType->resolver.getInteger(targetVariable,&i))
+                        variableNodeType->resolver.setInteger(targetVariable,i-1);
                 }
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
     struct CommentNode : EnclosedNodeType {
         CommentNode() : EnclosedNodeType("comment", 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
+        Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
     };
 
     template <bool Inverse>
     struct BranchNode : TagNodeType {
-        static Parser::Node internalRender(Renderer& renderer, const Parser::Node& node, Variable& store) {
+        static Node internalRender(Renderer& renderer, const Node& node, Variable store) {
             assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
             auto result = renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
@@ -108,14 +111,14 @@ namespace Liquid {
                     if (!conditionalResult.type && conditionalResult.variant.isTruthy())
                         return renderer.retrieveRenderedNode(*node.children[i+1].get(), store);
                 }
-                return Parser::Node();
+                return Node();
             }
         }
 
 
         struct ElsifNode : TagNodeType {
             ElsifNode() : TagNodeType(Composition::FREE, "elsif", 1, 1) { }
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const {
                 auto& arguments = node.children.front();
                 return renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
             }
@@ -123,8 +126,8 @@ namespace Liquid {
 
         struct ElseNode : TagNodeType {
             ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
-                return Parser::Node(Parser::Variant(true));
+            Node render(Renderer& renderer, const Node& node, Variable store) const {
+                return Node(Variant(true));
             }
         };
 
@@ -134,7 +137,7 @@ namespace Liquid {
         }
 
 
-        Parser::Error validate(const Context& context, const Parser::Node& node) const {
+        Parser::Error validate(const Context& context, const Node& node) const {
             auto elseNode = intermediates.find("else")->second.get();
             auto elsifNode = intermediates.find("elsif")->second.get();
             for (size_t i = 1; i < node.children.size(); ++i) {
@@ -147,7 +150,7 @@ namespace Liquid {
         }
 
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             return BranchNode<Inverse>::internalRender(renderer, node, store);
         }
     };
@@ -166,13 +169,13 @@ namespace Liquid {
         struct WhenNode : TagNodeType {
             WhenNode() : TagNodeType(Composition::FREE, "when", 1, 1) { }
 
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const {
                 return renderer.retrieveRenderedNode(*node.children[0]->children[0].get(), store);
             }
         };
         struct ElseNode : TagNodeType {
             ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
+            Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
         };
 
         CaseNode() : TagNodeType(Composition::ENCLOSED, "case", 1, 1) {
@@ -180,7 +183,7 @@ namespace Liquid {
             intermediates["else"] = make_unique<ElseNode>();
         }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
             auto result = renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
@@ -197,34 +200,34 @@ namespace Liquid {
                     return renderer.retrieveRenderedNode(*node.children[i+1].get(), store);
                 }
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
     struct ForNode : TagNodeType {
         struct InOperatorNode : OperatorNodeType {
             InOperatorNode() :  OperatorNodeType("in", Arity::BINARY, 0) { }
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
+            Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
         };
 
         struct ElseNode : TagNodeType {
             ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
+            Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
         };
 
         struct BreakNode : TagNodeType {
             BreakNode() : TagNodeType(Composition::FREE, "break", 0, 0) { }
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const {
                 renderer.control = Renderer::Control::BREAK;
-                return Parser::Node();
+                return Node();
             }
         };
 
         struct ContinueNode : TagNodeType {
             ContinueNode() : TagNodeType(Composition::FREE, "continue", 0, 0) { }
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const {
                 renderer.control = Renderer::Control::CONTINUE;
-                return Parser::Node();
+                return Node();
             }
         };
 
@@ -245,7 +248,7 @@ namespace Liquid {
             registerType<OffsetQualifierNode>();
         }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
             assert(arguments->children.size() >= 1);
@@ -256,19 +259,19 @@ namespace Liquid {
             assert(arguments->children[0]->children.size() == 2);
 
             auto& variableNode = arguments->children[0]->children[0];
-            Variable* targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode, store, true);
-            assert(targetVariable);
+            Variable targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode, store, true);
+            assert(targetVariable.exists());
 
             // TODO: Should have an optimization for when the operand from "in" ia s sequence; so that it doesn't render out to a ridiclous thing, it
             // simply loops through the existing stuff.
-            Parser::Node result = renderer.retrieveRenderedNode(*arguments->children[0]->children[1].get(), store);
+            Node result = renderer.retrieveRenderedNode(*arguments->children[0]->children[1].get(), store);
 
-            if (result.type != nullptr || (result.variant.type != Parser::Variant::Type::VARIABLE && result.variant.type != Parser::Variant::Type::ARRAY)) {
+            if (result.type != nullptr || (result.variant.type != Variant::Type::VARIABLE && result.variant.type != Variant::Type::ARRAY)) {
                 if (node.children.size() >= 4) {
                     // Run the else statement if there is one.
                     return renderer.retrieveRenderedNode(*node.children[3].get(), store);
                 }
-                return Parser::Node();
+                return Node();
             }
 
             bool reversed = false;
@@ -281,7 +284,7 @@ namespace Liquid {
             const NodeType* offsetQualifier = qualifiers.find("offset")->second.get();
 
             for (size_t i = 1; i < arguments->children.size(); ++i) {
-                Parser::Node* child = arguments->children[i].get();
+                Node* child = arguments->children[i].get();
                 if (child->type && child->type->type == NodeType::Type::QUALIFIER) {
                     const NodeType* argumentType = arguments->children[i]->type;
                     if (reversedQualifier == argumentType)
@@ -303,32 +306,35 @@ namespace Liquid {
 
             struct ForLoopContext {
                 Renderer& renderer;
-                const Parser::Node& node;
-                Variable& store;
-                Variable& targetVariable;
+                const Node& node;
+                Variable store;
+                Variable targetVariable;
                 bool (*iterator)(ForLoopContext& forloopContext);
                 long long length;
                 string result;
                 long long idx = 0;
             };
             auto iterator = +[](ForLoopContext& forLoopContext) {
-                Variable* forLoopVariable;
-                Variable* index0, *index, *rindex, *rindex0, *first, *last, *length;
-                forLoopContext.store.getDictionaryVariable(forLoopVariable, "forloop", true);
-                forLoopVariable->getDictionaryVariable(index0, "index0", true);
-                forLoopVariable->getDictionaryVariable(index, "index", true);
-                forLoopVariable->getDictionaryVariable(rindex, "rindex", true);
-                forLoopVariable->getDictionaryVariable(rindex0, "rindex0", true);
-                forLoopVariable->getDictionaryVariable(first, "first", true);
-                forLoopVariable->getDictionaryVariable(last, "last", true);
-                forLoopVariable->getDictionaryVariable(length, "length", true);
-                index0->assign(forLoopContext.idx);
-                index->assign(forLoopContext.idx+1);
-                rindex0->assign(forLoopContext.length - forLoopContext.idx);
-                rindex->assign(forLoopContext.length - (forLoopContext.idx+1));
-                first->assign(forLoopContext.idx == 0);
-                last->assign(forLoopContext.idx == forLoopContext.length-1);
-                length->assign(forLoopContext.length);
+                Variable forLoopVariable;
+                Variable index0, index, rindex, rindex0, first, last, length;
+
+                const Context::VariableNode* variableType = forLoopContext.renderer.context.getVariableNodeType();
+                auto& resolver = variableType->resolver;
+                resolver.getDictionaryVariable(forLoopContext.store, "forloop", true, forLoopVariable);
+                resolver.getDictionaryVariable(forLoopVariable, "index0", true, index0);
+                resolver.getDictionaryVariable(forLoopVariable, "index", true, index);
+                resolver.getDictionaryVariable(forLoopVariable, "rindex", true, rindex);
+                resolver.getDictionaryVariable(forLoopVariable, "rindex0", true, rindex0);
+                resolver.getDictionaryVariable(forLoopVariable, "first", true, first);
+                resolver.getDictionaryVariable(forLoopVariable, "last", true, last);
+                resolver.getDictionaryVariable(forLoopVariable, "length", true, length);
+                resolver.setInteger(index0, forLoopContext.idx);
+                resolver.setInteger(index, forLoopContext.idx+1);
+                resolver.setInteger(rindex0, forLoopContext.length - forLoopContext.idx);
+                resolver.setInteger(rindex, forLoopContext.length - (forLoopContext.idx+1));
+                resolver.setInteger(first, forLoopContext.idx == 0);
+                resolver.setInteger(last, forLoopContext.idx == forLoopContext.length-1);
+                resolver.setInteger(length, forLoopContext.length);
                 forLoopContext.result.append(forLoopContext.renderer.retrieveRenderedNode(*forLoopContext.node.children[1].get(), forLoopContext.store).getString());
                 ++forLoopContext.idx;
                 if (forLoopContext.renderer.control != Renderer::Control::NONE)  {
@@ -341,34 +347,38 @@ namespace Liquid {
                 return true;
             };
 
+            const Context::VariableNode* variableType = renderer.context.getVariableNodeType();
+            auto& resolver = variableType->resolver;
             ForLoopContext forLoopContext = { renderer, node, store, *targetVariable, iterator };
 
-            forLoopContext.length = result.variant.type == Parser::Variant::Type::ARRAY ? result.variant.a.size() : static_cast<Variable*>(result.variant.p)->getArraySize();
+            forLoopContext.length = result.variant.type == Variant::Type::ARRAY ? result.variant.a.size() : resolver.getArraySize(result.variant.p);
             if (!hasLimit)
                 limit = forLoopContext.length;
             else if (limit < 0)
                 limit = std::max((int)(limit+forLoopContext.length), 0);
-            if (result.variant.type == Parser::Variant::Type::ARRAY) {
+            if (result.variant.type == Variant::Type::ARRAY) {
                 int endIndex = std::min(limit+start-1, (int)forLoopContext.length-1);
                 if (reversed) {
                     for (int i = endIndex; i >= start; --i) {
-                        forLoopContext.targetVariable.clear();
-                        result.variant.a[i].inject(forLoopContext.targetVariable);
+                        resolver.setNil(forLoopContext.targetVariable);
+                        renderer.context.inject(forLoopContext.targetVariable, result.variant.a[i]);
                         if (!forLoopContext.iterator(forLoopContext))
                             break;
                     }
                 } else {
                     for (int i = start; i <= endIndex; ++i) {
-                        forLoopContext.targetVariable.clear();
-                        result.variant.a[i].inject(forLoopContext.targetVariable);
+                        resolver.setNil(forLoopContext.targetVariable);
+                        renderer.context.inject(forLoopContext.targetVariable, result.variant.a[i]);
                         if (!forLoopContext.iterator(forLoopContext))
                             break;
                     }
                 }
             } else {
-                static_cast<Variable*>(result.variant.p)->iterate(+[](Variable* variable, void* data) {
+                resolver.iterate(result.variant.v, +[](void* variable, void* data) {
                     ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
-                    forLoopContext.targetVariable.assign(*variable);
+                    const Context::VariableNode* variableType = forLoopContext.renderer.context.getVariableNodeType();
+                    auto& resolver = variableType->resolver;
+                    resolver.setVariable(forLoopContext.targetVariable, variable);
                     return forLoopContext.iterator(forLoopContext);
                 }, const_cast<void*>((void*)&forLoopContext), start, limit, reversed);
             }
@@ -376,26 +386,27 @@ namespace Liquid {
                 // Run the else statement if there is one.
                 return renderer.retrieveRenderedNode(*node.children[3].get(), store);
             }
-            return Parser::Node(forLoopContext.result);
+            return Node(forLoopContext.result);
         }
     };
 
     struct CycleNode : TagNodeType {
         CycleNode() : TagNodeType(Composition::FREE, "cycle", 2) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             assert(node.children.size() == 1 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
-            Variable* forloopVariable;
-            if (store.getDictionaryVariable(forloopVariable, "forloop", false)) {
-                Variable* index0;
-                if (forloopVariable->getDictionaryVariable(index0, "index0", false)) {
+            const LiquidVariableResolver& resolver = renderer.context.getVariableNodeType()->resolver;
+            Variable forloopVariable;
+            if (resolver.getDictionaryVariable(store, "forloop", false, forloopVariable)) {
+                Variable index0;
+                if (resolver.getDictionaryVariable(forloopVariable, "index0", false, index0)) {
                     long long i;
-                    if (index0->getInteger(i))
+                    if (resolver.getInteger(index0, &i))
                         return renderer.retrieveRenderedNode(*arguments->children[i % arguments->children.size()].get(), store);
                 }
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
@@ -409,31 +420,31 @@ namespace Liquid {
         double operate(long long v1, double v2) const { return Function()(v1, v2); }
         long long operate(long long v1, long long v2) const { return Function()(v1, v2); }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
-            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             if (op1.type || op2.type)
-                return Parser::Node();
+                return Node();
             switch (op1.variant.type) {
-                case Parser::Variant::Type::INT:
+                case Variant::Type::INT:
                     switch (op2.variant.type) {
-                        case Parser::Variant::Type::INT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.i, op2.variant.i)));
+                        case Variant::Type::INT:
+                            return Node(Variant(operate(op1.variant.i, op2.variant.i)));
                         break;
-                        case Parser::Variant::Type::FLOAT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.i, op2.variant.f)));
+                        case Variant::Type::FLOAT:
+                            return Node(Variant(operate(op1.variant.i, op2.variant.f)));
                         break;
                         default:
                         break;
                     }
                 break;
-                case Parser::Variant::Type::FLOAT:
+                case Variant::Type::FLOAT:
                     switch (op2.variant.type) {
-                        case Parser::Variant::Type::INT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.f, op2.variant.i)));
+                        case Variant::Type::INT:
+                            return Node(Variant(operate(op1.variant.f, op2.variant.i)));
                         break;
-                        case Parser::Variant::Type::FLOAT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.f, op2.variant.f)));
+                        case Variant::Type::FLOAT:
+                            return Node(Variant(operate(op1.variant.f, op2.variant.f)));
                         break;
                         default:
                         break;
@@ -442,7 +453,7 @@ namespace Liquid {
                 default:
                 break;
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
@@ -453,15 +464,15 @@ namespace Liquid {
     struct ModuloOperatorNode : OperatorNodeType {
         ModuloOperatorNode() : OperatorNodeType("%", Arity::BINARY, 10) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
-            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             if (op1.type || op2.type)
-                return Parser::Node();
+                return Node();
             long long divisor = op2.variant.getInt();
             if (divisor == 0)
-                return Parser::Node();
-            return Parser::Variant(op1.variant.getInt() % divisor);
+                return Node();
+            return Variant(op1.variant.getInt() % divisor);
         }
     };
 
@@ -472,32 +483,32 @@ namespace Liquid {
         template <class A, class B>
         bool operate(A a, B b) const { return Function()(a, b); }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
-            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             if (op1.type || op2.type)
-                return Parser::Node();
+                return Node();
             switch (op1.variant.type) {
-                return Parser::Node();
-                case Parser::Variant::Type::INT:
+                return Node();
+                case Variant::Type::INT:
                     switch (op2.variant.type) {
-                        case Parser::Variant::Type::INT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.i, op2.variant.i)));
+                        case Variant::Type::INT:
+                            return Node(Variant(operate(op1.variant.i, op2.variant.i)));
                         break;
-                        case Parser::Variant::Type::FLOAT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.i, op2.variant.f)));
+                        case Variant::Type::FLOAT:
+                            return Node(Variant(operate(op1.variant.i, op2.variant.f)));
                         break;
                         default:
                         break;
                     }
                 break;
-                case Parser::Variant::Type::FLOAT:
+                case Variant::Type::FLOAT:
                     switch (op2.variant.type) {
-                        case Parser::Variant::Type::INT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.f, op2.variant.i)));
+                        case Variant::Type::INT:
+                            return Node(Variant(operate(op1.variant.f, op2.variant.i)));
                         break;
-                        case Parser::Variant::Type::FLOAT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.f, op2.variant.f)));
+                        case Variant::Type::FLOAT:
+                            return Node(Variant(operate(op1.variant.f, op2.variant.f)));
                         break;
                         default:
                         break;
@@ -506,7 +517,7 @@ namespace Liquid {
                 default:
                 break;
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
@@ -517,46 +528,46 @@ namespace Liquid {
         template <class A, class B>
         bool operate(A a, B b) const { return Function()(a, b); }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
-            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             if (op1.type || op2.type)
-                return Parser::Node();
+                return Node();
             switch (op1.variant.type) {
-                return Parser::Node();
-                case Parser::Variant::Type::INT:
+                return Node();
+                case Variant::Type::INT:
                     switch (op2.variant.type) {
-                        case Parser::Variant::Type::INT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.i, op2.variant.i)));
+                        case Variant::Type::INT:
+                            return Node(Variant(operate(op1.variant.i, op2.variant.i)));
                         break;
-                        case Parser::Variant::Type::FLOAT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.i, op2.variant.f)));
+                        case Variant::Type::FLOAT:
+                            return Node(Variant(operate(op1.variant.i, op2.variant.f)));
                         break;
                         default:
                         break;
                     }
                 break;
-                case Parser::Variant::Type::FLOAT:
+                case Variant::Type::FLOAT:
                     switch (op2.variant.type) {
-                        case Parser::Variant::Type::INT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.f, op2.variant.i)));
+                        case Variant::Type::INT:
+                            return Node(Variant(operate(op1.variant.f, op2.variant.i)));
                         break;
-                        case Parser::Variant::Type::FLOAT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.f, op2.variant.f)));
+                        case Variant::Type::FLOAT:
+                            return Node(Variant(operate(op1.variant.f, op2.variant.f)));
                         break;
                         default:
                         break;
                     }
                 break;
-                case Parser::Variant::Type::STRING:
-                    if (op2.variant.type != Parser::Variant::Type::STRING)
-                        return Parser::Node(Parser::Variant(false));
-                    return Parser::Node(Parser::Variant(operate(op1.variant.s, op2.variant.s)));
+                case Variant::Type::STRING:
+                    if (op2.variant.type != Variant::Type::STRING)
+                        return Node(Variant(false));
+                    return Node(Variant(operate(op1.variant.s, op2.variant.s)));
                 break;
                 default:
                 break;
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
@@ -570,43 +581,43 @@ namespace Liquid {
     struct AndOperatorNode : OperatorNodeType {
         AndOperatorNode() : OperatorNodeType("and", Arity::BINARY, 1) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
-            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             if (!op1.type || !op1.variant.isTruthy())
-                return Parser::Node(Parser::Variant(false));
-            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            return Parser::Node(Parser::Variant(op2.type && op2.variant.isTruthy()));
+                return Node(Variant(false));
+            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+            return Node(Variant(op2.type && op2.variant.isTruthy()));
         }
     };
     struct OrOperatorNode : OperatorNodeType {
         OrOperatorNode() : OperatorNodeType("or", Arity::BINARY, 1) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
-            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             if (op1.type && op1.variant.isTruthy())
-                return Parser::Node(Parser::Variant(true));
-            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            return Parser::Node(Parser::Variant(op2.type && op2.variant.isTruthy()));
+                return Node(Variant(true));
+            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+            return Node(Variant(op2.type && op2.variant.isTruthy()));
         }
     };
 
     struct RangeOperatorNode : OperatorNodeType {
         RangeOperatorNode() : OperatorNodeType("..", Arity::BINARY, 10) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
-            Parser::Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            Parser::Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             // Requires integers.
-            if (op1.type || op2.type || op1.variant.type != Parser::Variant::Type::INT || op2.variant.type != Parser::Variant::Type::INT)
-                return Parser::Node();
-            auto result = Parser::Node(Parser::Variant(vector<Parser::Variant>()));
+            if (op1.type || op2.type || op1.variant.type != Variant::Type::INT || op2.variant.type != Variant::Type::INT)
+                return Node();
+            auto result = Node(Variant(vector<Variant>()));
             // TODO: This can allocate a lot of memory. Short-circuit that; but should be plugge dinto the allocator.
             long long size = op2.variant.i - op1.variant.i + 1;
             if (size > 10000)
-                return Parser::Node();
+                return Node();
             result.variant.a.reserve(size);
             for (long long i = op1.variant.i; i <= op2.variant.i; ++i)
-                result.variant.a.push_back(Parser::Variant(i));
+                result.variant.a.push_back(Variant(i));
             return result;
         }
     };
@@ -620,32 +631,32 @@ namespace Liquid {
         double operate(long long v1, double v2) const { return Function()(v1, v2); }
         long long operate(long long v1, long long v2) const { return Function()(v1, v2); }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             assert(node.children[1]->type && node.children[1]->type->type == NodeType::Type::ARGUMENTS);
-            Parser::Node op1 = getOperand(renderer, node, store);
-            Parser::Node op2 = getArgument(renderer, node, store, 0);
+            Node op1 = getOperand(renderer, node, store);
+            Node op2 = getArgument(renderer, node, store, 0);
             if (op1.type || op2.type)
-                return Parser::Node();
+                return Node();
             switch (op1.variant.type) {
-                case Parser::Variant::Type::INT:
+                case Variant::Type::INT:
                     switch (op2.variant.type) {
-                        case Parser::Variant::Type::INT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.i, op2.variant.i)));
+                        case Variant::Type::INT:
+                            return Node(Variant(operate(op1.variant.i, op2.variant.i)));
                         break;
-                        case Parser::Variant::Type::FLOAT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.i, op2.variant.f)));
+                        case Variant::Type::FLOAT:
+                            return Node(Variant(operate(op1.variant.i, op2.variant.f)));
                         break;
                         default:
                         break;
                     }
                 break;
-                case Parser::Variant::Type::FLOAT:
+                case Variant::Type::FLOAT:
                     switch (op2.variant.type) {
-                        case Parser::Variant::Type::INT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.f, op2.variant.i)));
+                        case Variant::Type::INT:
+                            return Node(Variant(operate(op1.variant.f, op2.variant.i)));
                         break;
-                        case Parser::Variant::Type::FLOAT:
-                            return Parser::Node(Parser::Variant(operate(op1.variant.f, op2.variant.f)));
+                        case Variant::Type::FLOAT:
+                            return Node(Variant(operate(op1.variant.f, op2.variant.f)));
                         break;
                         default:
                         break;
@@ -654,7 +665,7 @@ namespace Liquid {
                 default:
                 break;
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
@@ -665,182 +676,182 @@ namespace Liquid {
     struct ModuloFilterNode : FilterNodeType {
         ModuloFilterNode() : FilterNodeType("modulo", 1, 1) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type || argument.type)
-                return Parser::Node();
+                return Node();
             long long divisor = argument.variant.getInt();
             if (divisor == 0)
-                return Parser::Node();
-            return Parser::Node(Parser::Variant(operand.variant.getInt() % divisor));
+                return Node();
+            return Node(Variant(operand.variant.getInt() % divisor));
         }
     };
 
     struct AbsFilterNode : FilterNodeType {
         AbsFilterNode() : FilterNodeType("abs", 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             if (operand.type) {
                 switch (operand.variant.type) {
-                    case Parser::Variant::Type::FLOAT:
-                        return Parser::Node(fabs(operand.variant.f));
-                    case Parser::Variant::Type::INT:
-                        return Parser::Node((long long)abs(operand.variant.i));
+                    case Variant::Type::FLOAT:
+                        return Node(fabs(operand.variant.f));
+                    case Variant::Type::INT:
+                        return Node((long long)abs(operand.variant.i));
                     default:
                     break;
                 }
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
     struct CeilFilterNode : FilterNodeType {
         CeilFilterNode() : FilterNodeType("ceil", 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             if (operand.type) {
                 switch (operand.variant.type) {
-                    case Parser::Variant::Type::FLOAT:
-                        return Parser::Node(ceil(operand.variant.f));
-                    case Parser::Variant::Type::INT:
-                        return Parser::Node(operand.variant.i);
+                    case Variant::Type::FLOAT:
+                        return Node(ceil(operand.variant.f));
+                    case Variant::Type::INT:
+                        return Node(operand.variant.i);
                     default:
                     break;
                 }
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
     struct FloorFilterNode : FilterNodeType {
         FloorFilterNode() : FilterNodeType("floor", 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             if (operand.type) {
                 switch (operand.variant.type) {
-                    case Parser::Variant::Type::FLOAT:
-                        return Parser::Node(ceil(operand.variant.f));
-                    case Parser::Variant::Type::INT:
-                        return Parser::Node(operand.variant.i);
+                    case Variant::Type::FLOAT:
+                        return Node(ceil(operand.variant.f));
+                    case Variant::Type::INT:
+                        return Node(operand.variant.i);
                     default:
                     break;
                 }
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
 
     struct RoundFilterNode : FilterNodeType {
         RoundFilterNode() : FilterNodeType("round", 0, 1) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type) {
                 switch (operand.variant.type) {
-                    case Parser::Variant::Type::FLOAT: {
+                    case Variant::Type::FLOAT: {
                         if (!argument.type) {
                             int digits = argument.variant.getInt();
                             int multiplier = pow(10, digits);
                             double number = operand.variant.f * multiplier;
                             number = round(number);
-                            return Parser::Node(number / multiplier);
+                            return Node(number / multiplier);
                         }
-                        return Parser::Node(round(operand.variant.f));
+                        return Node(round(operand.variant.f));
                     }
-                    case Parser::Variant::Type::INT:
-                        return Parser::Node(operand.variant.i);
+                    case Variant::Type::INT:
+                        return Node(operand.variant.i);
                     default:
                     break;
                 }
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
     struct AtMostFilterNode : FilterNodeType {
         AtMostFilterNode() : FilterNodeType("at_most", 1, 1) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type) {
                 switch (operand.variant.type) {
-                    case Parser::Variant::Type::FLOAT:
-                        return Parser::Node(std::min(operand.variant.f, argument.variant.getFloat()));
-                    case Parser::Variant::Type::INT:
-                        return Parser::Node(std::min(operand.variant.i, argument.variant.getInt()));
+                    case Variant::Type::FLOAT:
+                        return Node(std::min(operand.variant.f, argument.variant.getFloat()));
+                    case Variant::Type::INT:
+                        return Node(std::min(operand.variant.i, argument.variant.getInt()));
                     default:
                     break;
                 }
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
     struct AtLeastFilterNode : FilterNodeType {
         AtLeastFilterNode() : FilterNodeType("at_least", 1, 1) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type) {
                 switch (operand.variant.type) {
-                    case Parser::Variant::Type::FLOAT:
-                        return Parser::Node(std::max(operand.variant.f, argument.variant.getFloat()));
-                    case Parser::Variant::Type::INT:
-                        return Parser::Node(std::max(operand.variant.i, argument.variant.getInt()));
+                    case Variant::Type::FLOAT:
+                        return Node(std::max(operand.variant.f, argument.variant.getFloat()));
+                    case Variant::Type::INT:
+                        return Node(std::max(operand.variant.i, argument.variant.getInt()));
                     default:
                     break;
                 }
             }
-            return Parser::Node();
+            return Node();
         }
     };
 
     struct AppendFilterNode : FilterNodeType {
         AppendFilterNode() : FilterNodeType("append", 1, 1) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type || argument.type)
-                return Parser::Node();
-            return Parser::Variant(operand.getString() + argument.getString());
+                return Node();
+            return Variant(operand.getString() + argument.getString());
         }
     };
 
     struct camelCaseFilterNode : FilterNodeType {
         camelCaseFilterNode() : FilterNodeType("camelcase", 1, 1) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             // TODO
-            return Parser::Node();
+            return Node();
         }
     };
 
     struct CapitalizeFilterNode : FilterNodeType {
         CapitalizeFilterNode() : FilterNodeType("capitalize", 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             if (operand.type)
-                return Parser::Node();
+                return Node();
             string str = operand.getString();
             str[0] = toupper(str[0]);
-            return Parser::Node(str);
+            return Node(str);
         }
     };
     struct DowncaseFilterNode : FilterNodeType {
         DowncaseFilterNode() : FilterNodeType("downcase", 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             if (operand.type)
-                return Parser::Node();
+                return Node();
             string str = operand.getString();
             std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::tolower(c); });
-            return Parser::Variant(str);
+            return Variant(str);
         }
     };
     struct HandleGenericFilterNode : FilterNodeType {
         HandleGenericFilterNode(const string& symbol) : FilterNodeType(symbol, 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             string str = getOperand(renderer, node, store).getString();
             string accumulator;
             accumulator.reserve(str.size());
@@ -857,7 +868,7 @@ namespace Liquid {
                     accumulator.push_back('-');
                 }
             }
-            return Parser::Variant(accumulator);
+            return Variant(accumulator);
         }
     };
     struct HandleFilterNode : HandleGenericFilterNode { HandleFilterNode() : HandleGenericFilterNode("handle") { } };
@@ -865,33 +876,33 @@ namespace Liquid {
 
     struct PluralizeFilterNode : FilterNodeType {
         PluralizeFilterNode() : FilterNodeType("pluralize", 2, 2) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument1 = getArgument(renderer, node, store, 1);
             auto argument2 = getArgument(renderer, node, store, 2);
             if (operand.type)
-                return Parser::Node();
-            return Parser::Variant(operand.variant.getInt() > 1 ? argument2.getString() : argument1.getString());
+                return Node();
+            return Variant(operand.variant.getInt() > 1 ? argument2.getString() : argument1.getString());
         }
     };
 
     struct PrependFilterNode : FilterNodeType {
         PrependFilterNode() : FilterNodeType("prepend", 1, 1) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type || argument.type)
-                return Parser::Node();
-            return Parser::Variant(argument.getString() + operand.getString());
+                return Node();
+            return Variant(argument.getString() + operand.getString());
         }
     };
     struct RemoveFilterNode : FilterNodeType {
         RemoveFilterNode() : FilterNodeType("remove", 1, 1) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type || argument.type)
-                return Parser::Node();
+                return Node();
             string accumulator;
             string str = operand.getString();
             string rm = argument.getString();
@@ -902,16 +913,16 @@ namespace Liquid {
                 start = idx + rm.size();
             }
             accumulator.append(str, start, str.size() - start);
-            return Parser::Variant(accumulator);
+            return Variant(accumulator);
         }
     };
     struct RemoveFirstFilterNode : FilterNodeType {
         RemoveFirstFilterNode() : FilterNodeType("removefirst", 1, 1) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type || argument.type)
-                return Parser::Node();
+                return Node();
             string accumulator;
             string str = operand.getString();
             string rm = argument.getString();
@@ -923,16 +934,16 @@ namespace Liquid {
                 break;
             }
             accumulator.append(str, start, str.size() - start);
-            return Parser::Variant(accumulator);
+            return Variant(accumulator);
         }
     };
     struct ReplaceFilterNode : FilterNodeType {
         ReplaceFilterNode() : FilterNodeType("replace", 2, 2) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type || argument.type)
-                return Parser::Node();
+                return Node();
             string accumulator;
             string str = operand.getString();
             string rm = argument.getString();
@@ -945,16 +956,16 @@ namespace Liquid {
                 start = idx + rm.size();
             }
             accumulator.append(str, start, str.size() - start);
-            return Parser::Variant(accumulator);
+            return Variant(accumulator);
         }
     };
     struct ReplaceFirstFilterNode : FilterNodeType {
         ReplaceFirstFilterNode() : FilterNodeType("replacefirst", 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type || argument.type)
-                return Parser::Node();
+                return Node();
             string accumulator;
             string str = operand.getString();
             string rm = argument.getString();
@@ -968,87 +979,87 @@ namespace Liquid {
                 break;
             }
             accumulator.append(str, start, str.size() - start);
-            return Parser::Variant(accumulator);
+            return Variant(accumulator);
         }
     };
     struct SliceFilterNode : FilterNodeType {
         SliceFilterNode() : FilterNodeType("slice", 1, 2) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto arg1 = getArgument(renderer, node, store, 0);
             auto arg2 = getArgument(renderer, node, store, 0);
 
-            if (operand.type || arg1.type || arg2.type || operand.variant.type != Parser::Variant::Type::STRING)
-                return Parser::Node();
+            if (operand.type || arg1.type || arg2.type || operand.variant.type != Variant::Type::STRING)
+                return Node();
             string str = operand.getString();
             long long offset = std::max(std::min(arg1.variant.getInt(), (long long)str.size()), 0LL);
             long long size = std::min(arg2.variant.getInt(), (long long)(str.size() - offset));
-            return Parser::Variant(str.substr(offset, size));
+            return Variant(str.substr(offset, size));
         }
     };
     struct SplitFilterNode : FilterNodeType {
         SplitFilterNode() : FilterNodeType("split", 1, 1) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type || argument.type)
-                return Parser::Node();
-            Parser::Variant result({ });
+                return Node();
+            Variant result({ });
             string str = operand.getString();
             string splitter = argument.getString();
             size_t start = 0, idx;
             while ((idx = str.find(splitter, start)) != string::npos) {
                 if (idx > start)
-                    result.a.push_back(Parser::Variant(str.substr(start, idx - start)));
+                    result.a.push_back(Variant(str.substr(start, idx - start)));
                 start = idx + splitter.size();
             }
             result.a.push_back(str.substr(start, str.size() - start));
-            return Parser::Variant(std::move(result));
+            return Variant(std::move(result));
         }
     };
     struct StripFilterNode : FilterNodeType {
         StripFilterNode() : FilterNodeType("strip", 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             if (operand.type)
-                return Parser::Node();
+                return Node();
             string str = operand.getString();
             size_t start, end;
             for (start = 0; start < str.size() && isblank(str[start]); ++start);
             for (end = str.size()-1; end > 0 && isblank(str[end]); --end);
-            return Parser::Node(str.substr(start, end - start + 1));
+            return Node(str.substr(start, end - start + 1));
         }
     };
     struct LStripFilterNode : FilterNodeType {
         LStripFilterNode() : FilterNodeType("lstrip", 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             if (operand.type)
-                return Parser::Node();
+                return Node();
             string str = operand.getString();
             size_t start;
             for (start = 0; start < str.size() && isblank(str[start]); ++start);
-            return Parser::Node(str.substr(start, str.size() - start));
+            return Node(str.substr(start, str.size() - start));
         }
     };
     struct RStripFilterNode : FilterNodeType {
         RStripFilterNode() : FilterNodeType("rstrip", 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             if (operand.type)
-                return Parser::Node();
+                return Node();
             string str = operand.getString();
             size_t end;
             for (end = str.size()-1; end > 0 && isblank(str[end]); --end);
-            return Parser::Node(str.substr(0, end + 1));
+            return Node(str.substr(0, end + 1));
         }
     };
     struct StripNewlinesFilterNode : FilterNodeType {
         StripNewlinesFilterNode() : FilterNodeType("strip_newlines", 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             if (operand.type)
-                return Parser::Node();
+                return Node();
             string str = operand.getString();
             string accumulator;
             accumulator.reserve(str.size());
@@ -1056,36 +1067,36 @@ namespace Liquid {
                 if (*it != '\n' && *it != '\r')
                     accumulator.push_back(*it);
             }
-            return Parser::Node(accumulator);
+            return Node(accumulator);
         }
     };
     struct TruncateFilterNode : FilterNodeType {
         TruncateFilterNode() : FilterNodeType("truncate", 1, 2) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto characterCount = getArgument(renderer, node, store, 0);
             auto customEllipsis = getArgument(renderer, node, store, 1);
             if (operand.type || characterCount.type || customEllipsis.type)
-                return Parser::Node();
+                return Node();
             string ellipsis = "...";
-            if (customEllipsis.variant.type == Parser::Variant::Type::STRING)
+            if (customEllipsis.variant.type == Variant::Type::STRING)
                 ellipsis = customEllipsis.getString();
             long long count = characterCount.variant.getInt();
             if (count > (long long)ellipsis.size()) {
                 string str = operand.getString();
-                return Parser::Variant(str.substr(0, std::min((long long)(count - ellipsis.size()), (long long)str.size())) + ellipsis);
+                return Variant(str.substr(0, std::min((long long)(count - ellipsis.size()), (long long)str.size())) + ellipsis);
             }
-            return Parser::Variant(ellipsis.substr(0, std::min(count, (long long)ellipsis.size())));
+            return Variant(ellipsis.substr(0, std::min(count, (long long)ellipsis.size())));
         }
     };
     struct TruncateWordsFilterNode : FilterNodeType {
         TruncateWordsFilterNode() : FilterNodeType("truncatewords", 1, 2) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto wordCount = getArgument(renderer, node, store, 0);
             auto customEllipsis = getArgument(renderer, node, store, 1);
             if (operand.type || wordCount.type || customEllipsis.type)
-                return Parser::Node();
+                return Node();
             string ellipsis = "...";
             string str = operand.getString();
             int targetWordCount = wordCount.variant.getInt();
@@ -1103,65 +1114,68 @@ namespace Liquid {
                     previousBlank = false;
                 }
             }
-            return Parser::Variant(str.substr(0, i-1));
+            return Variant(str.substr(0, i-1));
         }
     };
     struct UpcaseFilterNode : FilterNodeType {
         UpcaseFilterNode() : FilterNodeType("upcase", 0, 0) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type || argument.type)
-                return Parser::Node();
+                return Node();
             string str = operand.getString();
             std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::toupper(c); });
-            return Parser::Variant(str);
+            return Variant(str);
         }
     };
 
     struct ArrayFilterNodeType : FilterNodeType {
         ArrayFilterNodeType(const std::string& symbol, int minArguments = -1, int maxArguments = -1) : FilterNodeType(symbol, minArguments, maxArguments) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type || argument.type)
-                return Parser::Node();
+                return Node();
 
-            return Parser::Node();
+            return Node();
         }
     };
 
     struct JoinFilterNode : ArrayFilterNodeType {
         JoinFilterNode() : ArrayFilterNodeType("join", 0, 1) { }
 
-        Parser::Node variableOperate(Renderer& renderer, const Parser::Node& node, Variable& store, const Variable& operand) {
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, const Variable operand) {
             struct JoinStruct {
+                const Context& context;
                 string accumulator;
                 string joiner = "";
                 int idx = 0;
             };
-            JoinStruct joinStruct;
+            const LiquidVariableResolver& resolver = renderer.context.getVariableResolver();
+            JoinStruct joinStruct({ renderer.context });
             auto argument = getArgument(renderer, node, store, 0);
             if (!argument.type)
                 joinStruct.joiner = argument.getString();
 
-            operand.iterate(+[](Variable* variable, void* data) {
+
+            resolver.iterate(operand, +[](void* variable, void* data) {
                 JoinStruct& joinStruct = *(JoinStruct*)data;
                 string part;
                 if (joinStruct.idx++ > 0)
                     joinStruct.accumulator.append(joinStruct.joiner);
-                if (variable->getString(part))
+                if (joinStruct.context.resolveVariableString(part, variable))
                     joinStruct.accumulator.append(part);
                 return true;
-            }, &joinStruct);
-            return Parser::Node(joinStruct.accumulator);
+            }, &joinStruct, 0, -1, false);
+            return Node(joinStruct.accumulator);
         }
 
-        Parser::Node variantOperate(Renderer& renderer, const Parser::Node& node, Variable& store, const Parser::Variant& operand) {
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) {
             string accumulator;
-            if (operand.type != Parser::Variant::Type::ARRAY || operand.a.size() == 0)
-                return Parser::Node();
+            if (operand.type != Variant::Type::ARRAY || operand.a.size() == 0)
+                return Node();
             string joiner = "";
             auto argument = getArgument(renderer, node, store, 0);
             if (!argument.type)
@@ -1178,42 +1192,42 @@ namespace Liquid {
     struct ConcatFilterNode : ArrayFilterNodeType {
         ConcatFilterNode() : ArrayFilterNodeType("concat", 1, 1) { }
 
-        void accumulate(Parser::Variant& accumulator, const Variable& v) const {
-            v.iterate(+[](Variable* variable, void* data) {
-                    static_cast<Parser::Variant*>(data)->a.push_back(variable);
+        void accumulate(Renderer& renderer, Variant& accumulator, const Variable v) const {
+            renderer.context.getVariableResolver().iterate(v, +[](void* variable, void* data) {
+                    static_cast<Variant*>(data)->a.push_back(Variant(static_cast<Variable*>(variable)));
                 return true;
-            }, &accumulator);
+            }, &accumulator, 0, -1, false);
         }
 
-        void accumulate(Parser::Variant& accumulator, const Parser::Variant& v) const {
+        void accumulate(Renderer& renderer, Variant& accumulator, const Variant& v) const {
             for (auto it = v.a.begin(); it != v.a.end(); ++it)
                 accumulator.a.push_back(*it);
         }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
-            Parser::Variant accumulator;
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Variant accumulator;
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type)
-                return Parser::Node();
+                return Node();
             switch (operand.variant.type) {
-                case Parser::Variant::Type::VARIABLE:
-                    accumulate(accumulator, *operand.variant.v);
+                case Variant::Type::VARIABLE:
+                    accumulate(renderer, accumulator, *operand.variant.v);
                 break;
-                case Parser::Variant::Type::ARRAY:
-                    accumulate(accumulator, operand.variant.a);
+                case Variant::Type::ARRAY:
+                    accumulate(renderer, accumulator, operand.variant.a);
                 break;
                 default:
-                    return Parser::Node();
+                    return Node();
             }
             if (argument.type)
                 return accumulator;
             switch (argument.variant.type) {
-                case Parser::Variant::Type::VARIABLE:
-                    accumulate(accumulator, *argument.variant.v);
+                case Variant::Type::VARIABLE:
+                    accumulate(renderer, accumulator, *argument.variant.v);
                 break;
-                case Parser::Variant::Type::ARRAY:
-                    accumulate(accumulator, argument.variant.a);
+                case Variant::Type::ARRAY:
+                    accumulate(renderer, accumulator, argument.variant.a);
                 break;
                 default:
                     return accumulator;
@@ -1226,51 +1240,52 @@ namespace Liquid {
         MapFilterNode() : ArrayFilterNodeType("map", 1, 1) { }
 
         struct MapStruct {
+            const LiquidVariableResolver& resolver;
             string property;
-            Parser::Variant accumulator;
+            Variant accumulator;
         };
 
-        void accumulate(MapStruct& mapStruct, const Variable& v) const {
-            v.iterate(+[](Variable* variable, void* data) {
+        void accumulate(Renderer& renderer, MapStruct& mapStruct, const Variable v) const {
+            mapStruct.resolver.iterate(v, +[](void* variable, void* data) {
                 MapStruct& mapStruct = *static_cast<MapStruct*>(data);
-                Variable* target;
-                if (variable->getDictionaryVariable(target, mapStruct.property))
+                Variable target;
+                if (mapStruct.resolver.getDictionaryVariable(variable, mapStruct.property.data(), false, target))
                     mapStruct.accumulator.a.push_back(target);
                 else
-                    mapStruct.accumulator.a.push_back(Parser::Variant());
+                    mapStruct.accumulator.a.push_back(Variant());
                 return true;
-            }, &mapStruct);
+            }, &mapStruct, 0, -1, false);
         }
 
-        void accumulate(MapStruct& mapStruct, const Parser::Variant& v) const {
+        void accumulate(Renderer& renderer, MapStruct& mapStruct, const Variant& v) const {
             for (auto it = v.a.begin(); it != v.a.end(); ++it) {
-                if (it->type == Parser::Variant::Type::VARIABLE) {
-                    Variable* target;
-                    if (it->v->getDictionaryVariable(target, mapStruct.property))
+                if (it->type == Variant::Type::VARIABLE) {
+                    Variable target;
+                    if (mapStruct.resolver.getDictionaryVariable(it->v, mapStruct.property.data(), false, target))
                         mapStruct.accumulator.a.push_back(target);
                     else
-                        mapStruct.accumulator.a.push_back(Parser::Variant());
+                        mapStruct.accumulator.a.push_back(Variant());
                 } else {
-                    mapStruct.accumulator.a.push_back(Parser::Variant());
+                    mapStruct.accumulator.a.push_back(Variant());
                 }
             }
         }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type)
-                return Parser::Node();
-            MapStruct mapStruct = { argument.getString() };
+                return Node();
+            MapStruct mapStruct = { renderer.context.getVariableResolver(), argument.getString() };
             switch (operand.variant.type) {
-                case Parser::Variant::Type::VARIABLE:
-                    accumulate(mapStruct, *operand.variant.v);
+                case Variant::Type::VARIABLE:
+                    accumulate(renderer, mapStruct, *operand.variant.v);
                 break;
-                case Parser::Variant::Type::ARRAY:
-                    accumulate(mapStruct, operand.variant.a);
+                case Variant::Type::ARRAY:
+                    accumulate(renderer, mapStruct, operand.variant.a);
                 break;
                 default:
-                    return Parser::Node();
+                    return Node();
             }
             return mapStruct.accumulator;
         }
@@ -1279,25 +1294,25 @@ namespace Liquid {
     struct ReverseFilterNode : ArrayFilterNodeType {
         ReverseFilterNode() : ArrayFilterNodeType("reverse", 0, 0) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
-            Parser::Variant accumulator;
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Variant accumulator;
             auto operand = getOperand(renderer, node, store);
             if (operand.type)
-                return Parser::Node();
+                return Node();
             auto& v = operand.variant;
             switch (operand.variant.type) {
-                case Parser::Variant::Type::VARIABLE:
-                    v.v->iterate(+[](Variable* variable, void* data) {
-                        static_cast<Parser::Variant*>(data)->a.push_back(variable);
+                case Variant::Type::VARIABLE:
+                    renderer.context.getVariableResolver().iterate(v.v, +[](void* variable, void* data) {
+                        static_cast<Variant*>(data)->a.push_back(Variable({variable}));
                         return true;
-                    }, &accumulator);
+                    }, &accumulator, 0, -1, true);
                 break;
-                case Parser::Variant::Type::ARRAY:
-                    for (auto it = v.a.begin(); it != v.a.end(); ++it)
+                case Variant::Type::ARRAY:
+                    for (auto it = v.a.rbegin(); it != v.a.rend(); ++it)
                         accumulator.a.push_back(*it);
                 break;
                 default:
-                    return Parser::Node();
+                    return Node();
             }
             std::reverse(accumulator.a.begin(), accumulator.a.end());
             return accumulator;
@@ -1307,43 +1322,44 @@ namespace Liquid {
     struct SortFilterNode : ArrayFilterNodeType {
         SortFilterNode() : ArrayFilterNodeType("sort", 0, 1) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
-            Parser::Variant accumulator;
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Variant accumulator;
             string property;
+            const LiquidVariableResolver& resolver = renderer.context.getVariableResolver();
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type)
-                return Parser::Node();
+                return Node();
             switch (operand.variant.type) {
-                case Parser::Variant::Type::VARIABLE: {
-                    operand.variant.v->iterate(+[](Variable* variable, void* data) {
-                        static_cast<Parser::Variant*>(data)->a.push_back(variable);
+                case Variant::Type::VARIABLE: {
+                    resolver.iterate(operand.variant.v, +[](void* variable, void* data) {
+                        static_cast<Variant*>(data)->a.push_back(Variable({variable}));
                         return true;
-                    }, &accumulator);
+                    }, &accumulator, 0, -1, false);
                 } break;
-                case Parser::Variant::Type::ARRAY: {
+                case Variant::Type::ARRAY: {
                     auto& v = operand.variant;
                     for (auto it = v.a.begin(); it != v.a.end(); ++it)
                         accumulator.a.push_back(*it);
                 } break;
                 default:
-                    return Parser::Node();
+                    return Node();
             }
 
-            if (!argument.type && argument.variant.type == Parser::Variant::Type::STRING) {
+            if (!argument.type && argument.variant.type == Variant::Type::STRING) {
                 property = argument.getString();
-                std::sort(accumulator.a.begin(), accumulator.a.end(), [&property](Parser::Variant& a, Parser::Variant& b) -> bool {
-                    if (a.type != Parser::Variant::Type::VARIABLE || b.type != Parser::Variant::Type::VARIABLE)
+                std::sort(accumulator.a.begin(), accumulator.a.end(), [&property, &resolver](Variant& a, Variant& b) -> bool {
+                    if (a.type != Variant::Type::VARIABLE || b.type != Variant::Type::VARIABLE)
                         return false;
-                    Variable* targetA, *targetB;
-                    if (!a.v->getDictionaryVariable(targetA, property))
+                    Variable targetA, targetB;
+                    if (!resolver.getDictionaryVariable(a.v, property.data(), false, targetA))
                         return false;
-                    if (!b.v->getDictionaryVariable(targetB, property))
+                    if (!resolver.getDictionaryVariable(b.v, property.data(), false, targetB))
                         return false;
-                    return targetA->compare(*targetB) < 0;
+                    return resolver.compare(targetA, targetB) < 0;
                 });
             } else {
-                std::sort(accumulator.a.begin(), accumulator.a.end(), [](Parser::Variant& a, Parser::Variant& b) -> bool { return a < b; });
+                std::sort(accumulator.a.begin(), accumulator.a.end(), [](Variant& a, Variant& b) -> bool { return a < b; });
             }
             return accumulator;
         }
@@ -1354,71 +1370,72 @@ namespace Liquid {
         WhereFilterNode() : ArrayFilterNodeType("where", 1, 2) { }
 
         struct WhereStruct {
+            const LiquidVariableResolver& resolver;
             string property;
-            Parser::Variant value;
-            Parser::Variant accumulator;
+            Variant value;
+            Variant accumulator;
         };
 
-        void accumulate(WhereStruct& whereStruct, const Variable& v) const {
-            v.iterate(+[](Variable* variable, void* data) {
+        void accumulate(WhereStruct& whereStruct, const Variable v) const {
+            whereStruct.resolver.iterate(v, +[](void* variable, void* data) {
                 WhereStruct& whereStruct = *static_cast<WhereStruct*>(data);
-                Variable* target;
-                if (variable->getDictionaryVariable(target, whereStruct.property)) {
+                Variable target;
+                if (whereStruct.resolver.getDictionaryVariable(variable, whereStruct.property.data(), false, target)) {
                     if (whereStruct.property.empty()) {
-                        if (target->getTruthy())
+                        if (whereStruct.resolver.getTruthy(target))
                             whereStruct.accumulator.a.push_back(variable);
                     } else {
-                        std::string str;
-                        if (target->getString(str)) {
+                        // std::string str;
+                        //if (whereStruct.resolver.getString(str)) {
                             // TODO.
                             // if (str == whereStruct.value)
                             //    whereStruct.accumulator.a.push_back(variable);
-                        }
+                        //}
                     }
                 }
                 return true;
-            }, &whereStruct);
+            }, &whereStruct, 0, -1, false);
         }
 
-        void accumulate(WhereStruct& whereStruct, const Parser::Variant& v) const {
+        void accumulate(WhereStruct& whereStruct, const Variant& v) const {
             for (auto it = v.a.begin(); it != v.a.end(); ++it) {
-                if (it->type == Parser::Variant::Type::VARIABLE) {
-                    Variable* target;
-                    if (it->v->getDictionaryVariable(target, whereStruct.property)) {
+                if (it->type == Variant::Type::VARIABLE) {
+                    Variable target;
+                    if (whereStruct.resolver.getDictionaryVariable(it->v, whereStruct.property.data(), false, target)) {
                         if (whereStruct.property.empty()) {
-                            if (target->getTruthy())
+                            if (whereStruct.resolver.getTruthy(target))
                                 whereStruct.accumulator.a.push_back(*it);
                         } else {
-                            std::string str;
-                            if (target->getString(str)) {
+                            //std::string str;
+                            //if (target->getString(str)) {
                                 // TODO
                                 //if (str == whereStruct.value)
                                 //    whereStruct.accumulator.a.push_back(*it);
-                            }
+                            //}
                         }
                     }
                 }
             }
         }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto arg1 = getArgument(renderer, node, store, 0);
             if (operand.type)
-                return Parser::Node();
+                return Node();
             auto arg2 = getArgument(renderer, node, store, 1);
             if (arg2.type)
-                return Parser::Node();
-            WhereStruct whereStruct = { arg1.getString(), arg2.variant };
+                return Node();
+            WhereStruct whereStruct = { renderer.context.getVariableResolver(), arg1.getString(), arg2.variant };
             switch (operand.variant.type) {
-                case Parser::Variant::Type::VARIABLE:
-                    accumulate(whereStruct, *operand.variant.v);
+                case Variant::Type::VARIABLE:
+                    accumulate(whereStruct, operand.variant.v);
                 break;
-                case Parser::Variant::Type::ARRAY:
+                case Variant::Type::ARRAY:
                     accumulate(whereStruct, operand.variant.a);
                 break;
                 default:
-                    return Parser::Node();
+                    return Node();
             }
             return whereStruct.accumulator;
         }
@@ -1428,45 +1445,47 @@ namespace Liquid {
         UniqFilterNode() : ArrayFilterNodeType("uniq", 0, 0) { }
 
         struct UniqStruct {
+            const Context& context;
+            const LiquidVariableResolver& resolver;
             std::unordered_set<size_t> hashes;
-            Parser::Variant accumulator;
+            Variant accumulator;
         };
 
-        void accumulate(UniqStruct& uniqStruct, const Variable& v) const {
-            v.iterate(+[](Variable* variable, void* data) {
+        void accumulate(UniqStruct& uniqStruct, const Variable v) const {
+            uniqStruct.resolver.iterate(v, +[](void* variable, void* data) {
                 UniqStruct& uniqStruct = *static_cast<UniqStruct*>(data);
-                Parser::Variant v = Parser::Variant::parse(*variable);
+                Variant v = uniqStruct.context.parseVariant(Variable({variable}));
                 if (!uniqStruct.hashes.emplace(v.hash()).second)
                     uniqStruct.accumulator.a.push_back(variable);
                 return true;
-            }, &uniqStruct);
+            }, &uniqStruct, 0, -1, false);
         }
 
-        void accumulate(UniqStruct& uniqStruct, const Parser::Variant& v) const {
+        void accumulate(UniqStruct& uniqStruct, const Variant& v) const {
             for (auto it = v.a.begin(); it != v.a.end(); ++it) {
                 if (!uniqStruct.hashes.emplace(it->hash()).second)
                     uniqStruct.accumulator.a.push_back(v);
             }
         }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto arg1 = getArgument(renderer, node, store, 0);
             if (operand.type)
-                return Parser::Node();
+                return Node();
             auto arg2 = getArgument(renderer, node, store, 1);
             if (arg2.type)
-                return Parser::Node();
-            UniqStruct uniqStruct;
+                return Node();
+            UniqStruct uniqStruct = { renderer.context, renderer.context.getVariableResolver() };
             switch (operand.variant.type) {
-                case Parser::Variant::Type::VARIABLE:
-                    accumulate(uniqStruct, *operand.variant.v);
+                case Variant::Type::VARIABLE:
+                    accumulate(uniqStruct, operand.variant.v);
                 break;
-                case Parser::Variant::Type::ARRAY:
+                case Variant::Type::ARRAY:
                     accumulate(uniqStruct, operand.variant.a);
                 break;
                 default:
-                    return Parser::Node();
+                    return Node();
             }
             return uniqStruct.accumulator;
         }
@@ -1477,16 +1496,16 @@ namespace Liquid {
     struct FirstFilterNode : ArrayFilterNodeType {
         FirstFilterNode() : ArrayFilterNodeType("first", 0, 0) { }
 
-        Parser::Node variableOperate(Renderer& renderer, const Parser::Node& node, Variable& store, const Variable& operand) const {
-            Variable* v;
-            if (!operand.getArrayVariable(v, 0))
-                return Parser::Node();
-            return Parser::Node(v);
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, const Variable operand) const {
+            Variable v;
+            if (!renderer.context.getVariableResolver().getArrayVariable(operand, 0, false, 0))
+                return Node();
+            return Node(v);
         }
 
-        Parser::Node variantOperate(Renderer& renderer, const Parser::Node& node, Variable& store, const Parser::Variant& operand) const {
-            if (operand.type != Parser::Variant::Type::ARRAY || operand.a.size() == 0)
-                return Parser::Node();
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) const {
+            if (operand.type != Variant::Type::ARRAY || operand.a.size() == 0)
+                return Node();
             return operand.a[0];
         }
     };
@@ -1494,17 +1513,18 @@ namespace Liquid {
     struct LastFilterNode : ArrayFilterNodeType {
         LastFilterNode() : ArrayFilterNodeType("last", 0, 0) { }
 
-        Parser::Node variableOperate(Renderer& renderer, const Parser::Node& node, Variable& store, const Variable& operand) const {
-            Variable* v;
-            long long size = operand.getArraySize();
-            if (size == -1 || !operand.getArrayVariable(v, 0))
-                return Parser::Node();
-            return Parser::Node(v);
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, const Variable operand) const {
+            Variable v;
+            const LiquidVariableResolver& resolver = renderer.context.getVariableResolver();
+            long long size = resolver.getArraySize(operand);
+            if (size == -1 || !resolver.getArrayVariable(operand, size - 1, false, v))
+                return Node();
+            return Node(v);
         }
 
-        Parser::Node variantOperate(Renderer& renderer, const Parser::Node& node, Variable& store, const Parser::Variant& operand) const {
-            if (operand.type != Parser::Variant::Type::ARRAY || operand.a.size() == 0)
-                return Parser::Node();
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) const {
+            if (operand.type != Variant::Type::ARRAY || operand.a.size() == 0)
+                return Node();
             return operand.a[operand.a.size()-1];
         }
     };
@@ -1512,59 +1532,59 @@ namespace Liquid {
     struct IndexFilterNode : ArrayFilterNodeType {
         IndexFilterNode() : ArrayFilterNodeType("index", 1, 1) { }
 
-        Parser::Node variableOperate(Renderer& renderer, const Parser::Node& node, Variable& store, const Variable& operand) const {
-            Variable* v;
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, const Variable operand) const {
+            Variable v;
             auto argument = getArgument(renderer, node, store, 0);
             if (!argument.type)
-                return Parser::Node();
+                return Node();
             int idx = argument.variant.i;
-            if (!operand.getArrayVariable(v, idx))
-                return Parser::Node();
-            return Parser::Node(v);
+            if (!renderer.context.getVariableResolver().getArrayVariable(operand, idx, false, v))
+                return Node();
+            return Node(v);
         }
 
-        Parser::Node variantOperate(Renderer& renderer, const Parser::Node& node, Variable& store, const Parser::Variant& operand) const {
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant& operand) const {
             auto argument = getArgument(renderer, node, store, 0);
             if (!argument.type)
-                return Parser::Node();
+                return Node();
             long long idx = argument.variant.i;
-            if (operand.type != Parser::Variant::Type::ARRAY || idx >= (long long)operand.a.size())
-                return Parser::Node();
+            if (operand.type != Variant::Type::ARRAY || idx >= (long long)operand.a.size())
+                return Node();
             return operand.a[idx];
         }
     };
     struct SizeFilterNode : FilterNodeType {
         SizeFilterNode() : FilterNodeType("size", 0, 0) { }
 
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             if (operand.type)
-                return Parser::Node();
+                return Node();
 
             switch (operand.variant.type) {
-                case Parser::Variant::Type::ARRAY:
+                case Variant::Type::ARRAY:
                     return variantOperate(renderer, node, store, operand.variant);
-                case Parser::Variant::Type::VARIABLE:
-                    return variableOperate(renderer, node, store, *operand.variant.v);
-                case Parser::Variant::Type::STRING:
-                    return Parser::Variant((long long)operand.variant.s.size());
+                case Variant::Type::VARIABLE:
+                    return variableOperate(renderer, node, store, operand.variant.v);
+                case Variant::Type::STRING:
+                    return Variant((long long)operand.variant.s.size());
                 default:
-                    return Parser::Node();
+                    return Node();
             }
         }
 
-        Parser::Node variableOperate(Renderer& renderer, const Parser::Node& node, Variable& store, const Variable& operand) const {
-            long long size = operand.getArraySize();
-            return size != -1 ? Parser::Node(size) : Parser::Node();
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, const Variable operand) const {
+            long long size = renderer.context.getVariableResolver().getArraySize(operand);
+            return size != -1 ? Node(size) : Node();
         }
 
-        Parser::Node variantOperate(Renderer& renderer, const Parser::Node& node, Variable& store, const Parser::Variant& operand) const {
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) const {
             auto argument = getArgument(renderer, node, store, 0);
             if (!argument.type)
-                return Parser::Node();
+                return Node();
             long long idx = argument.variant.i;
-            if (operand.type != Parser::Variant::Type::ARRAY || idx >= (long long)operand.a.size())
-                return Parser::Node();
+            if (operand.type != Variant::Type::ARRAY || idx >= (long long)operand.a.size())
+                return Node();
             return operand.a[idx];
         }
     };
@@ -1572,7 +1592,7 @@ namespace Liquid {
 
     struct DefaultFilterNode : FilterNodeType {
         DefaultFilterNode() : FilterNodeType("default", 1, 1) { }
-        Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type || operand.variant.isTruthy())

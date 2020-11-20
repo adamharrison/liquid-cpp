@@ -3,54 +3,59 @@
 #define CPPVARIABLE_H
 
 #include "common.h"
+#include "context.h"
 
 namespace Liquid {
-    struct CPPVariable : Variable {
+
+    struct CPPVariable {
         union {
             bool b;
             string s;
             double f;
             long long i;
+            void* p;
             vector<unique_ptr<CPPVariable>> a;
             unordered_map<string, unique_ptr<CPPVariable>> d;
         };
-        Type type;
+        ELiquidVariableType type;
 
-        CPPVariable() :type(Type::NIL) { }
-        CPPVariable(bool b) : b(b), type(Type::BOOL) { }
-        CPPVariable(long long i) : i(i), type(Type::INT) { }
+        CPPVariable() :type(LIQUID_VARIABLE_TYPE_NIL) { }
+        CPPVariable(bool b) : b(b), type(LIQUID_VARIABLE_TYPE_BOOL) { }
+        CPPVariable(long long i) : i(i), type(LIQUID_VARIABLE_TYPE_INT) { }
         CPPVariable(int i) : CPPVariable((long long)i) { }
-        CPPVariable(double f) : f(f), type(Type::FLOAT) { }
-        CPPVariable(const string& s) : s(s), type(Type::STRING) { }
+        CPPVariable(double f) : f(f), type(LIQUID_VARIABLE_TYPE_FLOAT) { }
+        CPPVariable(const string& s) : s(s), type(LIQUID_VARIABLE_TYPE_STRING) { }
         CPPVariable(const char* s) : CPPVariable(string(s)) { }
-        CPPVariable(void* nil) : type(Type::NIL) { }
-        CPPVariable(const CPPVariable& v) :type(Type::NIL) { assign(v); }
-        CPPVariable(CPPVariable&& v) : type(Type::NIL) { this->move(std::move(v)); }
-        CPPVariable(std::initializer_list<CPPVariable> l) : type(Type::NIL) {
+        CPPVariable(void* nil) : type(LIQUID_VARIABLE_TYPE_NIL) { }
+        CPPVariable(const CPPVariable& v) :type(LIQUID_VARIABLE_TYPE_NIL) { assign(v); }
+        CPPVariable(CPPVariable&& v) : type(LIQUID_VARIABLE_TYPE_NIL) { this->move(std::move(v)); }
+        CPPVariable(std::initializer_list<CPPVariable> l) : type(LIQUID_VARIABLE_TYPE_NIL) {
             assign(vector<unique_ptr<CPPVariable>>());
             a.reserve(l.size());
             for (auto it = l.begin(); it != l.end(); ++it)
                 a.push_back(make_unique<CPPVariable>(*it));
         }
 
+        operator Variable () { return Variable({ this }); }
+
 
         ~CPPVariable() { clear(); }
 
         void clear() {
             switch (type) {
-                case Type::STRING:
+                case LIQUID_VARIABLE_TYPE_STRING:
                     s.~string();
                 break;
-                case Type::DICTIONARY:
+                case LIQUID_VARIABLE_TYPE_DICTIONARY:
                     d.~unordered_map<string, unique_ptr<CPPVariable>>();
                 break;
-                case Type::ARRAY:
+                case LIQUID_VARIABLE_TYPE_ARRAY:
                     a.~vector<unique_ptr<CPPVariable>>();
                 break;
                 default:
                 break;
             }
-            type = Type::NIL;
+            type = LIQUID_VARIABLE_TYPE_NIL;
         }
 
 
@@ -58,106 +63,102 @@ namespace Liquid {
             clear();
             type = v.type;
             switch (type) {
-                case Type::NIL:
+                case LIQUID_VARIABLE_TYPE_NIL:
                     type = v.type;
                 break;
-                case Type::BOOL:
+                case LIQUID_VARIABLE_TYPE_BOOL:
                     b = v.b;
                 break;
-                case Type::FLOAT:
+                case LIQUID_VARIABLE_TYPE_FLOAT:
                     f = v.f;
                 break;
-                case Type::INT:
+                case LIQUID_VARIABLE_TYPE_INT:
                     i = v.i;
                 break;
-                case Type::STRING:
+                case LIQUID_VARIABLE_TYPE_STRING:
                     new(&s) string(std::move(v.s));
                 break;
-                case Type::ARRAY:
+                case LIQUID_VARIABLE_TYPE_ARRAY:
                     new(&a) vector<unique_ptr<CPPVariable>>(std::move(v.a));
                 break;
-                case Type::DICTIONARY:
+                case LIQUID_VARIABLE_TYPE_DICTIONARY:
                     new(&d) unordered_map<string, unique_ptr<CPPVariable>>(std::move(v.d));
                 break;
-                case Type::OTHER:
+                case LIQUID_VARIABLE_TYPE_OTHER:
                     assert(false);
                 break;
             }
-            v.type = Type::NIL;
+            v.type = LIQUID_VARIABLE_TYPE_NIL;
         }
 
-        void assign(long long i) { clear(); this->i = i; type = Type::INT; }
+        void assign(long long i) { clear(); this->i = i; type = LIQUID_VARIABLE_TYPE_INT; }
         void assign(int i) { assign((long long)i); }
-        void assign(bool b) { clear(); this->b = b; type = Type::BOOL; }
-        void assign(double f) { clear(); this->f = f; type = Type::FLOAT; }
-        void assign(const string& s) { clear(); new(&this->s) string(); this->s = s; type = Type::STRING; }
+        void assign(bool b) { clear(); this->b = b; type = LIQUID_VARIABLE_TYPE_BOOL; }
+        void assign(double f) { clear(); this->f = f; type = LIQUID_VARIABLE_TYPE_FLOAT; }
+        void assign(const string& s) { clear(); new(&this->s) string(); this->s = s; type = LIQUID_VARIABLE_TYPE_STRING; }
         void assign(const char* s) { assign(string(s)); }
         void assign(const vector<unique_ptr<CPPVariable>>& a) {
             clear();
             new(&this->a) vector<unique_ptr<CPPVariable>>();
             this->a.reserve(a.size());
-            type = Type::ARRAY;
+            type = LIQUID_VARIABLE_TYPE_ARRAY;
             for (auto it = a.begin(); it != a.end(); ++it)
                 this->a.push_back(make_unique<CPPVariable>(**it));
         }
         void assign(const unordered_map<string, unique_ptr<CPPVariable>>& d) {
             clear();
             new(&this->d) unordered_map<string, unique_ptr<CPPVariable>>();
-            type = Type::DICTIONARY;
+            type = LIQUID_VARIABLE_TYPE_DICTIONARY;
             for (auto it = d.begin(); it != d.end(); ++it)
                 this->d[it->first] = make_unique<CPPVariable>(*it->second);
         }
         void assign(const CPPVariable& v) {
             clear();
             switch (v.type) {
-                case Type::NIL:
+                case LIQUID_VARIABLE_TYPE_NIL:
                     type = v.type;
                 break;
-                case Type::BOOL:
+                case LIQUID_VARIABLE_TYPE_BOOL:
                     assign(v.b);
                 break;
-                case Type::FLOAT:
+                case LIQUID_VARIABLE_TYPE_FLOAT:
                     assign(v.f);
                 break;
-                case Type::INT:
+                case LIQUID_VARIABLE_TYPE_INT:
                     assign(v.i);
                 break;
-                case Type::STRING:
+                case LIQUID_VARIABLE_TYPE_STRING:
                     assign(v.s);
                 break;
-                case Type::ARRAY:
+                case LIQUID_VARIABLE_TYPE_ARRAY:
                     assign(v.a);
                 break;
-                case Type::DICTIONARY:
+                case LIQUID_VARIABLE_TYPE_DICTIONARY:
                     assign(v.d);
                 break;
-                case Type::OTHER:
+                case LIQUID_VARIABLE_TYPE_OTHER:
                     assert(false);
                 break;
             }
         }
 
-        void assign(const Variable& v) {
-            assign(static_cast<const CPPVariable&>(v));
-        }
-
         CPPVariable& operator[](const string& s) {
-            if (type == Type::NIL) {
+            if (type == LIQUID_VARIABLE_TYPE_NIL) {
                 new(&this->d) unordered_map<string, unique_ptr<CPPVariable>>();
-                type = Type::DICTIONARY;
+                type = LIQUID_VARIABLE_TYPE_DICTIONARY;
             }
-            assert(type == Type::DICTIONARY);
+            assert(type == LIQUID_VARIABLE_TYPE_DICTIONARY);
             auto it = d.find(s);
             if (it != d.end())
                 return *it->second.get();
             return *d.emplace(s, make_unique<CPPVariable>()).first->second.get();
         }
         CPPVariable& operator[](size_t idx) {
-            if (type == Type::NIL) {
+            if (type == LIQUID_VARIABLE_TYPE_NIL) {
                 new(&this->a) vector<unique_ptr<CPPVariable>>();
-                type = Type::ARRAY;
+                type = LIQUID_VARIABLE_TYPE_ARRAY;
             }
-            assert(type == Type::ARRAY);
+            assert(type == LIQUID_VARIABLE_TYPE_ARRAY);
             if (a.size() < idx+1) {
                 size_t oldSize = a.size();
                 a.resize(idx+1);
@@ -174,39 +175,50 @@ namespace Liquid {
         CPPVariable& operator = (long long i) { assign(i); return *this; }
         CPPVariable& operator = (int i) { assign(i); return *this; }
         CPPVariable& operator = (CPPVariable&& v) { move(std::move(v)); return *this; }
-        /*CPPVariable& operator = (const CPPVariable& v) { assign(v); return *this; }*/
+        CPPVariable& operator = (const CPPVariable& v) { assign(v); return *this; }
 
 
-        Type getType() const  {
+        ELiquidVariableType getType() const  {
             return type;
         }
 
         bool getBool(bool& b) const {
-            if (type != Type::BOOL)
+            if (type != LIQUID_VARIABLE_TYPE_BOOL)
                 return false;
             b = this->b;
             return true;
         }
+
+        bool getTruthy() const {
+            return !(
+                (type == LIQUID_VARIABLE_TYPE_BOOL && !b) ||
+                (type == LIQUID_VARIABLE_TYPE_INT && !i) ||
+                (type == LIQUID_VARIABLE_TYPE_FLOAT && !f) ||
+                (type == LIQUID_VARIABLE_TYPE_OTHER && !p) ||
+                (type == LIQUID_VARIABLE_TYPE_NIL)
+            );
+        }
+
         bool getString(std::string& s) const  {
-            if (type != Type::STRING)
+            if (type != LIQUID_VARIABLE_TYPE_STRING)
                 return false;
             s = this->s;
             return true;
         }
         bool getInteger(long long& i) const  {
-            if (type != Type::INT)
+            if (type != LIQUID_VARIABLE_TYPE_INT)
                 return false;
             i = this->i;
             return true;
         }
         bool getFloat(double& f) const  {
-            if (type != Type::FLOAT)
+            if (type != LIQUID_VARIABLE_TYPE_FLOAT)
                 return false;
             f = this->f;
             return true;
         }
-        bool getDictionaryVariable(Variable*& variable, const std::string& key) const  {
-            if (type != Type::DICTIONARY)
+        bool getDictionaryVariable(Variable& variable, const std::string& key) const  {
+            if (type != LIQUID_VARIABLE_TYPE_DICTIONARY)
                 return false;
             auto it = d.find(key);
             if (it == d.end()) {
@@ -217,9 +229,9 @@ namespace Liquid {
             return true;
         }
 
-        bool getDictionaryVariable(Variable*& variable, const std::string& key, bool createOnNotExists)  {
-            if (type != Type::DICTIONARY) {
-                if (type != Type::NIL)
+        bool getDictionaryVariable(Variable& variable, const std::string& key, bool createOnNotExists)  {
+            if (type != LIQUID_VARIABLE_TYPE_DICTIONARY) {
+                if (type != LIQUID_VARIABLE_TYPE_NIL)
                     return false;
                 assign(unordered_map<string, unique_ptr<CPPVariable>>());
             }
@@ -234,8 +246,8 @@ namespace Liquid {
             return true;
         }
 
-        bool getArrayVariable(Variable*& variable, size_t idx) const {
-            if (type != Type::ARRAY)
+        bool getArrayVariable(Variable& variable, size_t idx) const {
+            if (type != LIQUID_VARIABLE_TYPE_ARRAY)
                 return false;
             if (idx >= a.size())
                 return false;
@@ -243,9 +255,9 @@ namespace Liquid {
             return true;
         }
 
-        bool getArrayVariable(Variable*& variable, size_t idx, bool createOnNotExists)  {
-            if (type != Type::ARRAY) {
-                if (type != Type::NIL)
+        bool getArrayVariable(Variable& variable, size_t idx, bool createOnNotExists)  {
+            if (type != LIQUID_VARIABLE_TYPE_ARRAY) {
+                if (type != LIQUID_VARIABLE_TYPE_NIL)
                     return false;
                 assign(vector<unique_ptr<CPPVariable>>());
             }
@@ -261,13 +273,13 @@ namespace Liquid {
         }
 
         long long getArraySize() const {
-            if (type != Type::ARRAY)
+            if (type != LIQUID_VARIABLE_TYPE_ARRAY)
                 return -1;
             return a.size();
         }
 
-        bool iterate(bool (*callback)(Variable* variable, void* data), void* data, int start = 0, int limit = -1, bool reverse = false) const {
-            if (type != Type::ARRAY)
+        bool iterate(bool (*callback)(void* variable, void* data), void* data, int start = 0, int limit = -1, bool reverse = false) const {
+            if (type != LIQUID_VARIABLE_TYPE_ARRAY)
                 return false;
             if (limit < 0)
                 limit = (int)a.size() + limit;
@@ -287,7 +299,76 @@ namespace Liquid {
             }
             return true;
         }
+
+        bool operator < (const CPPVariable& v) const {
+            if (v.type != type)
+                return false;
+            switch (type) {
+                case LIQUID_VARIABLE_TYPE_INT:
+                    return i < v.i;
+                case LIQUID_VARIABLE_TYPE_FLOAT:
+                    return f < v.f;
+                case LIQUID_VARIABLE_TYPE_STRING: {
+                    if (v.type == LIQUID_VARIABLE_TYPE_STRING)
+                        return s < v.s;
+                    string str;
+                    v.getString(str);
+                    return s < str;
+                }
+                default:
+                    return p < v.p;
+            }
+            return false;
+        }
     };
+
+    struct CPPVariableNode : Context::VariableNode {
+        CPPVariableNode() {
+            resolver.getType = +[](void* variable) { return static_cast<CPPVariable*>(variable)->type; };
+            resolver.getBool = +[](void* variable, bool* target) { return static_cast<CPPVariable*>(variable)->getBool(*target); };
+            resolver.getTruthy = +[](void* variable) { return static_cast<CPPVariable*>(variable)->getTruthy(); };
+            resolver.getString = +[](void* variable, char* target) {
+                if (static_cast<CPPVariable*>(variable)->type != LIQUID_VARIABLE_TYPE_STRING)
+                    return false;
+                strcpy(target, static_cast<CPPVariable*>(variable)->s.data());
+                return true;
+            };
+            resolver.getStringLength = +[](void* variable) {
+                if (static_cast<CPPVariable*>(variable)->type != LIQUID_VARIABLE_TYPE_STRING)
+                    return -1LL;
+                return (long long)static_cast<CPPVariable*>(variable)->s.size();
+            };
+            resolver.getInteger = +[](void* variable, long long* target) { return static_cast<CPPVariable*>(variable)->getInteger(*target); };
+            resolver.getFloat = +[](void* variable, double* target) { return static_cast<CPPVariable*>(variable)->getFloat(*target); };
+            resolver.getDictionaryVariable = +[](void* variable, const char* key, bool createOnNotExists, void** target) {
+                Variable var;
+                if (!static_cast<CPPVariable*>(variable)->getDictionaryVariable(var, key, createOnNotExists))
+                    return false;
+                *target = var;
+                return true;
+            };
+            resolver.getArrayVariable = +[](void* variable, size_t idx, bool createOnNotExists, void** target) {
+                Variable var;
+                if (!static_cast<CPPVariable*>(variable)->getArrayVariable(var, idx, createOnNotExists))
+                    return false;
+                *target = var;
+                return true;
+            };
+            resolver.iterate = +[](void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) { return static_cast<CPPVariable*>(variable)->iterate(callback, data, start, limit, reverse); };
+            resolver.getArraySize = +[](void* variable) { return static_cast<CPPVariable*>(variable)->getArraySize(); };
+
+            resolver.setVariable = +[](void* variable, void* value) { *static_cast<CPPVariable*>(variable) = *static_cast<CPPVariable*>(value); };
+            resolver.setFloat = +[](void* variable, double value) { *static_cast<CPPVariable*>(variable) = value; };
+            resolver.setBool = +[](void* variable, bool value) { *static_cast<CPPVariable*>(variable) = value; };
+            resolver.setInteger = +[](void* variable, long long value) { *static_cast<CPPVariable*>(variable) = value; };
+            resolver.setString = +[](void* variable, const char* value) { *static_cast<CPPVariable*>(variable) = value; };
+            resolver.setPointer = +[](void* variable, void* value) { *static_cast<CPPVariable*>(variable) = value; };
+            resolver.setNil = +[](void* variable) { static_cast<CPPVariable*>(variable)->clear(); };
+
+            resolver.compare = +[](void* a, void* b) { return *static_cast<CPPVariable*>(a) < *static_cast<CPPVariable*>(b) ? -1 : 0; };
+        }
+    };
+
 }
 
 #endif

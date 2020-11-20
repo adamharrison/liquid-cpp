@@ -3,9 +3,9 @@
 
 namespace Liquid {
 
-    Parser::Error Parser::Node::validate(const Context& context) const {
-        if (type)
-            return type->validate(context, *this);
+    Parser::Error Parser::validate(const Node& node) const {
+        if (node.type)
+            return node.type->validate(context, node);
         return Error();
     }
 
@@ -18,7 +18,6 @@ namespace Liquid {
             parser.pushError(Parser::Error(*this, Parser::Error::Type::INVALID_SYMBOL, ":"));
             return false;
         }
-        parser.nodes.back()->type = context.getNamedVariableNodeType();
         return true;
     }
 
@@ -317,7 +316,7 @@ namespace Liquid {
             return false;
         unique_ptr<Node> argumentNode = move(nodes.back());
         nodes.pop_back();
-        argumentNode->validate(context);
+        validate(*argumentNode.get());
 
         if (nodes.back()->children.size() == 0 || nodes.back()->children.back().get())
             return false;
@@ -380,7 +379,7 @@ namespace Liquid {
         return true;
     }
 
-    Parser::Node Parser::parse(const char* buffer, size_t len) {
+    Node Parser::parse(const char* buffer, size_t len) {
         errors.clear();
         nodes.clear();
         filterState = EFilterState::UNSET;

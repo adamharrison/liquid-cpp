@@ -31,17 +31,17 @@ namespace Liquid {
         ~NodeType() { }
 
         // When a node is rendered, depending on its mode, it'll return a node.
-        virtual Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const = 0;
-        virtual Parser::Error validate(const Context& context, const Parser::Node& node) const { return Parser::Error(); }
-        virtual void optimize(const Context& context, Parser::Node& node, Variable& store) const { }
+        virtual Node render(Renderer& renderer, const Node& node, Variable store) const = 0;
+        virtual Parser::Error validate(const Context& context, const Node& node) const { return Parser::Error(); }
+        virtual void optimize(const Context& context, Node& node, Variable store) const { }
 
 
-        Parser::Node (*renderFunction)(Renderer& renderer, const Parser::Node& node, Variable& store) =
-            +[](Renderer& renderer, const Parser::Node& node, Variable& store) {
+        Node (*renderFunction)(Renderer& renderer, const Node& node, Variable store) =
+            +[](Renderer& renderer, const Node& node, Variable store) {
                 return node.type->render(renderer, node, store);
             };
-        void (*optimizeFunction)(const Context& context, Parser::Node& node, Variable& store) =
-            +[](const Context& context, Parser::Node& node, Variable& store) {
+        void (*optimizeFunction)(const Context& context, Node& node, Variable store) =
+            +[](const Context& context, Node& node, Variable store) {
                 node.type->optimize(context, node, store);
             };
     };
@@ -61,7 +61,7 @@ namespace Liquid {
             Arity arity;
 
             QualifierNodeType(const string& symbol, Arity arity) : NodeType(NodeType::Type::QUALIFIER, symbol, 1) { }
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { return Parser::Node(); }
+            Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
         };
 
         // For things like if/else, and whatnot. else is a free tag that sits inside the if statement.
@@ -95,9 +95,6 @@ namespace Liquid {
 
     struct EnclosedNodeType : TagNodeType {
         EnclosedNodeType(string symbol, int minArguments = -1, int maxArguments = -1) : TagNodeType(Composition::ENCLOSED, symbol, minArguments, maxArguments) { }
-
-        // I don't like doing this, but
-        #define assignEnclosedRender(result, context, node, store) result = context.retrieveRenderedNode(node, store); if (!result.type && result.varaint.type == Parser::Variant::Type::CONTROL) return result;
     };
 
     struct OperatorNodeType : NodeType {
@@ -142,8 +139,8 @@ namespace Liquid {
         FilterNodeType(string symbol, int minArguments = -1, int maxArguments = -1) : NodeType(NodeType::Type::FILTER, symbol, -1), minArguments(minArguments), maxArguments(maxArguments) { }
 
 
-        Parser::Node getOperand(Renderer& renderer, const Parser::Node& node, Variable& store) const;
-        Parser::Node getArgument(Renderer& renderer, const Parser::Node& node, Variable& store, int idx) const;
+        Node getOperand(Renderer& renderer, const Node& node, Variable store) const;
+        Node getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const;
     };
 
     struct Context {
@@ -152,21 +149,17 @@ namespace Liquid {
         struct ConcatenationNode : NodeType {
             ConcatenationNode() : NodeType(Type::OPERATOR) { }
 
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const;
+            Node render(Renderer& renderer, const Node& node, Variable store) const;
         };
 
         struct OutputNode : NodeType {
             OutputNode() : NodeType(Type::OUTPUT) { }
 
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const {
                 assert(node.children.size() == 1);
-
                 auto& argumentNode = node.children.front();
                 assert(argumentNode->children.size() == 1);
-                auto it = argumentNode->children.begin();
-                if ((*it)->type)
-                    return (*it)->type->render(renderer, *it->get(), store);
-                return *it->get();
+                return renderer.retrieveRenderedNode(*argumentNode->children[0].get(), store);
             }
         };
 
@@ -174,7 +167,7 @@ namespace Liquid {
             PassthruNode(NodeType::Type type) :NodeType(type) { }
             ~PassthruNode() { }
 
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const {
                 assert(node.children.size() == 1);
                 auto it = node.children.begin();
                 if ((*it)->type)
@@ -194,84 +187,55 @@ namespace Liquid {
         // Used exclusively for tags. Should be never be rendered by itself.
         struct ArgumentNode : NodeType {
             ArgumentNode() : NodeType(Type::ARGUMENTS) { }
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const { assert(false); }
+            Node render(Renderer& renderer, const Node& node, Variable store) const { assert(false); }
         };
 
         struct VariableNode : NodeType {
             VariableNode() : NodeType(Type::VARIABLE) { }
 
+            LiquidVariableResolver resolver;
 
-            Variable* getVariable(Renderer& renderer, const Parser::Node& node, Variable& store, bool createIfNotExists) const {
-                Variable* storePointer = &store;
+            Variable getVariable(Renderer& renderer, const Node& node, Variable store, bool createIfNotExists) const {
+                Variable storePointer = store;
                 for (auto& link : node.children) {
                     auto node = renderer.retrieveRenderedNode(*link.get(), store);
                     switch (node.variant.type) {
-                        case Parser::Variant::Type::INT:
-                            if (!storePointer->getArrayVariable(storePointer, node.variant.i, createIfNotExists))
-                                storePointer = nullptr;
+                        case Variant::Type::INT:
+                            if (!resolver.getArrayVariable(storePointer, node.variant.i, createIfNotExists, (void**)&storePointer))
+                                storePointer = Variable({ nullptr });
                         break;
-                        case Parser::Variant::Type::STRING:
-                            if (!storePointer->getDictionaryVariable(storePointer, node.variant.s, createIfNotExists))
-                                storePointer = nullptr;
+                        case Variant::Type::STRING:
+                            if (!resolver.getDictionaryVariable(storePointer, node.variant.s.data(), createIfNotExists, (void**)&storePointer))
+                                storePointer = Variable({ nullptr });
                         break;
                         default:
-                            storePointer = nullptr;
+                            storePointer = Variable({ nullptr });
                         break;
                     }
-                    if (!storePointer)
-                        return nullptr;
+                    if (!storePointer.pointer)
+                        return Variable({ nullptr });
                 }
                 return storePointer;
             }
 
-            Parser::Node render(Renderer& renderer, const Parser::Node& node, Variable& store) const {
-                Variable* storePointer = getVariable(renderer, node, store, false);
-                if (!storePointer)
-                    return Parser::Node(Parser::Variant());
-                switch (storePointer->getType()) {
-                    case Variable::Type::NIL: {
-                        return Parser::Node(Parser::Variant());
-                    } break;
-                    case Variable::Type::FLOAT: {
-                        double f;
-                        storePointer->getFloat(f);
-                        return Parser::Node(Parser::Variant(f));
-                    } break;
-                    case Variable::Type::STRING: {
-                        std::string s;
-                        storePointer->getString(s);
-                        return Parser::Node(Parser::Variant(s));
-                    } break;
-                    case Variable::Type::INT: {
-                        long long i;
-                        storePointer->getInteger(i);
-                        return Parser::Node(Parser::Variant(i));
-                    } break;
-                    case Variable::Type::BOOL: {
-                        bool b;
-                        storePointer->getBool(b);
-                        return Parser::Node(Parser::Variant(b));
-                    } break;
-                    default:
-                        return Parser::Node(Parser::Variant(storePointer));
-                    break;
-                }
-
+            void setVariable(Variable variable, const Node& node) const {
+                resolver.setString(variable, node.getString().data());
             }
-        };
 
-        struct NamedVariableNode : VariableNode {
-
+            Node render(Renderer& renderer, const Node& node, Variable store) const {
+                Variable storePointer = getVariable(renderer, node, store, false);
+                return Node(renderer.context.parseVariant(storePointer));
+            }
         };
 
         unordered_map<string, unique_ptr<NodeType>> tagTypes;
         unordered_map<string, unique_ptr<NodeType>> operatorTypes;
         unordered_map<string, unique_ptr<NodeType>> filterTypes;
+        unique_ptr<NodeType> variableNodeType;
 
         const NodeType* getConcatenationNodeType() const { static ConcatenationNode concatenationNodeType; return &concatenationNodeType; }
         const NodeType* getOutputNodeType() const { static OutputNode outputNodeType; return &outputNodeType; }
-        const NodeType* getVariableNodeType() const { static VariableNode variableNodeType; return &variableNodeType; }
-        const NodeType* getNamedVariableNodeType() const { static NamedVariableNode namedVariableNodeType; return &namedVariableNodeType; }
+        const VariableNode* getVariableNodeType() const { return static_cast<VariableNode*>(variableNodeType.get()); }
         const NodeType* getGroupNodeType() const { static GroupNode groupNodeType; return &groupNodeType; }
         const NodeType* getGroupDereferenceNodeType() const { static GroupDereferenceNode groupDereferenceNodeType; return &groupDereferenceNodeType; }
         const NodeType* getArgumentsNodeType() const { static ArgumentNode argumentNodeType; return &argumentNodeType; }
@@ -281,6 +245,9 @@ namespace Liquid {
             switch (type->type) {
                 case NodeType::Type::TAG:
                     tagTypes[type->symbol] = move(type);
+                break;
+                case NodeType::Type::VARIABLE:
+                    variableNodeType = move(type);
                 break;
                 case NodeType::Type::OPERATOR:
                     operatorTypes[type->symbol] = move(type);
@@ -315,8 +282,20 @@ namespace Liquid {
             return static_cast<FilterNodeType*>(it->second.get());
         }
 
-        void optimize(Parser::Node& ast, Variable& store);
+        void optimize(Node& ast, Variable store);
 
+        void inject(Variable& variable, const Variant& variant) const;
+        Variant parseVariant(Variable variable) const;
+
+        const LiquidVariableResolver& getVariableResolver() const { return getVariableNodeType()->resolver; }
+        bool resolveVariableString(string& target, void* variable) const {
+            const LiquidVariableResolver& resolver = getVariableResolver();
+            long long length = resolver.getStringLength(variable);
+            target.resize(length);
+            if (!resolver.getString(variable, const_cast<char*>(target.data())))
+                return false;
+            return true;
+        }
 
     };
 }

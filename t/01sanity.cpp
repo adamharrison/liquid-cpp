@@ -16,6 +16,7 @@ Context& getContext() {
     static Context context;
     if (!setup) {
         StandardDialect::implement(context);
+        context.registerType<CPPVariableNode>();
         setup = true;
     }
     return context;
@@ -81,7 +82,7 @@ TEST(sanity, divide) {
 
 TEST(sanity, orderOfOperations) {
     CPPVariable variable;
-    Parser::Node ast;
+    Node ast;
     std::string str;
     variable["a"] = 3;
     ast = getParser().parse("asdbfsdf {{ a+3 * 6 }} b");
@@ -134,7 +135,7 @@ TEST(sanity, dereference) {
 
 TEST(sanity, whitespace) {
     CPPVariable variable, hash;
-    Parser::Node ast;
+    Node ast;
     std::string str;
     hash["b"] = 2;
     variable["a"] = std::move(hash);
@@ -157,7 +158,7 @@ TEST(sanity, whitespace) {
 
 TEST(sanity, ifstatement) {
     CPPVariable variable, hash;
-    Parser::Node ast;
+    Node ast;
     std::string str;
     hash["b"] = 2;
 
@@ -215,7 +216,7 @@ TEST(sanity, ifstatement) {
 
 TEST(sanity, casestatement) {
     CPPVariable hash;
-    Parser::Node ast;
+    Node ast;
     std::string str;
     hash["b"] = 2;
 
@@ -228,7 +229,7 @@ TEST(sanity, assignments) {
     CPPVariable variable, hash;
     hash["b"] = 2;
     variable["a"] = std::move(hash);
-    Parser::Node ast;
+    Node ast;
     std::string str;
 
     ast = getParser().parse("{% assign a = 1 %} {{ a }}");
@@ -251,7 +252,7 @@ TEST(sanity, forloop) {
     CPPVariable array = { 1, 5, 10, 20 };
     CPPVariable hash = { };
     hash["list"] = std::move(array);
-    Parser::Node ast;
+    Node ast;
     std::string str;
 
 
@@ -301,7 +302,7 @@ TEST(sanity, forloop) {
 TEST(sanity, filters) {
     CPPVariable hash = { };
     hash["a"] = 1;
-    Parser::Node ast;
+    Node ast;
     std::string str;
 
     ast = getParser().parse("{% assign a = a | plus: 5 %}{{ a }}");
@@ -328,7 +329,7 @@ TEST(sanity, filters) {
 TEST(sanity, error) {
     CPPVariable hash = { };
     hash["a"] = 1;
-    Parser::Node ast;
+    Node ast;
     std::string str;
 
     ASSERT_THROW({
