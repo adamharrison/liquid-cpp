@@ -95,7 +95,7 @@ extern "C" {
         bool (*getArrayVariable)(void* variable, size_t idx, bool createOnNotExists, void** target);
         bool (*iterate)(void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse);
         long long (*getArraySize)(void* variable);
-        void (*setVariable)(void* variable, void* value);
+        void (*setVariable)(void* variable, const void* value);
         void (*setFloat)(void* variable, double value);
         void (*setBool)(void* variable, bool value);
         void (*setInteger)(void* variable, long long value);

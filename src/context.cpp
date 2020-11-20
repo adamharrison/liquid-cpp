@@ -59,6 +59,8 @@ namespace Liquid {
     }
 
     Variant Context::parseVariant(Variable variable) const {
+        if (!variable.exists())
+            return Variant();
         const LiquidVariableResolver& resolver = getVariableResolver();
         ELiquidVariableType type = resolver.getType(variable);
         switch (type) {

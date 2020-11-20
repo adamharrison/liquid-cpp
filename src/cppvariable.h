@@ -19,7 +19,7 @@ namespace Liquid {
         };
         ELiquidVariableType type;
 
-        CPPVariable() :type(LIQUID_VARIABLE_TYPE_NIL) { }
+        CPPVariable() : type(LIQUID_VARIABLE_TYPE_NIL) { }
         CPPVariable(bool b) : b(b), type(LIQUID_VARIABLE_TYPE_BOOL) { }
         CPPVariable(long long i) : i(i), type(LIQUID_VARIABLE_TYPE_INT) { }
         CPPVariable(int i) : CPPVariable((long long)i) { }
@@ -355,9 +355,11 @@ namespace Liquid {
                 return true;
             };
             resolver.iterate = +[](void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) { return static_cast<CPPVariable*>(variable)->iterate(callback, data, start, limit, reverse); };
-            resolver.getArraySize = +[](void* variable) { return static_cast<CPPVariable*>(variable)->getArraySize(); };
+            resolver.getArraySize = +[](void* variable) {
+                return static_cast<CPPVariable*>(variable)->getArraySize();
+            };
 
-            resolver.setVariable = +[](void* variable, void* value) { *static_cast<CPPVariable*>(variable) = *static_cast<CPPVariable*>(value); };
+            resolver.setVariable = +[](void* variable, const void* value) { *static_cast<CPPVariable*>(variable) = *static_cast<const CPPVariable*>(value); };
             resolver.setFloat = +[](void* variable, double value) { *static_cast<CPPVariable*>(variable) = value; };
             resolver.setBool = +[](void* variable, bool value) { *static_cast<CPPVariable*>(variable) = value; };
             resolver.setInteger = +[](void* variable, long long value) { *static_cast<CPPVariable*>(variable) = value; };

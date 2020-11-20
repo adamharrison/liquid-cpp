@@ -32,7 +32,6 @@ namespace Liquid {
         operator void*() { return pointer; }
         operator const void*() const { return pointer; }
         operator void** () { return &pointer; }
-        operator void** () const { return &const_cast<Variable*>(this)->pointer; }
 
         Variable& operator = (void* pointer) { this->pointer = pointer; return *this; }
 

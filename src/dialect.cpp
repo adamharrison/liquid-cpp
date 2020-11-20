@@ -1146,7 +1146,7 @@ namespace Liquid {
     struct JoinFilterNode : ArrayFilterNodeType {
         JoinFilterNode() : ArrayFilterNodeType("join", 0, 1) { }
 
-        Node variableOperate(Renderer& renderer, const Node& node, Variable store, const Variable operand) {
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) {
             struct JoinStruct {
                 const Context& context;
                 string accumulator;
@@ -1172,7 +1172,7 @@ namespace Liquid {
             return Node(joinStruct.accumulator);
         }
 
-        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) {
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, Variant operand) {
             string accumulator;
             if (operand.type != Variant::Type::ARRAY || operand.a.size() == 0)
                 return Node();
@@ -1192,7 +1192,7 @@ namespace Liquid {
     struct ConcatFilterNode : ArrayFilterNodeType {
         ConcatFilterNode() : ArrayFilterNodeType("concat", 1, 1) { }
 
-        void accumulate(Renderer& renderer, Variant& accumulator, const Variable v) const {
+        void accumulate(Renderer& renderer, Variant& accumulator, Variable v) const {
             renderer.context.getVariableResolver().iterate(v, +[](void* variable, void* data) {
                     static_cast<Variant*>(data)->a.push_back(Variant(static_cast<Variable*>(variable)));
                 return true;
@@ -1245,7 +1245,7 @@ namespace Liquid {
             Variant accumulator;
         };
 
-        void accumulate(Renderer& renderer, MapStruct& mapStruct, const Variable v) const {
+        void accumulate(Renderer& renderer, MapStruct& mapStruct, Variable v) const {
             mapStruct.resolver.iterate(v, +[](void* variable, void* data) {
                 MapStruct& mapStruct = *static_cast<MapStruct*>(data);
                 Variable target;
@@ -1261,7 +1261,7 @@ namespace Liquid {
             for (auto it = v.a.begin(); it != v.a.end(); ++it) {
                 if (it->type == Variant::Type::VARIABLE) {
                     Variable target;
-                    if (mapStruct.resolver.getDictionaryVariable(it->v, mapStruct.property.data(), false, target))
+                    if (mapStruct.resolver.getDictionaryVariable(const_cast<Variable&>(it->v), mapStruct.property.data(), false, target))
                         mapStruct.accumulator.a.push_back(target);
                     else
                         mapStruct.accumulator.a.push_back(Variant());
@@ -1376,7 +1376,7 @@ namespace Liquid {
             Variant accumulator;
         };
 
-        void accumulate(WhereStruct& whereStruct, const Variable v) const {
+        void accumulate(WhereStruct& whereStruct, Variable v) const {
             whereStruct.resolver.iterate(v, +[](void* variable, void* data) {
                 WhereStruct& whereStruct = *static_cast<WhereStruct*>(data);
                 Variable target;
@@ -1401,7 +1401,7 @@ namespace Liquid {
             for (auto it = v.a.begin(); it != v.a.end(); ++it) {
                 if (it->type == Variant::Type::VARIABLE) {
                     Variable target;
-                    if (whereStruct.resolver.getDictionaryVariable(it->v, whereStruct.property.data(), false, target)) {
+                    if (whereStruct.resolver.getDictionaryVariable(const_cast<Variable&>(it->v), whereStruct.property.data(), false, target)) {
                         if (whereStruct.property.empty()) {
                             if (whereStruct.resolver.getTruthy(target))
                                 whereStruct.accumulator.a.push_back(*it);
@@ -1451,7 +1451,7 @@ namespace Liquid {
             Variant accumulator;
         };
 
-        void accumulate(UniqStruct& uniqStruct, const Variable v) const {
+        void accumulate(UniqStruct& uniqStruct, Variable v) const {
             uniqStruct.resolver.iterate(v, +[](void* variable, void* data) {
                 UniqStruct& uniqStruct = *static_cast<UniqStruct*>(data);
                 Variant v = uniqStruct.context.parseVariant(Variable({variable}));
@@ -1496,7 +1496,7 @@ namespace Liquid {
     struct FirstFilterNode : ArrayFilterNodeType {
         FirstFilterNode() : ArrayFilterNodeType("first", 0, 0) { }
 
-        Node variableOperate(Renderer& renderer, const Node& node, Variable store, const Variable operand) const {
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             Variable v;
             if (!renderer.context.getVariableResolver().getArrayVariable(operand, 0, false, 0))
                 return Node();
@@ -1513,7 +1513,7 @@ namespace Liquid {
     struct LastFilterNode : ArrayFilterNodeType {
         LastFilterNode() : ArrayFilterNodeType("last", 0, 0) { }
 
-        Node variableOperate(Renderer& renderer, const Node& node, Variable store, const Variable operand) const {
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             Variable v;
             const LiquidVariableResolver& resolver = renderer.context.getVariableResolver();
             long long size = resolver.getArraySize(operand);
@@ -1532,7 +1532,7 @@ namespace Liquid {
     struct IndexFilterNode : ArrayFilterNodeType {
         IndexFilterNode() : ArrayFilterNodeType("index", 1, 1) { }
 
-        Node variableOperate(Renderer& renderer, const Node& node, Variable store, const Variable operand) const {
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             Variable v;
             auto argument = getArgument(renderer, node, store, 0);
             if (!argument.type)
@@ -1573,7 +1573,7 @@ namespace Liquid {
             }
         }
 
-        Node variableOperate(Renderer& renderer, const Node& node, Variable store, const Variable operand) const {
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             long long size = renderer.context.getVariableResolver().getArraySize(operand);
             return size != -1 ? Node(size) : Node();
         }
