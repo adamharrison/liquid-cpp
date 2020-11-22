@@ -35,7 +35,6 @@
 				<Option output="bin/01sanity" prefix_auto="1" extension_auto="1" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="--gtest_filter=sanity.forloop" />
 			</Target>
 		</Build>
 		<Compiler>
@@ -57,6 +56,11 @@
 			<Option target="executable" />
 		</Unit>
 		<Unit filename="README.md" />
+		<Unit filename="ruby/Makefile" />
+		<Unit filename="ruby/extconf.rb" />
+		<Unit filename="ruby/liquid.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="src/common.h" />
 		<Unit filename="src/context.cpp">
 			<Option target="executable" />

@@ -1,6 +1,8 @@
 #ifndef INTERFACE_H
 #define INTERFACE_H
 
+#include <stdlib.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -11,7 +13,7 @@ extern "C" {
     An example usage would go like this.
 
         // The liquid context represents all registered tags, operators, filters, and a way to resolve variables.
-        LiquidContext context = liquidCreateContext();
+        LiquidContext context = liquidCreateContext(LIQUID_SETTINGS_DEFAULT);
 
         // Very few of the bits of liquid are part of the 'core'; instead, they are implemented as dialects. In order to
         // stick in most of the default bits of Liquid, you can ask the context to implement the standard dialect, but this
@@ -71,6 +73,19 @@ extern "C" {
         void* node;
     };
 
+    struct LiquidTemplateRender {
+        void* internal;
+    };
+
+    enum ELiquidSettings {
+        LIQUID_SETTINGS_DEFAULT = 0,
+        // Can do {% assign a[1] = ... %}.
+        LIQUID_SETTINGS_EXTENDED_ASSIGNMENT_SYNTAX = (1 << 1),
+        // Can use parentheses, operators, and everything in all expressions, not just assignments.
+        LIQUID_SETTINGS_EXTENDED_EXPRESSION_SYNTAX = (1 << 2),
+
+    };
+
     enum ELiquidVariableType {
         LIQUID_VARIABLE_TYPE_NIL,
         LIQUID_VARIABLE_TYPE_FLOAT,
@@ -83,6 +98,12 @@ extern "C" {
     };
 
     // Convenience function to register a custom variable type.
+    // Ownership model looks thusly:
+    // Calling create creates a newly allocated pointer. In all cases, one of the two things must happen:
+    //  1. It must be set as an array element, or a hash element.
+    //  2. It must be freed with freeVariable.
+    // For languages where the variables are garbage collected, like perl and ruby; freeVariable will be a no-op.
+    // Whenever getArrayVariable or getDictionaryVariable are called, a pointer is given, but no allocaitons are made.
     struct LiquidVariableResolver {
         ELiquidVariableType (*getType)(void* variable);
         bool (*getBool)(void* variable, bool* target);
@@ -91,21 +112,26 @@ extern "C" {
         long long (*getStringLength)(void* variable);
         bool (*getInteger)(void* variable, long long* target);
         bool (*getFloat)(void* variable, double* target);
-        bool (*getDictionaryVariable)(void* variable, const char* key, bool createOnNotExists, void** target);
-        bool (*getArrayVariable)(void* variable, size_t idx, bool createOnNotExists, void** target);
+        bool (*getDictionaryVariable)(void* variable, const char* key, void** target);
+        bool (*getArrayVariable)(void* variable, size_t idx, void** target);
         bool (*iterate)(void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse);
         long long (*getArraySize)(void* variable);
-        void (*setVariable)(void* variable, const void* value);
-        void (*setFloat)(void* variable, double value);
-        void (*setBool)(void* variable, bool value);
-        void (*setInteger)(void* variable, long long value);
-        void (*setString)(void* variable, const char* str);
-        void (*setPointer)(void* variable, void* value);
-        void (*setNil)(void* variable);
+        void* (*setDictionaryVariable)(void* variable, const char* key, void* target);
+        void* (*setArrayVariable)(void* variable, size_t idx, void* target);
+        void* (*createHash)();
+        void* (*createArray)();
+        void* (*createFloat)(double value);
+        void* (*createBool)(bool value);
+        void* (*createInteger)(long long value);
+        void* (*createString)(const char* str);
+        void* (*createPointer)(void* value);
+        void* (*createNil)();
+        void* (*createClone)(void* value);
+        void (*freeVariable)(void* value);
         int (*compare)(void* a, void* b);
     };
 
-    LiquidContext liquidCreateContext();
+    LiquidContext liquidCreateContext(ELiquidSettings settings);
     void liquidFreeContext(LiquidContext context);
     void liquidImplementStandardDialect(LiquidContext context);
     LiquidRenderer liquidCreateRenderer(LiquidContext context);
@@ -124,8 +150,11 @@ extern "C" {
     LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size);
     void liquidFreeTemplate(LiquidTemplate tmpl);
 
-    char* liquidRenderTemplate(void* variableStore, LiquidTemplate tmpl, int* size);
-    void liquidFreeTemplateRender(char* buffer);
+    LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl);
+    void liquidFreeTemplateRender(LiquidTemplateRender render);
+
+    const char* liquidTemplateRenderGetBuffer(LiquidTemplateRender render);
+    size_t liquidTemplateRenderGetSize(LiquidTemplateRender render);
 
     const char* liquidGetError();
     void liquidClearError();

@@ -26,34 +26,34 @@ namespace Liquid {
         const LiquidVariableResolver& resolver = getVariableResolver();
         switch (variant.type) {
             case Variant::Type::STRING:
-                resolver.setString(variable, variant.s.data());
+                variable = resolver.createString(variant.s.data());
             break;
             case Variant::Type::INT:
-                resolver.setInteger(variable, variant.i);
+                variable = resolver.createInteger(variant.i);
             break;
             case Variant::Type::FLOAT:
-                resolver.setInteger(variable, variant.f);
+                variable = resolver.createFloat(variant.f);
             break;
             case Variant::Type::NIL:
-                resolver.setNil(variable);
+                variable = resolver.createNil();
             break;
             case Variant::Type::BOOL:
-                resolver.setBool(variable, variant.b);
+                variable = resolver.createBool(variant.b);
             break;
             case Variant::Type::VARIABLE:
-                resolver.setVariable(variable, variant.v);
+                variable = variant.v;
             break;
             case Variant::Type::ARRAY: {
-                resolver.setNil(variable);
+                variable = resolver.createArray();
                 for (size_t i = 0; i < variant.a.size(); ++i) {
                     Variable target;
-                    if (!resolver.getArrayVariable(variable, i, true, target))
-                        break;
                     inject(target, variant.a[i]);
+                    if (!resolver.setArrayVariable(variable, i, target))
+                        break;
                 }
             } break;
             default:
-                resolver.setPointer(variable, variant.p);
+                variable = resolver.createPointer(variant.p);
             break;
         }
     }

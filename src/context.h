@@ -195,17 +195,18 @@ namespace Liquid {
 
             LiquidVariableResolver resolver;
 
-            Variable getVariable(Renderer& renderer, const Node& node, Variable store, bool createIfNotExists) const {
+            Variable getVariable(Renderer& renderer, const Node& node, Variable store) const {
                 Variable storePointer = store;
                 for (auto& link : node.children) {
                     auto node = renderer.retrieveRenderedNode(*link.get(), store);
                     switch (node.variant.type) {
                         case Variant::Type::INT:
-                            if (!resolver.getArrayVariable(storePointer, node.variant.i, createIfNotExists, (void**)&storePointer))
+                            if (!resolver.getArrayVariable(storePointer, node.variant.i, storePointer)) {
                                 storePointer = Variable({ nullptr });
+                            }
                         break;
                         case Variant::Type::STRING:
-                            if (!resolver.getDictionaryVariable(storePointer, node.variant.s.data(), createIfNotExists, (void**)&storePointer))
+                            if (!resolver.getDictionaryVariable(storePointer, node.variant.s.data(), storePointer))
                                 storePointer = Variable({ nullptr });
                         break;
                         default:
@@ -218,12 +219,42 @@ namespace Liquid {
                 return storePointer;
             }
 
-            void setVariable(Variable variable, const Node& node) const {
-                resolver.setString(variable, node.getString().data());
+            bool setVariable(Renderer& renderer, const Node& node, Variable store, Variable value) const {
+                Variable storePointer = store;
+                for (size_t i = 0; i < node.children.size(); ++i) {
+                    auto& link = node.children[i];
+                    auto part = renderer.retrieveRenderedNode(*link.get(), store);
+                    if (i == node.children.size() - 1) {
+                        switch (part.variant.type) {
+                            case Variant::Type::INT:
+                                return resolver.setArrayVariable(storePointer, part.variant.i, value);
+                            case Variant::Type::STRING:
+                                return resolver.setDictionaryVariable(storePointer, part.variant.s.data(), value);
+                            default:
+                                return false;
+                        }
+                    } else {
+                        switch (part.variant.type) {
+                            case Variant::Type::INT:
+                                if (!resolver.getArrayVariable(storePointer, part.variant.i, storePointer))
+                                    return false;
+                            break;
+                            case Variant::Type::STRING:
+                                if (!resolver.getDictionaryVariable(storePointer, part.variant.s.data(), storePointer))
+                                    return false;
+                            break;
+                            default:
+                                return false;
+                        }
+                    }
+                    if (!storePointer.pointer)
+                        return false;
+                }
+                return false;
             }
 
             Node render(Renderer& renderer, const Node& node, Variable store) const {
-                Variable storePointer = getVariable(renderer, node, store, false);
+                Variable storePointer = getVariable(renderer, node, store);
                 return Node(renderer.context.parseVariant(storePointer));
             }
         };

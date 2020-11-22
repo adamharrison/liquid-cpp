@@ -14,13 +14,13 @@ namespace Liquid {
             auto& assignmentNode = argumentNode->children.front();
             auto& variableNode = assignmentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode.get(), store, true);
-                if (targetVariable.exists()) {
-                    auto& operandNode = assignmentNode->children.back();
-                    Node node = renderer.retrieveRenderedNode(*operandNode.get(), store);
-                    assert(!node.type);
-                    renderer.context.inject(targetVariable, node.variant);
-                }
+                Variable targetVariable;
+                auto& operandNode = assignmentNode->children.back();
+                Node node = renderer.retrieveRenderedNode(*operandNode.get(), store);
+                assert(!node.type);
+                renderer.context.inject(targetVariable, node.variant);
+
+                static_cast<const Context::VariableNode*>(variableNode->type)->setVariable(renderer, *variableNode.get(), store, targetVariable);
             }
             return Node();
         }
@@ -39,9 +39,8 @@ namespace Liquid {
             auto& variableNode = argumentNode->children.front();
             const Context::VariableNode* variableTypeNode = static_cast<const Context::VariableNode*>(variableNode->type);
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable targetVariable = variableTypeNode->getVariable(renderer, *variableNode.get(), store, true);
-                if (targetVariable.exists())
-                    variableTypeNode->setVariable(targetVariable, renderer.retrieveRenderedNode(*node.children[1].get(), store));
+                Variable targetVariable = variableTypeNode->resolver.createString(renderer.retrieveRenderedNode(*node.children[1].get(), store).getString().data());
+                variableTypeNode->setVariable(renderer, *variableNode.get(), store, targetVariable);
             }
             return Node();
         }
@@ -55,11 +54,11 @@ namespace Liquid {
             auto& variableNode = argumentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
                 const Context::VariableNode* variableNodeType = static_cast<const Context::VariableNode*>(variableNode->type);
-                Variable targetVariable = variableNodeType->getVariable(renderer, *variableNode.get(), store, true);
+                Variable targetVariable = variableNodeType->getVariable(renderer, *variableNode.get(), store);
                 if (targetVariable.exists()) {
                     long long i = -1;
                     if (variableNodeType->resolver.getInteger(targetVariable,&i))
-                        variableNodeType->resolver.setInteger(targetVariable,i+1);
+                        variableNodeType->setVariable(renderer, *variableNode.get(), targetVariable, variableNodeType->resolver.createInteger(i+1));
                 }
             }
             return Node();
@@ -74,11 +73,11 @@ namespace Liquid {
             auto& variableNode = argumentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
                 const Context::VariableNode* variableNodeType = static_cast<const Context::VariableNode*>(variableNode->type);
-                Variable targetVariable = variableNodeType->getVariable(renderer, *variableNode.get(), store, true);
+                Variable targetVariable = variableNodeType->getVariable(renderer, *variableNode.get(), store);
                 if (targetVariable.exists()) {
-                    long long i = 0;
+                    long long i = -1;
                     if (variableNodeType->resolver.getInteger(targetVariable,&i))
-                        variableNodeType->resolver.setInteger(targetVariable,i-1);
+                        variableNodeType->setVariable(renderer, *variableNode.get(), targetVariable, variableNodeType->resolver.createInteger(i-1));
                 }
             }
             return Node();
@@ -259,8 +258,6 @@ namespace Liquid {
             assert(arguments->children[0]->children.size() == 2);
 
             auto& variableNode = arguments->children[0]->children[0];
-            Variable targetVariable = static_cast<const Context::VariableNode*>(variableNode->type)->getVariable(renderer, *variableNode, store, true);
-            assert(targetVariable.exists());
 
             // TODO: Should have an optimization for when the operand from "in" ia s sequence; so that it doesn't render out to a ridiclous thing, it
             // simply loops through the existing stuff.
@@ -308,7 +305,7 @@ namespace Liquid {
                 Renderer& renderer;
                 const Node& node;
                 Variable store;
-                Variable targetVariable;
+                const Node& variableNode;
                 bool (*iterator)(ForLoopContext& forloopContext);
                 long long length;
                 string result;
@@ -316,27 +313,23 @@ namespace Liquid {
             };
             auto iterator = +[](ForLoopContext& forLoopContext) {
                 Variable forLoopVariable;
-                Variable index0, index, rindex, rindex0, first, last, length;
-
                 const Context::VariableNode* variableType = forLoopContext.renderer.context.getVariableNodeType();
                 auto& resolver = variableType->resolver;
-                resolver.getDictionaryVariable(forLoopContext.store, "forloop", true, forLoopVariable);
-                resolver.getDictionaryVariable(forLoopVariable, "index0", true, index0);
-                resolver.getDictionaryVariable(forLoopVariable, "index", true, index);
-                resolver.getDictionaryVariable(forLoopVariable, "rindex", true, rindex);
-                resolver.getDictionaryVariable(forLoopVariable, "rindex0", true, rindex0);
-                resolver.getDictionaryVariable(forLoopVariable, "first", true, first);
-                resolver.getDictionaryVariable(forLoopVariable, "last", true, last);
-                resolver.getDictionaryVariable(forLoopVariable, "length", true, length);
-                resolver.setInteger(index0, forLoopContext.idx);
-                resolver.setInteger(index, forLoopContext.idx+1);
-                resolver.setInteger(rindex0, forLoopContext.length - forLoopContext.idx);
-                resolver.setInteger(rindex, forLoopContext.length - (forLoopContext.idx+1));
-                resolver.setInteger(first, forLoopContext.idx == 0);
-                resolver.setInteger(last, forLoopContext.idx == forLoopContext.length-1);
-                resolver.setInteger(length, forLoopContext.length);
+
+                if (!resolver.getDictionaryVariable(forLoopContext.store, "forloop", forLoopVariable))
+                    forLoopVariable = resolver.setDictionaryVariable(forLoopContext.store, "forloop", resolver.createHash());
+
+                resolver.setDictionaryVariable(forLoopVariable, "index0", resolver.createInteger(forLoopContext.idx));
+                resolver.setDictionaryVariable(forLoopVariable, "index", resolver.createInteger(forLoopContext.idx+1));
+                resolver.setDictionaryVariable(forLoopVariable, "rindex0", resolver.createInteger(forLoopContext.length - forLoopContext.idx));
+                resolver.setDictionaryVariable(forLoopVariable, "rindex", resolver.createInteger(forLoopContext.length - (forLoopContext.idx+1)));
+                resolver.setDictionaryVariable(forLoopVariable, "first", resolver.createBool(forLoopContext.idx == 0));
+                resolver.setDictionaryVariable(forLoopVariable, "last", resolver.createBool(forLoopContext.idx ==  forLoopContext.length-1));
+                resolver.setDictionaryVariable(forLoopVariable, "length", resolver.createInteger(forLoopContext.length));
+
                 forLoopContext.result.append(forLoopContext.renderer.retrieveRenderedNode(*forLoopContext.node.children[1].get(), forLoopContext.store).getString());
-                ++forLoopContext.idx;
+                ++forLoopContext.idx;;
+
                 if (forLoopContext.renderer.control != Renderer::Control::NONE)  {
                     if (forLoopContext.renderer.control == Renderer::Control::BREAK) {
                         forLoopContext.renderer.control = Renderer::Control::NONE;
@@ -349,7 +342,7 @@ namespace Liquid {
 
             const Context::VariableNode* variableType = renderer.context.getVariableNodeType();
             auto& resolver = variableType->resolver;
-            ForLoopContext forLoopContext = { renderer, node, store, *targetVariable, iterator };
+            ForLoopContext forLoopContext = { renderer, node, store, *variableNode.get(), iterator };
 
             forLoopContext.length = result.variant.type == Variant::Type::ARRAY ? result.variant.a.size() : resolver.getArraySize(result.variant.p);
             if (!hasLimit)
@@ -360,15 +353,17 @@ namespace Liquid {
                 int endIndex = std::min(limit+start-1, (int)forLoopContext.length-1);
                 if (reversed) {
                     for (int i = endIndex; i >= start; --i) {
-                        resolver.setNil(forLoopContext.targetVariable);
-                        renderer.context.inject(forLoopContext.targetVariable, result.variant.a[i]);
+                        Variable targetVariable;
+                        renderer.context.inject(targetVariable, result.variant.a[i]);
+                        variableType->setVariable(renderer, *variableNode, store, targetVariable);
                         if (!forLoopContext.iterator(forLoopContext))
                             break;
                     }
                 } else {
                     for (int i = start; i <= endIndex; ++i) {
-                        resolver.setNil(forLoopContext.targetVariable);
-                        renderer.context.inject(forLoopContext.targetVariable, result.variant.a[i]);
+                        Variable targetVariable;
+                        renderer.context.inject(targetVariable, result.variant.a[i]);
+                        variableType->setVariable(renderer, *variableNode, store, targetVariable);
                         if (!forLoopContext.iterator(forLoopContext))
                             break;
                     }
@@ -377,8 +372,7 @@ namespace Liquid {
                 resolver.iterate(result.variant.v, +[](void* variable, void* data) {
                     ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
                     const Context::VariableNode* variableType = forLoopContext.renderer.context.getVariableNodeType();
-                    auto& resolver = variableType->resolver;
-                    resolver.setVariable(forLoopContext.targetVariable, variable);
+                    variableType->setVariable(forLoopContext.renderer, forLoopContext.variableNode, forLoopContext.store, variableType->resolver.createClone(variable));
                     return forLoopContext.iterator(forLoopContext);
                 }, const_cast<void*>((void*)&forLoopContext), start, limit, reversed);
             }
@@ -398,9 +392,9 @@ namespace Liquid {
             auto& arguments = node.children.front();
             const LiquidVariableResolver& resolver = renderer.context.getVariableNodeType()->resolver;
             Variable forloopVariable;
-            if (resolver.getDictionaryVariable(store, "forloop", false, forloopVariable)) {
+            if (resolver.getDictionaryVariable(store, "forloop", forloopVariable)) {
                 Variable index0;
-                if (resolver.getDictionaryVariable(forloopVariable, "index0", false, index0)) {
+                if (resolver.getDictionaryVariable(forloopVariable, "index0", index0)) {
                     long long i;
                     if (resolver.getInteger(index0, &i))
                         return renderer.retrieveRenderedNode(*arguments->children[i % arguments->children.size()].get(), store);
@@ -1212,7 +1206,7 @@ namespace Liquid {
                 return Node();
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
-                    accumulate(renderer, accumulator, *operand.variant.v);
+                    accumulate(renderer, accumulator, operand.variant.v);
                 break;
                 case Variant::Type::ARRAY:
                     accumulate(renderer, accumulator, operand.variant.a);
@@ -1224,7 +1218,7 @@ namespace Liquid {
                 return accumulator;
             switch (argument.variant.type) {
                 case Variant::Type::VARIABLE:
-                    accumulate(renderer, accumulator, *argument.variant.v);
+                    accumulate(renderer, accumulator, argument.variant.v);
                 break;
                 case Variant::Type::ARRAY:
                     accumulate(renderer, accumulator, argument.variant.a);
@@ -1249,7 +1243,7 @@ namespace Liquid {
             mapStruct.resolver.iterate(v, +[](void* variable, void* data) {
                 MapStruct& mapStruct = *static_cast<MapStruct*>(data);
                 Variable target;
-                if (mapStruct.resolver.getDictionaryVariable(variable, mapStruct.property.data(), false, target))
+                if (mapStruct.resolver.getDictionaryVariable(variable, mapStruct.property.data(), target))
                     mapStruct.accumulator.a.push_back(target);
                 else
                     mapStruct.accumulator.a.push_back(Variant());
@@ -1261,7 +1255,7 @@ namespace Liquid {
             for (auto it = v.a.begin(); it != v.a.end(); ++it) {
                 if (it->type == Variant::Type::VARIABLE) {
                     Variable target;
-                    if (mapStruct.resolver.getDictionaryVariable(const_cast<Variable&>(it->v), mapStruct.property.data(), false, target))
+                    if (mapStruct.resolver.getDictionaryVariable(const_cast<Variable&>(it->v), mapStruct.property.data(), target))
                         mapStruct.accumulator.a.push_back(target);
                     else
                         mapStruct.accumulator.a.push_back(Variant());
@@ -1279,7 +1273,7 @@ namespace Liquid {
             MapStruct mapStruct = { renderer.context.getVariableResolver(), argument.getString() };
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
-                    accumulate(renderer, mapStruct, *operand.variant.v);
+                    accumulate(renderer, mapStruct, operand.variant.v);
                 break;
                 case Variant::Type::ARRAY:
                     accumulate(renderer, mapStruct, operand.variant.a);
@@ -1352,9 +1346,9 @@ namespace Liquid {
                     if (a.type != Variant::Type::VARIABLE || b.type != Variant::Type::VARIABLE)
                         return false;
                     Variable targetA, targetB;
-                    if (!resolver.getDictionaryVariable(a.v, property.data(), false, targetA))
+                    if (!resolver.getDictionaryVariable(a.v, property.data(), targetA))
                         return false;
-                    if (!resolver.getDictionaryVariable(b.v, property.data(), false, targetB))
+                    if (!resolver.getDictionaryVariable(b.v, property.data(), targetB))
                         return false;
                     return resolver.compare(targetA, targetB) < 0;
                 });
@@ -1380,7 +1374,7 @@ namespace Liquid {
             whereStruct.resolver.iterate(v, +[](void* variable, void* data) {
                 WhereStruct& whereStruct = *static_cast<WhereStruct*>(data);
                 Variable target;
-                if (whereStruct.resolver.getDictionaryVariable(variable, whereStruct.property.data(), false, target)) {
+                if (whereStruct.resolver.getDictionaryVariable(variable, whereStruct.property.data(), target)) {
                     if (whereStruct.property.empty()) {
                         if (whereStruct.resolver.getTruthy(target))
                             whereStruct.accumulator.a.push_back(variable);
@@ -1401,7 +1395,7 @@ namespace Liquid {
             for (auto it = v.a.begin(); it != v.a.end(); ++it) {
                 if (it->type == Variant::Type::VARIABLE) {
                     Variable target;
-                    if (whereStruct.resolver.getDictionaryVariable(const_cast<Variable&>(it->v), whereStruct.property.data(), false, target)) {
+                    if (whereStruct.resolver.getDictionaryVariable(const_cast<Variable&>(it->v), whereStruct.property.data(), target)) {
                         if (whereStruct.property.empty()) {
                             if (whereStruct.resolver.getTruthy(target))
                                 whereStruct.accumulator.a.push_back(*it);
@@ -1498,7 +1492,7 @@ namespace Liquid {
 
         Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             Variable v;
-            if (!renderer.context.getVariableResolver().getArrayVariable(operand, 0, false, 0))
+            if (!renderer.context.getVariableResolver().getArrayVariable(operand, 0, v))
                 return Node();
             return Node(v);
         }
@@ -1517,7 +1511,7 @@ namespace Liquid {
             Variable v;
             const LiquidVariableResolver& resolver = renderer.context.getVariableResolver();
             long long size = resolver.getArraySize(operand);
-            if (size == -1 || !resolver.getArrayVariable(operand, size - 1, false, v))
+            if (size == -1 || !resolver.getArrayVariable(operand, size - 1, v))
                 return Node();
             return Node(v);
         }
@@ -1538,7 +1532,7 @@ namespace Liquid {
             if (!argument.type)
                 return Node();
             int idx = argument.variant.i;
-            if (!renderer.context.getVariableResolver().getArrayVariable(operand, idx, false, v))
+            if (!renderer.context.getVariableResolver().getArrayVariable(operand, idx, v))
                 return Node();
             return Node(v);
         }

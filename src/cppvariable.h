@@ -35,6 +35,9 @@ namespace Liquid {
             for (auto it = l.begin(); it != l.end(); ++it)
                 a.push_back(make_unique<CPPVariable>(*it));
         }
+        CPPVariable(const unordered_map<string, unique_ptr<CPPVariable>>& d) : type(LIQUID_VARIABLE_TYPE_NIL) {
+            assign(d);
+        }
 
         operator Variable () { return Variable({ this }); }
 
@@ -217,59 +220,49 @@ namespace Liquid {
             f = this->f;
             return true;
         }
-        bool getDictionaryVariable(Variable& variable, const std::string& key) const  {
+
+        bool getDictionaryVariable(const CPPVariable** variable, const std::string& key) const {
             if (type != LIQUID_VARIABLE_TYPE_DICTIONARY)
                 return false;
             auto it = d.find(key);
-            if (it == d.end()) {
+            if (it == d.end())
                 return false;
-            } else {
-                variable = it->second.get();
-            }
+            *variable = it->second.get();
             return true;
         }
 
-        bool getDictionaryVariable(Variable& variable, const std::string& key, bool createOnNotExists)  {
+
+        CPPVariable* setDictionaryVariable(const std::string& key, CPPVariable* target)  {
             if (type != LIQUID_VARIABLE_TYPE_DICTIONARY) {
                 if (type != LIQUID_VARIABLE_TYPE_NIL)
-                    return false;
+                    return nullptr;
                 assign(unordered_map<string, unique_ptr<CPPVariable>>());
             }
             auto it = d.find(key);
             if (it == d.end()) {
-                if (!createOnNotExists)
-                    return false;
-                variable = &(*this)[key];
+                it = d.emplace(key, unique_ptr<CPPVariable>(target)).first;
             } else {
-                variable = it->second.get();
+                it->second = unique_ptr<CPPVariable>(target);
             }
-            return true;
+            return it->second.get();
         }
 
-        bool getArrayVariable(Variable& variable, size_t idx) const {
+        bool getArrayVariable(const CPPVariable** variable, size_t idx) const {
             if (type != LIQUID_VARIABLE_TYPE_ARRAY)
                 return false;
             if (idx >= a.size())
                 return false;
-            variable = &(*const_cast<CPPVariable*>(this))[idx];
+            *variable = &((const_cast<CPPVariable*>(this))[idx]);
             return true;
         }
 
-        bool getArrayVariable(Variable& variable, size_t idx, bool createOnNotExists)  {
-            if (type != LIQUID_VARIABLE_TYPE_ARRAY) {
-                if (type != LIQUID_VARIABLE_TYPE_NIL)
-                    return false;
-                assign(vector<unique_ptr<CPPVariable>>());
-            }
-            if (idx >= a.size()) {
-                if (!createOnNotExists)
-                    return false;
+        CPPVariable* setArrayVariable(size_t idx, CPPVariable* target)  {
+            if (type != LIQUID_VARIABLE_TYPE_ARRAY)
+                return nullptr;
+            if (idx >= a.size())
                 a.resize(idx+1);
-            }
-            if (!a[idx].get())
-                a[idx] = make_unique<CPPVariable>();
-            variable = a[idx].get();
-            return true;
+            a[idx] = make_unique<CPPVariable>(target);
+            return a[idx].get();
         }
 
         long long getArraySize() const {
@@ -340,32 +333,33 @@ namespace Liquid {
             };
             resolver.getInteger = +[](void* variable, long long* target) { return static_cast<CPPVariable*>(variable)->getInteger(*target); };
             resolver.getFloat = +[](void* variable, double* target) { return static_cast<CPPVariable*>(variable)->getFloat(*target); };
-            resolver.getDictionaryVariable = +[](void* variable, const char* key, bool createOnNotExists, void** target) {
-                Variable var;
-                if (!static_cast<CPPVariable*>(variable)->getDictionaryVariable(var, key, createOnNotExists))
-                    return false;
-                *target = var;
-                return true;
+            resolver.getDictionaryVariable = +[](void* variable, const char* key, void** target) {
+                return static_cast<CPPVariable*>(variable)->getDictionaryVariable((const CPPVariable**)target, key);
             };
-            resolver.getArrayVariable = +[](void* variable, size_t idx, bool createOnNotExists, void** target) {
-                Variable var;
-                if (!static_cast<CPPVariable*>(variable)->getArrayVariable(var, idx, createOnNotExists))
-                    return false;
-                *target = var;
-                return true;
+            resolver.getArrayVariable = +[](void* variable, size_t idx, void** target) {
+                return static_cast<CPPVariable*>(variable)->getArrayVariable((const CPPVariable**)target, idx);
+            };
+            resolver.setArrayVariable = +[](void* variable, size_t idx, void* target) {
+                return (void*)static_cast<CPPVariable*>(variable)->setArrayVariable(idx, static_cast<CPPVariable*>(target));
+            };
+            resolver.setDictionaryVariable = +[](void* variable, const char* key, void* target) {
+                return (void*)static_cast<CPPVariable*>(variable)->setDictionaryVariable(key, static_cast<CPPVariable*>(target));
             };
             resolver.iterate = +[](void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) { return static_cast<CPPVariable*>(variable)->iterate(callback, data, start, limit, reverse); };
             resolver.getArraySize = +[](void* variable) {
                 return static_cast<CPPVariable*>(variable)->getArraySize();
             };
 
-            resolver.setVariable = +[](void* variable, const void* value) { *static_cast<CPPVariable*>(variable) = *static_cast<const CPPVariable*>(value); };
-            resolver.setFloat = +[](void* variable, double value) { *static_cast<CPPVariable*>(variable) = value; };
-            resolver.setBool = +[](void* variable, bool value) { *static_cast<CPPVariable*>(variable) = value; };
-            resolver.setInteger = +[](void* variable, long long value) { *static_cast<CPPVariable*>(variable) = value; };
-            resolver.setString = +[](void* variable, const char* value) { *static_cast<CPPVariable*>(variable) = value; };
-            resolver.setPointer = +[](void* variable, void* value) { *static_cast<CPPVariable*>(variable) = value; };
-            resolver.setNil = +[](void* variable) { static_cast<CPPVariable*>(variable)->clear(); };
+            resolver.createHash = +[]() { return (void*)new CPPVariable(unordered_map<string, unique_ptr<CPPVariable>>()); };
+            resolver.createArray = +[]() { return (void*)new CPPVariable({ }); };
+            resolver.createFloat = +[](double value) { return (void*)new CPPVariable(value); };
+            resolver.createBool = +[](bool value) { return (void*)new CPPVariable(value); };
+            resolver.createInteger = +[](long long value) { return (void*)new CPPVariable(value); };
+            resolver.createString = +[]( const char* value) { return (void*)new CPPVariable(string(value)); };
+            resolver.createPointer = +[](void* value) { return (void*)new CPPVariable(value); };
+            resolver.createNil = +[]() { return (void*)new CPPVariable(); };
+            resolver.createClone = +[](void* variable) { return (void*)new CPPVariable(*static_cast<CPPVariable*>(variable)); };
+            resolver.freeVariable = +[](void* variable) { delete (CPPVariable*)variable;  };
 
             resolver.compare = +[](void* a, void* b) { return *static_cast<CPPVariable*>(a) < *static_cast<CPPVariable*>(b) ? -1 : 0; };
         }

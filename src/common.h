@@ -26,7 +26,10 @@ namespace Liquid {
 
     // Represents the underlying variable implementation that is passed in to liquid.
     struct Variable {
-        void* pointer = nullptr;
+        void* pointer;
+
+        Variable() :pointer(nullptr) { }
+        Variable(void* pointer) : pointer(pointer) { }
 
         operator bool() const { return pointer != nullptr; }
         operator void*() { return pointer; }
@@ -294,6 +297,8 @@ namespace Liquid {
         ~Node() {
             if (type)
                 children.~vector<unique_ptr<Node>>();
+            else
+                variant.~Variant();
         }
 
         string getString() const {
