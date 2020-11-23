@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <cassert>
+#include <cstdarg>
 
 #include "interface.h"
 
@@ -23,6 +24,22 @@ namespace Liquid {
     using std::move;
 
 
+    struct Exception : public std::exception {
+        std::string internal;
+
+        Exception() { }
+        Exception(const char* format, ...) {
+            char buffer[512];
+            va_list args;
+            va_start(args, format);
+            vsnprintf(buffer, sizeof(buffer), format, args);
+            va_end(args);
+            internal = buffer;
+        }
+        const char * what () const throw () {
+            return internal.c_str();
+        }
+    };
 
     // Represents the underlying variable implementation that is passed in to liquid.
     struct Variable {

@@ -13,6 +13,7 @@ In development. Currently a bit all over the place.
 
 The C++ library, which is built with the normal Makefile can be linked in as a static library. Will eventually be available as a header-only library.
 
+```c++
     #include <cstdio>
     #include "liquid.h"
 
@@ -36,12 +37,13 @@ The C++ library, which is built with the normal Makefile can be linked in as a s
         fprintf(stdout, "%s\n", result.data());
         return 0;
     }
-
+```
 
 #### C
 
 The C library, which is built with the normal Makefile can be linked in as a static library.
 
+```c
     #include <stdio.h>
 
     int(int argc, char* argv[]) {
@@ -84,17 +86,19 @@ The C library, which is built with the normal Makefile can be linked in as a sta
 
         return 0;
     }
-
+```
 
 #### Ruby
 
 There're two ways to get the ruby library working;
 
+```ruby
     require 'liquid-c'
     context = LiquidC.new()
     renderer = LiquidC::Renderer.new(context)
     template = LiquidC::Template.new(context, "{% if a %}asdfghj {{ a }}{% endif %}")
     puts renderer.render({ "a" => 1 }, template)
+```
 
 Or, alternatively, one can use the "drop in replacement" function, which will register the exact same constructs as the normal liquid library.
 
@@ -102,11 +106,15 @@ This is generally discouraged, as you lose some useful features of the library; 
 tags, filters, operators, and settings; and you have thread-safe rendering of shared templates, vs. just shoving everything into a global namespace.
 But, it's of course, up to you.
 
+```ruby
     require 'liquid-c'
     LiquidC::DIR()
 
     template = Liquid::Template.parse("{% if a %}asdfghj {{ a }}{% endif %}")
     puts template.render({ "a" => 1 }, template)
+```
+
+May eventually stick the "drop in replacement" into a separate module, that just calls it a in single include.
 
 #### Perl
 

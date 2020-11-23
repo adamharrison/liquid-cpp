@@ -108,7 +108,7 @@ namespace Liquid {
         };
 
 
-        struct Exception : std::exception {
+        struct Exception : Liquid::Exception {
             Parser::Error parserError;
             Lexer::Error lexerError;
             std::string message;
