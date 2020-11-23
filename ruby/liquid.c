@@ -257,7 +257,7 @@ VALUE liquidC_registerOperator(VALUE self, VALUE name) {
     return Qnil;
 }
 
-VALUE liquidC_getFirst(VALUE klass, VALUE name) {
+VALUE liquidC_getSingleton(VALUE klass, VALUE name) {
     return liquidGlobalContext;
 }
 
@@ -374,6 +374,13 @@ VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
     return str;
 }
 
+/* Drop in replacement for reuglar liquid. */
+VALUE liquidC_DIR(VALUE klass) {
+	VALUE liquid, tmpl;
+	liquid = rb_define_module("Liquid");
+	tmpl = rb_define_class_under(liquid, "Tempalte", rb_cData);
+}
+
 
 void Init_LiquidC() {
 	VALUE liquidC, liquidCRenderer, liquidCTemplate;
@@ -387,7 +394,8 @@ void Init_LiquidC() {
 	rb_define_method(liquidC, "registerFilter", liquidC_registerFilter, 1);
     rb_define_method(liquidC, "registerOperator", liquidC_registerOperator, 1);
     // Specifically to conform to the insane Shopify paradigm.
-	rb_define_singleton_method(liquidC, "getFirst", liquidC_getFirst, 0);
+	rb_define_singleton_method(liquidC, "getSingleton", liquidC_getSingleton, 0);
+	rb_define_singleton_method(liquidC, "DIR", liquidC_DIR, 0);
 
 	rb_define_alloc_func(liquidCRenderer, liquidCRenderer_alloc);
     rb_define_method(liquidCRenderer, "initialize", liquidCRenderer_m_initialize, 1);

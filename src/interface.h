@@ -7,54 +7,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-    /* ## Liquid Interface
-
-    This is the primary C interface to the LiquidCPP module.
-
-    An example usage would go like this.
-
-        // The liquid context represents all registered tags, operators, filters, and a way to resolve variables.
-        LiquidContext context = liquidCreateContext(LIQUID_SETTINGS_DEFAULT);
-
-        // Very few of the bits of liquid are part of the 'core'; instead, they are implemented as dialects. In order to
-        // stick in most of the default bits of Liquid, you can ask the context to implement the standard dialect, but this
-        // is not necessary. The only default tag available is {% raw %}, as this is less a tag, and more a lexing hint. No
-        // filters, or operators, other than the unary - operator, are available by default; they are are all part of the liquid standard dialect.
-        liquidImplementStandardDialect(context);
-        // In addition, dialects can be layered. Implementing one dialects does not forgo implementating another; and dialects
-        // can override one another; whichever dialect was applied last will apply its proper tags, operators, and filters.
-        // Currently, there is no way to deregsiter a tag, operator, or filter once registered.
-
-        // If no LiquidVariableResolver is specified; an internal default is used that won't read anything you pass in, but will funciton for {% assign %}, {% capture %} and other tags.
-        LiquidVariableResolver resolver = {
-            ...
-        };
-        liquidRegisterVariableResolver(resolver);
-
-        const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
-        LiquidTemplate tmpl = liquidCreateTemplate(context, exampleFile, sizeof(exampleFile)-1);
-        if (liquidGetError()) {
-            fprintf(stderr, "Error parsing template: %s", liquidGetError());
-            exit(-1);
-        }
-        // This object should be thread-local.
-        LiquidRenderer renderer = liquidCreateRenderer(context);
-        // Use something that works with your language here; as resolved by the LiquidVariableResolver above.
-        void* variableStore = ...;
-
-        int size;
-        char* result = liquidRenderTemplate(variableStore, tmpl, &size);
-        fprintf(stdout, "%s", result);
-
-        // All resources, unless otherwise specified, must be free explicitly.
-        liquidFreeTemplateRender(result);
-        liquidFreeRenderer(renderer);
-        liquidFreeTemplate(tmpl);
-        liquidFreeContext(context);
-
-
-
-    */
 
     enum ETagType {
         TAG_TYPE_ENCLOSING,
@@ -103,6 +55,13 @@ extern "C" {
         LIQUID_VARIABLE_TYPE_OTHER
     };
     typedef enum ELiquidVariableType LiquidVariableType;
+
+    enum ELiquidParserSettings {
+        LIQUID_PARSER_SETTINGS_LAX,
+        LIQUID_PARSER_SETTINGS_WARN,
+        LIQUID_PARSER_SETTINGS_STRICT
+    };
+    typedef enum ELiquidParserSettings LiquidParserSettings;
 
     // Convenience function to register a custom variable type.
     // Ownership model looks thusly:

@@ -7,6 +7,111 @@ Is a soon-to-be fully featured C++17 renderer for Liquid; Shopify's templating l
 
 In development. Currently a bit all over the place.
 
+### Quick Start
+
+#### C++
+
+The C++ library, which is built with the normal Makefile can be linked in as a static library. Will eventually be available as a header-only library.
+
+    #include <cstdio>
+    #include "liquid.h"
+
+    using namespace Liquid;
+
+    int(int argc, char* argv[]) {
+        Context context;
+        Parser parser(context);
+        StandardDialect::implement(context);
+        context.registerType<CPPVariableNode>();
+
+        const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
+        // Throws an exception if there's a parsing error.
+        Node ast = parser.parseFile(exampleFile, sizeof(exampleFile)-1);
+        Renderer renderer(context);
+
+        CPPVariable store;
+        store["a"] = 10;
+
+        std::string result = result = renderer.render(ast, store);
+        fprintf(stdout, "%s\n", result.data());
+        return 0;
+    }
+
+
+#### C
+
+The C library, which is built with the normal Makefile can be linked in as a static library.
+
+    #include <stdio.h>
+
+    int(int argc, char* argv[]) {
+        // The liquid context represents all registered tags, operators, filters, and a way to resolve variables.
+        LiquidContext context = liquidCreateContext(LIQUID_SETTINGS_DEFAULT);
+
+        // Very few of the bits of liquid are part of the 'core'; instead, they are implemented as dialects. In order to
+        // stick in most of the default bits of Liquid, you can ask the context to implement the standard dialect, but this
+        // is not necessary. The only default tag available is {% raw %}, as this is less a tag, and more a lexing hint. No
+        // filters, or operators, other than the unary - operator, are available by default; they are are all part of the liquid standard dialect.
+        liquidImplementStandardDialect(context);
+        // In addition, dialects can be layered. Implementing one dialects does not forgo implementating another; and dialects
+        // can override one another; whichever dialect was applied last will apply its proper tags, operators, and filters.
+        // Currently, there is no way to deregsiter a tag, operator, or filter once registered.
+
+        // If no LiquidVariableResolver is specified; an internal default is used that won't read anything you pass in, but will funciton for {% assign %}, {% capture %} and other tags.
+        LiquidVariableResolver resolver = {
+            ...
+        };
+        liquidRegisterVariableResolver(resolver);
+
+        const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
+        LiquidTemplate tmpl = liquidCreateTemplate(context, exampleFile, sizeof(exampleFile)-1);
+        if (liquidGetError()) {
+            fprintf(stderr, "Error parsing template: %s", liquidGetError());
+            exit(-1);
+        }
+        // This object should be thread-local.
+        LiquidRenderer renderer = liquidCreateRenderer(context);
+        // Use something that works with your language here; as resolved by the LiquidVariableResolver above.
+        void* variableStore = NULL;
+        LiquidTemplateRender result = liquidRenderTemplate(renderer, variableStore, tmpl);
+        fprintf(stdout, "%s\n", liquidTemplateRenderGetBuffer(result));
+
+        // All resources, unless otherwise specified, must be free explicitly.
+        liquidFreeTemplateRender(result);
+        liquidFreeRenderer(renderer);
+        liquidFreeTemplate(tmpl);
+        liquidFreeContext(context);
+
+        return 0;
+    }
+
+
+#### Ruby
+
+There're two ways to get the ruby library working;
+
+    require 'liquid-c'
+    context = LiquidC.new()
+    renderer = LiquidC::Renderer.new(context)
+    template = LiquidC::Template.new(context, "{% if a %}asdfghj {{ a }}{% endif %}")
+    puts renderer.render({ "a" => 1 }, template)
+
+Or, alternatively, one can use the "drop in replacement" function, which will register the exact same constructs as the normal liquid library.
+
+This is generally discouraged, as you lose some useful features of the library; like the ability to have independent liquid contexts with different
+tags, filters, operators, and settings; and you have thread-safe rendering of shared templates, vs. just shoving everything into a global namespace.
+But, it's of course, up to you.
+
+    require 'liquid-c'
+    LiquidC::DIR()
+
+    template = Liquid::Template.parse("{% if a %}asdfghj {{ a }}{% endif %}")
+    puts template.render({ "a" => 1 }, template)
+
+#### Perl
+
+Coming Soon! Will likely be called `WWW::Shopify::Liquid::XS`.
+
 ## Features / Roadmap
 
 This is what I'm aiming for at any rate.
@@ -21,11 +126,13 @@ This is what I'm aiming for at any rate.
 
 ### Partial
 
-* Togglable extra features, such as real operators, parentheses, etc..
+* Togglable extra features, such as real operators, parentheses, etc.. (This is in, but not togglable).
 * Line accurate, and helpful error messages. (Some are accurate and helpful, others are not).
-* Significant speedup over ruby-based liquid. (Need to do benchmarks)
+* Significant speedup over ruby-based liquid. (Need to do benchmarks; seems like a minimum of a 6-fold speedup over regular Liquid)
 * Ability to step through and examine the liquid AST. (AST is generated, but no mechanisms to step through yet)
 * Full test suite that runs all major examples from Shopify's doucmentation. (Test suite runs some examples, but not all).
+* Extremely easy to embed in other libraries, software, and langauges. Possiblilty of having it as a header-only library. (Emebedding easy; header-only, not yet).
+* Fully featured `extern "C"` interface for easy linking to most scripting languages. OOB bindings for both Ruby and Perl will be provided, that will act as drop-in replacements for `Liquid` and `WWW::Shopify::Liquid`. (Ruby, but not Perl yet).
 
 ### TODO
 
@@ -34,8 +141,6 @@ This is what I'm aiming for at any rate.
 * Optional compatibilty with rapidjson to allow for JSON reading.
 * Ability to set limits on memory consumed, and time spent rendering.
 * Built-in optimizer that will do things like loop unrolling, conditional elimiation, etc...
-* Extremely easy to embed in other libraries, software, and langauges. Possiblilty of having it as a header-only library.
-* Fully featured `extern "C"` interface for easy linking to most scripting languages. OOB bindings for both Ruby and Perl will be provided, that will act as drop-in replacements for `Liquid` and `WWW::Shopify::Liquid`.
 
 
 ## License
