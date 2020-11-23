@@ -2,6 +2,7 @@
 #define INTERFACE_H
 
 #include <stdlib.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,31 +61,36 @@ extern "C" {
         TAG_TYPE_FREE
     };
 
-    struct LiquidContext {
+    struct SLiquidContext {
         void* context;
     };
-    struct LiquidRenderer {
+    typedef struct SLiquidContext LiquidContext;
+    struct SLiquidRenderer {
         void* renderer;
     };
-    struct LiquidTemplate {
+    typedef struct SLiquidRenderer LiquidRenderer;
+    struct SLiquidTemplate {
         void* ast;
     };
-    struct LiquidNode {
+    typedef struct SLiquidTemplate LiquidTemplate;
+    struct SLiquidNode {
         void* node;
     };
+    typedef struct SLiquidNode LiquidNode;
 
-    struct LiquidTemplateRender {
+    struct SLiquidTemplateRender {
         void* internal;
     };
+    typedef struct SLiquidTemplateRender LiquidTemplateRender;
 
-    enum ELiquidSettings {
-        LIQUID_SETTINGS_DEFAULT = 0,
+    enum ELiquidContextSettings {
+        LIQUID_CONTEXT_SETTINGS_DEFAULT = 0,
         // Can do {% assign a[1] = ... %}.
-        LIQUID_SETTINGS_EXTENDED_ASSIGNMENT_SYNTAX = (1 << 1),
+        LIQUID_CONTEXT_SETTINGS_EXTENDED_ASSIGNMENT_SYNTAX = (1 << 1),
         // Can use parentheses, operators, and everything in all expressions, not just assignments.
-        LIQUID_SETTINGS_EXTENDED_EXPRESSION_SYNTAX = (1 << 2),
-
+        LIQUID_CONTEXT_SETTINGS_EXTENDED_EXPRESSION_SYNTAX = (1 << 2)
     };
+    typedef enum ELiquidContextSettings LiquidContextSettings;
 
     enum ELiquidVariableType {
         LIQUID_VARIABLE_TYPE_NIL,
@@ -96,6 +102,7 @@ extern "C" {
         LIQUID_VARIABLE_TYPE_DICTIONARY,
         LIQUID_VARIABLE_TYPE_OTHER
     };
+    typedef enum ELiquidVariableType LiquidVariableType;
 
     // Convenience function to register a custom variable type.
     // Ownership model looks thusly:
@@ -104,8 +111,8 @@ extern "C" {
     //  2. It must be freed with freeVariable.
     // For languages where the variables are garbage collected, like perl and ruby; freeVariable will be a no-op.
     // Whenever getArrayVariable or getDictionaryVariable are called, a pointer is given, but no allocaitons are made.
-    struct LiquidVariableResolver {
-        ELiquidVariableType (*getType)(void* variable);
+    struct SLiquidVariableResolver {
+        LiquidVariableType (*getType)(void* variable);
         bool (*getBool)(void* variable, bool* target);
         bool (*getTruthy)(void* variable);
         bool (*getString)(void* variable, char* target);
@@ -130,8 +137,9 @@ extern "C" {
         void (*freeVariable)(void* value);
         int (*compare)(void* a, void* b);
     };
+    typedef struct SLiquidVariableResolver LiquidVariableResolver;
 
-    LiquidContext liquidCreateContext(ELiquidSettings settings);
+    LiquidContext liquidCreateContext(LiquidContextSettings settings);
     void liquidFreeContext(LiquidContext context);
     void liquidImplementStandardDialect(LiquidContext context);
     LiquidRenderer liquidCreateRenderer(LiquidContext context);
@@ -142,7 +150,7 @@ extern "C" {
     typedef void* (*LiquidRenderFunction)(LiquidRenderer renderer, LiquidNode node, void* variableStore);
 
     // Passing -1 to min/maxArguments means no min or max.
-    void liquidRegisterTag(LiquidContext context, const char* symbol, ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction);
+    void liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction);
     void liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction);
     void liquidRegisterOperator(LiquidContext context, const char* symbol, int priority, LiquidRenderFunction renderFunction);
     void liquidRegisterVariableResolver(LiquidContext context, LiquidVariableResolver resolver);

@@ -191,9 +191,16 @@ namespace Liquid {
         };
 
         struct VariableNode : NodeType {
-            VariableNode() : NodeType(Type::VARIABLE) { }
+            /* Things like .size, etc.. */
+            struct UnaryVariableFilterNode : FilterNodeType {
+                UnaryVariableFilterNode(const std::string& symbol) : FilterNodeType(symbol, 0, 0) { }
+            };
+
+            unordered_map<std::string, unique_ptr<NodeType>> filters;
 
             LiquidVariableResolver resolver;
+
+            VariableNode() : NodeType(Type::VARIABLE) { }
 
             Variable getVariable(Renderer& renderer, const Node& node, Variable store) const {
                 Variable storePointer = store;

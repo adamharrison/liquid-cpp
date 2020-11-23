@@ -6,7 +6,7 @@ using namespace Liquid;
 
 char* liquidError = nullptr;
 
-LiquidContext liquidCreateContext() {
+LiquidContext liquidCreateContext(ELiquidContextSettings settings) {
     return LiquidContext({ new Context() });
 }
 

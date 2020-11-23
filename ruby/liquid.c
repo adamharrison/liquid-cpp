@@ -3,32 +3,6 @@
 
 VALUE liquidC = Qnil;
 
-void liquidC_free(void* data) {
-    liquidFreeContext(*((LiquidContext*)data));
-    free(data);
-}
-
-size_t liquidC_size(const void* data) {
-    return sizeof(LiquidContext);
-}
-
-
-static const rb_data_type_t liquidC_type = {
-    .wrap_struct_name = "LiquidC",
-    .function = {
-            .dmark = NULL,
-            .dfree = liquidC_free,
-            .dsize = liquidC_size,
-    },
-    .data = NULL,
-    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
-};
-
-
-VALUE liquidC_alloc(VALUE self) {
-    LiquidContext* data = (LiquidContext*)malloc(sizeof(LiquidContext));
-    return TypedData_Wrap_Struct(self, &liquidC_type, data);
-}
 
 static LiquidVariableType liquidCgetType(void* variable) {
     switch (TYPE(variable)) {
@@ -66,106 +40,169 @@ static bool liquidCgetBool(void* variable, bool* target) {
     }
 
 }
+
 static bool liquidCgetTruthy(void* variable) {
     return RTEST(variable);
 }
+
 static bool liquidCgetString(void* variable, char* target) {
-    if (TYPE(variable) != T_STRING)
+    VALUE value;
+    char* str;
+    value = (VALUE)variable;
+    if (TYPE(value) != T_STRING)
         return false;
-    char* str = StringValueCStr(variable);
+    str = StringValueCStr(value);
     strcpy(target, str);
     return true;
 }
-static long long liquidCgetStringLength(void* variable) {
-    return RSTRING_LEN(variable);
-}
-static bool liquidCgetInteger(void* variable, long long* target) {
-    switch (TYPE(variable)) {
-        case T_FIXNUM:
-        case T_BIGNUM:
-        case T_FLOAT:
-            *target = NUM2LL(variable);
-            return true;
-    }
-    return false;
-}
-static bool liquidCgetFloat(void* variable, double* target) {
-    switch (TYPE(variable)) {
-        case T_FIXNUM:
-        case T_BIGNUM:
-        case T_FLOAT:
-            *target = NUM2DBL(variable);
-            return true;
-    }
-    return false;
-}
-static bool liquidCgetDictionaryVariable(void* variable, const char* key, bool createOnNotExists, void** target) {
-    if (TYPE(variable) != T_HASH)
-        return false
-    VALUE value = rb_hash_aref(variable, rb_intern(key));
-    if (TYPE(value) == T_UNDEFINED) {
-        if (!createOnNotExists)
-            return false;
-        rb_hash_aset(
-    } else {
 
+static long long liquidCgetStringLength(void* variable) {
+    return RSTRING_LEN((VALUE)variable);
+}
+
+static bool liquidCgetInteger(void* variable, long long* target) {
+    VALUE value;
+    value = (VALUE)variable;
+    switch (TYPE(value)) {
+        case T_FIXNUM:
+        case T_BIGNUM:
+        case T_FLOAT:
+            *target = NUM2LL(value);
+            return true;
     }
+    return false;
+}
+
+static bool liquidCgetFloat(void* variable, double* target) {
+    VALUE value;
+    value = (VALUE)variable;
+    switch (TYPE(value)) {
+        case T_FIXNUM:
+        case T_BIGNUM:
+        case T_FLOAT:
+            *target = NUM2DBL(value);
+            return true;
+    }
+    return false;
+}
+
+static bool liquidCgetDictionaryVariable(void* variable, const char* key, void** target) {
+    VALUE value;
+    if (TYPE((VALUE)variable) != T_HASH)
+        return false;
+    value = rb_hash_aref((VALUE)variable, rb_str_new2(key));
+    if (TYPE(value) == T_UNDEF)
+        return false;
+    *target = (void*)value;
     return true;
 }
 
-static bool liquidCgetArrayVariable(void* variable, size_t idx, bool createOnNotExists, void** target) {
-
+static bool liquidCgetArrayVariable(void* variable, size_t idx, void** target) {
+    VALUE value;
+	if (TYPE((VALUE)variable) != T_ARRAY)
+        return false;
+    value = rb_ary_entry((VALUE)variable, idx);
+    if (TYPE((VALUE)value) == T_UNDEF)
+        return false;
+    *target = (void*)value;
+    return true;
 }
 
 static bool liquidCiterate(void* variable, bool liquidCcallback(void* variable, void* data), void* data, int start, int limit, bool reverse) {
-
+    return false;
 }
 
 static long long liquidCgetArraySize(void* variable) {
-
+    VALUE value = (VALUE)variable;
+    if (TYPE(value) != T_ARRAY)
+        return -1;
+    return RARRAY_LEN(value);
 }
 
-static void liquidCsetVariable(void* variable, const void* value) {
-
+static void* liquidCsetDictionaryVariable(void* variable, const char* key, void* target) {
+    if (TYPE((VALUE)variable) != T_HASH)
+        return NULL;
+    rb_hash_aset((VALUE)variable, rb_str_new2(key), (VALUE)target);
+    return target;
 }
 
-static void liquidCsetFloat(void* variable, double value) {
-
+static void* liquidCsetArrayVariable(void* variable, size_t idx, void* target) {
+    if (TYPE(variable) != T_ARRAY)
+        return NULL;
+    rb_ary_store((VALUE)variable, idx, (VALUE)target);
+    return target;
 }
 
-static void liquidCsetBool(void* variable, bool value) {
-
+static void* liquidCcreateHash() {
+    return (void*)rb_hash_new();
 }
 
-static void liquidCsetInteger(void* variable, long long value) {
-
+static void* liquidCcreateArray() {
+    return (void*)rb_ary_new();
 }
 
-static void liquidCsetString(void* variable, const char* str) {
+static void* liquidCcreateFloat(double value) {
+    return (void*)DBL2NUM(value);
+}
+static void* liquidCcreateBool(bool value) {
+    return (void*)Qtrue;
+}
+static void* liquidCcreateInteger(long long value) {
+    return (void*)Qfalse;
+}
+static void* liquidCcreateString(const char* str) {
+    return (void*)rb_str_new2(str);
+}
+static void* liquidCcreatePointer(void* value) {
+    return NULL;
+}
+static void* liquidCcreateNil() {
+    return (void*)Qnil;
+}
+static void* liquidCcreateClone(void* value) {
+    return (void*)value;
+}
+static void liquidCfreeVariable(void* value) {
 
 }
-
-static void liquidCsetPointer(void* variable, void* value) {
-
-}
-
-static void liquidCsetNil(void* variable) {
-
-}
-
 static int liquidCcompare(void* a, void* b) {
-
+    VALUE result;
+    result = rb_funcall((VALUE)a, rb_intern("<=>"), 1, (VALUE)b);
+    return NUM2INT(result);
 }
 
-VALUE liquidC_m_initialize(VALUE self, VALUE name) {
-        LiquidContext context;
-        TypedData_Get_Struct(self, void*, &liquidC_type, data);
-        *data = liquidCreateContext(StringValueCStr(name));
-        if (!*data) {
-                rb_raise(rb_eTypeError, "SearchCore initalization error: %s", scGetError());
-                return self;
-        }
 
+void liquidC_free(void* data) {
+    liquidFreeContext(*((LiquidContext*)data));
+    free(data);
+}
+
+size_t liquidC_size(const void* data) {
+    return sizeof(LiquidContext);
+}
+
+
+static const rb_data_type_t liquidC_type = {
+    .wrap_struct_name = "LiquidC",
+    .function = {
+            .dmark = NULL,
+            .dfree = liquidC_free,
+            .dsize = liquidC_size,
+    },
+    .data = NULL,
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
+};
+
+
+VALUE liquidC_alloc(VALUE self) {
+    LiquidContext* data = (LiquidContext*)malloc(sizeof(LiquidContext));
+    return TypedData_Wrap_Struct(self, &liquidC_type, data);
+}
+
+VALUE liquidGlobalContext;
+
+VALUE liquidC_m_initialize(VALUE self) {
+        LiquidContext* context;
         LiquidVariableResolver resolver = {
             liquidCgetType,
             liquidCgetBool,
@@ -176,77 +213,168 @@ VALUE liquidC_m_initialize(VALUE self, VALUE name) {
             liquidCgetFloat,
             liquidCgetDictionaryVariable,
             liquidCgetArrayVariable,
-            liquidCliquidCcallback,
+            liquidCiterate,
             liquidCgetArraySize,
-            liquidCsetVariable,
-            liquidCsetFloat,
-            liquidCsetBool,
-            liquidCsetInteger,
-            liquidCsetString,
-            liquidCsetPointer,
-            liquidCsetNil,
-            liquidCcompare,
+            liquidCsetDictionaryVariable,
+            liquidCsetArrayVariable,
+            liquidCcreateHash,
+            liquidCcreateArray,
+            liquidCcreateFloat,
+            liquidCcreateBool,
+            liquidCcreateInteger,
+            liquidCcreateString,
+            liquidCcreatePointer,
+            liquidCcreateNil,
+            liquidCcreateClone,
+            liquidCfreeVariable,
+            liquidCcompare
         };
+        TypedData_Get_Struct(self, LiquidContext, &liquidC_type, context);
+        *context = liquidCreateContext(LIQUID_CONTEXT_SETTINGS_DEFAULT);
+        if (!liquidGetError()) {
+            rb_raise(rb_eTypeError, "LiquidC init failure: %s.", liquidGetError());
+            return self;
+        }
+        liquidRegisterVariableResolver(*context, resolver);
 
-        liquidRegisterVariableResolver(context,resolver);
+        liquidGlobalContext = self;
 
         return self;
 }
 
-
-VALUE liquidC_m_initialize(VALUE self) {
-        void** data;
-        TypedData_Get_Struct(self, void*, &liquidC_type, data);
-        *data = scOpenReader(StringValueCStr(name));
-        if (!*data) {
-            rb_raise(rb_eTypeError, "SearchCore initalization error: %s", scGetError());
-            return self;
-        }
+VALUE liquidC_registerTag(VALUE self, VALUE name) {
+    return Qnil;
 }
 
+VALUE liquidC_registerFilter(VALUE self, VALUE name) {
+    return Qnil;
+}
 
-VALUE liquidC_renderer_m_initialize(VALUE self, VALUE context) {
-        void** data;
-        VALUE array;
-        struct SCProductUpdate results;
-        TypedData_Get_Struct(self, void*, &writer_type, data);
-        results = scUpdateProducts(*data, StringValueCStr(productPath));
-        if (results.updatedProducts == -1) {
-                rb_raise(rb_eTypeError, "SearchCore updateProducts error: %s", scGetError());
-                return -1;
-        }
-        array = rb_ary_new();
-        rb_ary_push(array, INT2NUM(results.updatedProducts));
-        rb_ary_push(array, INT2NUM(results.updatedVariants));
-        return array;
+VALUE liquidC_registerOperator(VALUE self, VALUE name) {
+    return Qnil;
+}
+
+VALUE liquidC_getFirst(VALUE klass, VALUE name) {
+    return liquidGlobalContext;
 }
 
 
 
-VALUE liquidCRenderer_m_initialize(VALUE self, VALUE productPath) {
-        void** data;
-        VALUE array;
-        struct SCProductUpdate results;
-        TypedData_Get_Struct(self, void*, &liquidC_type, data);
-        results = scUpdateProducts(*data, StringValueCStr(productPath));
-        if (results.updatedProducts == -1) {
-                rb_raise(rb_eTypeError, "SearchCore updateProducts error: %s", scGetError());
-                return -1;
-        }
-        array = rb_ary_new();
-        rb_ary_push(array, INT2NUM(results.updatedProducts));
-        rb_ary_push(array, INT2NUM(results.updatedVariants));
-        return array;
+void liquidCRenderer_free(void* data) {
+    liquidFreeRenderer(*((LiquidRenderer*)data));
+    free(data);
+}
+
+size_t liquidCRenderer_size(const void* data) {
+    return sizeof(LiquidRenderer);
+}
+
+
+static const rb_data_type_t liquidCRenderer_type = {
+    .wrap_struct_name = "Renderer",
+    .function = {
+            .dmark = NULL,
+            .dfree = liquidCRenderer_free,
+            .dsize = liquidCRenderer_size,
+    },
+    .data = NULL,
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
+};
+
+
+VALUE liquidCRenderer_alloc(VALUE self) {
+    LiquidRenderer* data = (LiquidRenderer*)malloc(sizeof(LiquidRenderer));
+    return TypedData_Wrap_Struct(self, &liquidCRenderer_type, data);
+}
+
+
+VALUE liquidCRenderer_m_initialize(VALUE self, VALUE contextValue) {
+    LiquidRenderer* renderer;
+    LiquidContext* context;
+    TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, renderer);
+    TypedData_Get_Struct(contextValue, LiquidContext, &liquidC_type, context);
+    *renderer = liquidCreateRenderer(*context);
+    if (!liquidGetError()) {
+        rb_raise(rb_eTypeError, "LiquidC Renderer init failure: %s.", liquidGetError());
+        return self;
+    }
+    return self;
+}
+
+
+
+void liquidCTemplate_free(void* data) {
+    liquidFreeTemplate(*((LiquidTemplate*)data));
+    free(data);
+}
+
+size_t liquidCTemplate_size(const void* data) {
+    return sizeof(LiquidTemplate);
+}
+
+
+static const rb_data_type_t liquidCTemplate_type = {
+    .wrap_struct_name = "Template",
+    .function = {
+            .dmark = NULL,
+            .dfree = liquidCTemplate_free,
+            .dsize = liquidCTemplate_size,
+    },
+    .data = NULL,
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
+};
+
+
+VALUE liquidCTemplate_alloc(VALUE self) {
+    LiquidTemplate* data = (LiquidTemplate*)malloc(sizeof(LiquidTemplate));
+    return TypedData_Wrap_Struct(self, &liquidCTemplate_type, data);
+}
+
+VALUE liquidCTemplate_m_initialize(VALUE self, VALUE contextValue, VALUE tmplContents) {
+    char* tmplBody;
+    size_t length;
+    LiquidTemplate* tmpl;
+    LiquidContext* context;
+    TypedData_Get_Struct(self, LiquidTemplate, &liquidCTemplate_type, tmpl);
+    TypedData_Get_Struct(contextValue, LiquidContext, &liquidC_type, context);
+
+    Check_Type(tmplContents, T_STRING);
+    tmplBody = StringValueCStr(tmplContents);
+    length = RSTRING_LEN(tmplContents);
+
+    *tmpl = liquidCreateTemplate(*context, tmplBody, length);
+
+    if (!liquidGetError()) {
+        rb_raise(rb_eTypeError, "LiquidC Template init failure: %s.", liquidGetError());
+        return self;
+    }
+    return self;
+}
+
+
+
+VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
+    VALUE str;
+    LiquidTemplate* liquidTemplate;
+    LiquidRenderer* liquidRenderer;
+    LiquidTemplateRender result;
+    Check_Type(stash, T_HASH);
+    TypedData_Get_Struct(self, LiquidTemplate, &liquidCTemplate_type, liquidTemplate);
+    TypedData_Get_Struct(tmpl, LiquidRenderer, &liquidCRenderer_type, liquidRenderer);
+    result = liquidRenderTemplate(*liquidRenderer, (void*)stash, *liquidTemplate);
+    str = rb_str_new(liquidTemplateRenderGetBuffer(result), liquidTemplateRenderGetSize(result));
+    liquidFreeTemplateRender(result);
+    return str;
 }
 
 
 void Init_LiquidC() {
-	VALUE liquidCRenderer, liquidCTemplate;
+	VALUE liquidC, liquidCRenderer, liquidCTemplate;
 	liquidC = rb_define_module("LiquidC");
-	liquidCRenderer = rb_define_class_under(LiquidC, "Renderer", rb_cData);
-	liquidCTemplate = rb_define_class_under(LiquidC, "Template", rb_cData);
+	liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cData);
+	liquidCTemplate = rb_define_class_under(liquidC, "Template", rb_cData);
 
-	rb_define_alloc_func(LiquidC, liquidC_alloc);
+	rb_define_alloc_func(liquidC, liquidC_alloc);
 	rb_define_method(liquidC, "initialize", liquidC_m_initialize, 0);
 	rb_define_method(liquidC, "registerTag", liquidC_registerTag, 1);
 	rb_define_method(liquidC, "registerFilter", liquidC_registerFilter, 1);
