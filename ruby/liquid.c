@@ -173,7 +173,8 @@ static int liquidCcompare(void* a, void* b) {
 
 
 void liquidC_free(void* data) {
-    liquidFreeContext(*((LiquidContext*)data));
+    if (((LiquidContext*)data)->context)
+        liquidFreeContext(*((LiquidContext*)data));
     free(data);
 }
 
@@ -196,6 +197,7 @@ static const rb_data_type_t liquidC_type = {
 
 VALUE liquidC_alloc(VALUE self) {
     LiquidContext* data = (LiquidContext*)malloc(sizeof(LiquidContext));
+    data->context = NULL;
     return TypedData_Wrap_Struct(self, &liquidC_type, data);
 }
 
@@ -231,11 +233,12 @@ VALUE liquidC_m_initialize(VALUE self) {
         };
         TypedData_Get_Struct(self, LiquidContext, &liquidC_type, context);
         *context = liquidCreateContext(LIQUID_CONTEXT_SETTINGS_DEFAULT);
-        if (!liquidGetError()) {
+        if (liquidGetError()) {
             rb_raise(rb_eTypeError, "LiquidC init failure: %s.", liquidGetError());
             return self;
         }
         liquidRegisterVariableResolver(*context, resolver);
+        liquidImplementStandardDialect(*context);
 
         liquidGlobalContext = self;
 
@@ -261,7 +264,8 @@ VALUE liquidC_getFirst(VALUE klass, VALUE name) {
 
 
 void liquidCRenderer_free(void* data) {
-    liquidFreeRenderer(*((LiquidRenderer*)data));
+    if (((LiquidRenderer*)data)->renderer)
+        liquidFreeRenderer(*((LiquidRenderer*)data));
     free(data);
 }
 
@@ -284,6 +288,7 @@ static const rb_data_type_t liquidCRenderer_type = {
 
 VALUE liquidCRenderer_alloc(VALUE self) {
     LiquidRenderer* data = (LiquidRenderer*)malloc(sizeof(LiquidRenderer));
+    data->renderer = NULL;
     return TypedData_Wrap_Struct(self, &liquidCRenderer_type, data);
 }
 
@@ -294,7 +299,7 @@ VALUE liquidCRenderer_m_initialize(VALUE self, VALUE contextValue) {
     TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, renderer);
     TypedData_Get_Struct(contextValue, LiquidContext, &liquidC_type, context);
     *renderer = liquidCreateRenderer(*context);
-    if (!liquidGetError()) {
+    if (liquidGetError()) {
         rb_raise(rb_eTypeError, "LiquidC Renderer init failure: %s.", liquidGetError());
         return self;
     }
@@ -304,7 +309,8 @@ VALUE liquidCRenderer_m_initialize(VALUE self, VALUE contextValue) {
 
 
 void liquidCTemplate_free(void* data) {
-    liquidFreeTemplate(*((LiquidTemplate*)data));
+    if (((LiquidTemplate*)data)->ast)
+        liquidFreeTemplate(*((LiquidTemplate*)data));
     free(data);
 }
 
@@ -327,6 +333,7 @@ static const rb_data_type_t liquidCTemplate_type = {
 
 VALUE liquidCTemplate_alloc(VALUE self) {
     LiquidTemplate* data = (LiquidTemplate*)malloc(sizeof(LiquidTemplate));
+    data->ast = NULL;
     return TypedData_Wrap_Struct(self, &liquidCTemplate_type, data);
 }
 
@@ -344,7 +351,7 @@ VALUE liquidCTemplate_m_initialize(VALUE self, VALUE contextValue, VALUE tmplCon
 
     *tmpl = liquidCreateTemplate(*context, tmplBody, length);
 
-    if (!liquidGetError()) {
+    if (liquidGetError()) {
         rb_raise(rb_eTypeError, "LiquidC Template init failure: %s.", liquidGetError());
         return self;
     }
@@ -359,8 +366,8 @@ VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
     LiquidRenderer* liquidRenderer;
     LiquidTemplateRender result;
     Check_Type(stash, T_HASH);
-    TypedData_Get_Struct(self, LiquidTemplate, &liquidCTemplate_type, liquidTemplate);
-    TypedData_Get_Struct(tmpl, LiquidRenderer, &liquidCRenderer_type, liquidRenderer);
+    TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, liquidRenderer);
+    TypedData_Get_Struct(tmpl, LiquidTemplate, &liquidCTemplate_type, liquidTemplate);
     result = liquidRenderTemplate(*liquidRenderer, (void*)stash, *liquidTemplate);
     str = rb_str_new(liquidTemplateRenderGetBuffer(result), liquidTemplateRenderGetSize(result));
     liquidFreeTemplateRender(result);
@@ -370,7 +377,7 @@ VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
 
 void Init_LiquidC() {
 	VALUE liquidC, liquidCRenderer, liquidCTemplate;
-	liquidC = rb_define_module("LiquidC");
+	liquidC = rb_define_class("LiquidC", rb_cData);
 	liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cData);
 	liquidCTemplate = rb_define_class_under(liquidC, "Template", rb_cData);
 
@@ -387,5 +394,5 @@ void Init_LiquidC() {
     rb_define_method(liquidCRenderer, "render", method_liquidCTemplateRender, 2);
 
 	rb_define_alloc_func(liquidCTemplate, liquidCTemplate_alloc);
-	rb_define_method(liquidCTemplate, "initialize", liquidCTemplate_m_initialize, 1);
+	rb_define_method(liquidCTemplate, "initialize", liquidCTemplate_m_initialize, 2);
 }

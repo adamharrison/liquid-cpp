@@ -1,6 +1,7 @@
 #include "interface.h"
 #include "dialect.h"
 #include "context.h"
+#include <memory>
 
 using namespace Liquid;
 
@@ -18,7 +19,7 @@ void liquidImplementStandardDialect(LiquidContext context) {
     StandardDialect::implement(*static_cast<Context*>(context.context));
 }
 
-LiquidRenderer liquidCreateRendere(LiquidContext context) {
+LiquidRenderer liquidCreateRenderer(LiquidContext context) {
     return LiquidRenderer({ new Renderer(*static_cast<Context*>(context.context)) });
 }
 
@@ -41,9 +42,17 @@ void liquidFreeTemplate(LiquidTemplate tmpl) {
     delete (Node*)tmpl.ast;
 }
 
-LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, int* size) {
+LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl) {
     std::string* str = new std::string(std::move(static_cast<Renderer*>(renderer.renderer)->render(*static_cast<Node*>(tmpl.ast), Variable({ variableStore }))));
     return LiquidTemplateRender({ str });
+}
+
+
+void liquidRegisterVariableResolver(LiquidContext context, LiquidVariableResolver resolver) {
+    Context* ctx = static_cast<Context*>(context.context);
+    unique_ptr<NodeType> type = make_unique<Context::VariableNode>();
+    static_cast<Context::VariableNode*>(type.get())->resolver = resolver;
+    ctx->registerType(move(type));
 }
 
 void liquidFreeTemplateRender(LiquidTemplateRender render) {
