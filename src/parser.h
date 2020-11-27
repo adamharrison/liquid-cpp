@@ -78,6 +78,8 @@ namespace Liquid {
         vector<unique_ptr<Node>> nodes;
         vector<Error> errors;
 
+        bool treatUnknownFiltersAsErrors = false;
+
         void pushError(const Error& error) {
             errors.push_back(error);
         }

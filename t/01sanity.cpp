@@ -324,6 +324,12 @@ TEST(sanity, filters) {
     ast = getParser().parse("{% assign a = a | split: \" \" %}{{ a | size }}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "3");
+
+
+    hash["a"] = CPPVariable({ 1, 2, 3, 4 });
+    ast = getParser().parse("{{ a.size }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "4");
 }
 
 TEST(sanity, error) {

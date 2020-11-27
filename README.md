@@ -14,29 +14,27 @@ In development. Currently a bit all over the place.
 The C++ library, which is built with the normal Makefile can be linked in as a static library. Will eventually be available as a header-only library.
 
 ```c++
-    #include <cstdio>
-    #include "liquid.h"
+#include <cstdio>
+#include "liquid.h"
 
-    using namespace Liquid;
+int(int argc, char* argv[]) {
+    Liquid::Context context;
+    Liquid::Parser parser(context);
+    Liquid::StandardDialect::implement(context);
+    context.registerType<Liquid::CPPVariableNode>();
 
-    int(int argc, char* argv[]) {
-        Context context;
-        Parser parser(context);
-        StandardDialect::implement(context);
-        context.registerType<CPPVariableNode>();
+    const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
+    // Throws an exception if there's a parsing error.
+    Node ast = parser.parseFile(exampleFile, sizeof(exampleFile)-1);
+    Renderer renderer(context);
 
-        const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
-        // Throws an exception if there's a parsing error.
-        Node ast = parser.parseFile(exampleFile, sizeof(exampleFile)-1);
-        Renderer renderer(context);
+    Liquid::CPPVariable store;
+    store["a"] = 10;
 
-        CPPVariable store;
-        store["a"] = 10;
-
-        std::string result = result = renderer.render(ast, store);
-        fprintf(stdout, "%s\n", result.data());
-        return 0;
-    }
+    std::string result = result = renderer.render(ast, store);
+    fprintf(stdout, "%s\n", result.data());
+    return 0;
+}
 ```
 
 #### C
@@ -44,48 +42,48 @@ The C++ library, which is built with the normal Makefile can be linked in as a s
 The C library, which is built with the normal Makefile can be linked in as a static library.
 
 ```c
-    #include <stdio.h>
+#include <stdio.h>
 
-    int(int argc, char* argv[]) {
-        // The liquid context represents all registered tags, operators, filters, and a way to resolve variables.
-        LiquidContext context = liquidCreateContext(LIQUID_SETTINGS_DEFAULT);
+int(int argc, char* argv[]) {
+    // The liquid context represents all registered tags, operators, filters, and a way to resolve variables.
+    LiquidContext context = liquidCreateContext(LIQUID_SETTINGS_DEFAULT);
 
-        // Very few of the bits of liquid are part of the 'core'; instead, they are implemented as dialects. In order to
-        // stick in most of the default bits of Liquid, you can ask the context to implement the standard dialect, but this
-        // is not necessary. The only default tag available is {% raw %}, as this is less a tag, and more a lexing hint. No
-        // filters, or operators, other than the unary - operator, are available by default; they are are all part of the liquid standard dialect.
-        liquidImplementStandardDialect(context);
-        // In addition, dialects can be layered. Implementing one dialects does not forgo implementating another; and dialects
-        // can override one another; whichever dialect was applied last will apply its proper tags, operators, and filters.
-        // Currently, there is no way to deregsiter a tag, operator, or filter once registered.
+    // Very few of the bits of liquid are part of the 'core'; instead, they are implemented as dialects. In order to
+    // stick in most of the default bits of Liquid, you can ask the context to implement the standard dialect, but this
+    // is not necessary. The only default tag available is {% raw %}, as this is less a tag, and more a lexing hint. No
+    // filters, or operators, other than the unary - operator, are available by default; they are are all part of the liquid standard dialect.
+    liquidImplementStandardDialect(context);
+    // In addition, dialects can be layered. Implementing one dialects does not forgo implementating another; and dialects
+    // can override one another; whichever dialect was applied last will apply its proper tags, operators, and filters.
+    // Currently, there is no way to deregsiter a tag, operator, or filter once registered.
 
-        // If no LiquidVariableResolver is specified; an internal default is used that won't read anything you pass in, but will funciton for {% assign %}, {% capture %} and other tags.
-        LiquidVariableResolver resolver = {
-            ...
-        };
-        liquidRegisterVariableResolver(resolver);
+    // If no LiquidVariableResolver is specified; an internal default is used that won't read anything you pass in, but will funciton for {% assign %}, {% capture %} and other tags.
+    LiquidVariableResolver resolver = {
+        ...
+    };
+    liquidRegisterVariableResolver(resolver);
 
-        const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
-        LiquidTemplate tmpl = liquidCreateTemplate(context, exampleFile, sizeof(exampleFile)-1);
-        if (liquidGetError()) {
-            fprintf(stderr, "Error parsing template: %s", liquidGetError());
-            exit(-1);
-        }
-        // This object should be thread-local.
-        LiquidRenderer renderer = liquidCreateRenderer(context);
-        // Use something that works with your language here; as resolved by the LiquidVariableResolver above.
-        void* variableStore = NULL;
-        LiquidTemplateRender result = liquidRenderTemplate(renderer, variableStore, tmpl);
-        fprintf(stdout, "%s\n", liquidTemplateRenderGetBuffer(result));
-
-        // All resources, unless otherwise specified, must be free explicitly.
-        liquidFreeTemplateRender(result);
-        liquidFreeRenderer(renderer);
-        liquidFreeTemplate(tmpl);
-        liquidFreeContext(context);
-
-        return 0;
+    const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
+    LiquidTemplate tmpl = liquidCreateTemplate(context, exampleFile, sizeof(exampleFile)-1);
+    if (liquidGetError()) {
+        fprintf(stderr, "Error parsing template: %s", liquidGetError());
+        exit(-1);
     }
+    // This object should be thread-local.
+    LiquidRenderer renderer = liquidCreateRenderer(context);
+    // Use something that works with your language here; as resolved by the LiquidVariableResolver above.
+    void* variableStore = NULL;
+    LiquidTemplateRender result = liquidRenderTemplate(renderer, variableStore, tmpl);
+    fprintf(stdout, "%s\n", liquidTemplateRenderGetBuffer(result));
+
+    // All resources, unless otherwise specified, must be free explicitly.
+    liquidFreeTemplateRender(result);
+    liquidFreeRenderer(renderer);
+    liquidFreeTemplate(tmpl);
+    liquidFreeContext(context);
+
+    return 0;
+}
 ```
 
 #### Ruby
@@ -93,11 +91,11 @@ The C library, which is built with the normal Makefile can be linked in as a sta
 There're two ways to get the ruby library working;
 
 ```ruby
-    require 'liquid-c'
-    context = LiquidC.new()
-    renderer = LiquidC::Renderer.new(context)
-    template = LiquidC::Template.new(context, "{% if a %}asdfghj {{ a }}{% endif %}")
-    puts renderer.render({ "a" => 1 }, template)
+require 'liquid-c'
+context = LiquidC.new()
+renderer = LiquidC::Renderer.new(context)
+template = LiquidC::Template.new(context, "{% if a %}asdfghj {{ a }}{% endif %}")
+puts renderer.render({ "a" => 1 }, template)
 ```
 
 Or, alternatively, one can use the "drop in replacement" function, which will register the exact same constructs as the normal liquid library.
@@ -107,11 +105,11 @@ tags, filters, operators, and settings; and you have thread-safe rendering of sh
 But, it's of course, up to you.
 
 ```ruby
-    require 'liquid-c'
-    LiquidC::DIR()
+require 'liquid-c'
+LiquidC::DIR()
 
-    template = Liquid::Template.parse("{% if a %}asdfghj {{ a }}{% endif %}")
-    puts template.render({ "a" => 1 }, template)
+template = Liquid::Template.parse("{% if a %}asdfghj {{ a }}{% endif %}")
+puts template.render({ "a" => 1 }, template)
 ```
 
 May eventually stick the "drop in replacement" into a separate module, that just calls it a in single include.

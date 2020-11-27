@@ -19,7 +19,8 @@ namespace Liquid {
             ARGUMENTS,
             QUALIFIER,
             OPERATOR,
-            FILTER
+            FILTER,
+            DOT_FILTER
         };
         Type type;
         string symbol;
@@ -143,9 +144,14 @@ namespace Liquid {
         Node getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const;
     };
 
+
+    struct DotFilterNodeType : NodeType {
+        DotFilterNodeType(string symbol) : NodeType(NodeType::Type::DOT_FILTER, symbol, -1) { }
+
+        Node getOperand(Renderer& renderer, const Node& node, Variable store) const;
+    };
+
     struct Context {
-
-
         struct ConcatenationNode : NodeType {
             ConcatenationNode() : NodeType(Type::OPERATOR) { }
 
@@ -188,6 +194,11 @@ namespace Liquid {
         struct ArgumentNode : NodeType {
             ArgumentNode() : NodeType(Type::ARGUMENTS) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const { assert(false); }
+        };
+
+        struct UnknownFilterNode : FilterNodeType {
+            UnknownFilterNode() : FilterNodeType("", -1, -1) { }
+            Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
         };
 
         struct VariableNode : NodeType {
@@ -234,9 +245,9 @@ namespace Liquid {
                     if (i == node.children.size() - 1) {
                         switch (part.variant.type) {
                             case Variant::Type::INT:
-                                return resolver.setArrayVariable(storePointer, part.variant.i, value);
+                                return resolver.setArrayVariable(renderer, storePointer, part.variant.i, value);
                             case Variant::Type::STRING:
-                                return resolver.setDictionaryVariable(storePointer, part.variant.s.data(), value);
+                                return resolver.setDictionaryVariable(renderer, storePointer, part.variant.s.data(), value);
                             default:
                                 return false;
                         }
@@ -262,13 +273,14 @@ namespace Liquid {
 
             Node render(Renderer& renderer, const Node& node, Variable store) const {
                 Variable storePointer = getVariable(renderer, node, store);
-                return Node(renderer.context.parseVariant(storePointer));
+                return Node(renderer.parseVariant(storePointer));
             }
         };
 
         unordered_map<string, unique_ptr<NodeType>> tagTypes;
         unordered_map<string, unique_ptr<NodeType>> operatorTypes;
         unordered_map<string, unique_ptr<NodeType>> filterTypes;
+        unordered_map<string, unique_ptr<NodeType>> dotFilterTypes;
         unique_ptr<NodeType> variableNodeType;
 
         const NodeType* getConcatenationNodeType() const { static ConcatenationNode concatenationNodeType; return &concatenationNodeType; }
@@ -277,6 +289,7 @@ namespace Liquid {
         const NodeType* getGroupNodeType() const { static GroupNode groupNodeType; return &groupNodeType; }
         const NodeType* getGroupDereferenceNodeType() const { static GroupDereferenceNode groupDereferenceNodeType; return &groupDereferenceNodeType; }
         const NodeType* getArgumentsNodeType() const { static ArgumentNode argumentNodeType; return &argumentNodeType; }
+        const NodeType* getUnknownFilterNodeType() const { static UnknownFilterNode filterNodeType; return &filterNodeType; }
 
 
         void registerType(unique_ptr<NodeType> type) {
@@ -292,6 +305,9 @@ namespace Liquid {
                 break;
                 case NodeType::Type::FILTER:
                     filterTypes[type->symbol] = move(type);
+                break;
+                case NodeType::Type::DOT_FILTER:
+                    dotFilterTypes[type->symbol] = move(type);
                 break;
                 default:
                     assert(false);
@@ -319,11 +335,14 @@ namespace Liquid {
                 return nullptr;
             return static_cast<FilterNodeType*>(it->second.get());
         }
+        const DotFilterNodeType* getDotFilterType(string symbol) const {
+            auto it = dotFilterTypes.find(symbol);
+            if (it == dotFilterTypes.end())
+                return nullptr;
+            return static_cast<DotFilterNodeType*>(it->second.get());
+        }
 
         void optimize(Node& ast, Variable store);
-
-        void inject(Variable& variable, const Variant& variant) const;
-        Variant parseVariant(Variable variable) const;
 
         const LiquidVariableResolver& getVariableResolver() const { return getVariableNodeType()->resolver; }
         bool resolveVariableString(string& target, void* variable) const {

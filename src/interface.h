@@ -56,13 +56,6 @@ extern "C" {
     };
     typedef enum ELiquidVariableType LiquidVariableType;
 
-    enum ELiquidParserSettings {
-        LIQUID_PARSER_SETTINGS_LAX,
-        LIQUID_PARSER_SETTINGS_WARN,
-        LIQUID_PARSER_SETTINGS_STRICT
-    };
-    typedef enum ELiquidParserSettings LiquidParserSettings;
-
     // Convenience function to register a custom variable type.
     // Ownership model looks thusly:
     // Calling create creates a newly allocated pointer. In all cases, one of the two things must happen:
@@ -82,18 +75,18 @@ extern "C" {
         bool (*getArrayVariable)(void* variable, size_t idx, void** target);
         bool (*iterate)(void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse);
         long long (*getArraySize)(void* variable);
-        void* (*setDictionaryVariable)(void* variable, const char* key, void* target);
-        void* (*setArrayVariable)(void* variable, size_t idx, void* target);
-        void* (*createHash)();
-        void* (*createArray)();
-        void* (*createFloat)(double value);
-        void* (*createBool)(bool value);
-        void* (*createInteger)(long long value);
-        void* (*createString)(const char* str);
-        void* (*createPointer)(void* value);
-        void* (*createNil)();
-        void* (*createClone)(void* value);
-        void (*freeVariable)(void* value);
+        void* (*setDictionaryVariable)(LiquidRenderer renderer, void* variable, const char* key, void* target);
+        void* (*setArrayVariable)(LiquidRenderer renderer, void* variable, size_t idx, void* target);
+        void* (*createHash)(LiquidRenderer renderer);
+        void* (*createArray)(LiquidRenderer renderer);
+        void* (*createFloat)(LiquidRenderer renderer, double value);
+        void* (*createBool)(LiquidRenderer renderer, bool value);
+        void* (*createInteger)(LiquidRenderer renderer, long long value);
+        void* (*createString)(LiquidRenderer renderer, const char* str);
+        void* (*createPointer)(LiquidRenderer renderer, void* value);
+        void* (*createNil)(LiquidRenderer renderer);
+        void* (*createClone)(LiquidRenderer renderer, void* value);
+        void (*freeVariable)(LiquidRenderer renderer, void* value);
         int (*compare)(void* a, void* b);
     };
     typedef struct SLiquidVariableResolver LiquidVariableResolver;
@@ -111,6 +104,7 @@ extern "C" {
     // Passing -1 to min/maxArguments means no min or max.
     void liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction);
     void liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction);
+    void liquidRegisterDotFilter(LiquidContext context, const char* symbol, LiquidRenderFunction renderFunction);
     void liquidRegisterOperator(LiquidContext context, const char* symbol, int priority, LiquidRenderFunction renderFunction);
     void liquidRegisterVariableResolver(LiquidContext context, LiquidVariableResolver resolver);
 

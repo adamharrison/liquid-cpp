@@ -4,7 +4,7 @@ BDIR=bin
 TDIR=t
 CXX=g++
 CC=gcc
-CFLAGS=-Wall -fexceptions -fPIC -g -O3
+CFLAGS=-Wall -fexceptions -fPIC -g
 CXXFLAGS=$(CFLAGS) -std=c++17
 LDFLAGS=
 AR=ar

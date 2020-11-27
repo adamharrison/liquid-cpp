@@ -193,7 +193,17 @@ namespace Liquid {
             case Parser::State::ARGUMENT: {
                 auto& lastNode = parser.nodes.back();
                 if (lastNode->type && lastNode->type->type == NodeType::Type::VARIABLE && !lastNode->children.back().get()) {
-                    lastNode->children.back() = move(make_unique<Node>(Variant(std::string(str, len))));
+                    // Check for dot filters.
+                    std::string opName = std::string(str, len);
+                    const DotFilterNodeType* op = context.getDotFilterType(opName);
+                    if (op) {
+                        lastNode->children.pop_back();
+                        auto operatorNode = make_unique<Node>(op);
+                        operatorNode->children.push_back(move(lastNode));
+                        parser.nodes.back() = move(operatorNode);
+                    } else {
+                        lastNode->children.back() = move(make_unique<Node>(Variant(move(opName))));
+                    }
                 } else {
                     if (lastNode->type && lastNode->children.size() > 0 && !lastNode->children.back().get()) {
                         unique_ptr<Node> node = make_unique<Node>(context.getVariableNodeType());
@@ -214,8 +224,12 @@ namespace Liquid {
                             parser.filterState = Parser::EFilterState::COLON;
                             const FilterNodeType* op = context.getFilterType(opName);
                             if (!op) {
-                                parser.pushError(Parser::Error(*this, Parser::Error::Type::UNKNOWN_FILTER, opName));
-                                return false;
+                                if (parser.treatUnknownFiltersAsErrors) {
+                                    parser.pushError(Parser::Error(*this, Parser::Error::Type::UNKNOWN_FILTER, opName));
+                                    return false;
+                                } else {
+                                    op = static_cast<const FilterNodeType*>(context.getUnknownFilterNodeType());
+                                }
                             }
                             auto operatorNode = make_unique<Node>(op);
                             auto& parentNode = parser.nodes[parser.nodes.size()-2];

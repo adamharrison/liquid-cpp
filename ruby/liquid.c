@@ -119,53 +119,53 @@ static long long liquidCgetArraySize(void* variable) {
     return RARRAY_LEN(value);
 }
 
-static void* liquidCsetDictionaryVariable(void* variable, const char* key, void* target) {
+static void* liquidCsetDictionaryVariable(LiquidRenderer renderer, void* variable, const char* key, void* target) {
     if (TYPE((VALUE)variable) != T_HASH)
         return NULL;
     rb_hash_aset((VALUE)variable, rb_str_new2(key), (VALUE)target);
     return target;
 }
 
-static void* liquidCsetArrayVariable(void* variable, size_t idx, void* target) {
+static void* liquidCsetArrayVariable(LiquidRenderer renderer, void* variable, size_t idx, void* target) {
     if (TYPE(variable) != T_ARRAY)
         return NULL;
     rb_ary_store((VALUE)variable, idx, (VALUE)target);
     return target;
 }
 
-static void* liquidCcreateHash() {
+static void* liquidCcreateHash(LiquidRenderer renderer) {
     return (void*)rb_hash_new();
 }
 
-static void* liquidCcreateArray() {
+static void* liquidCcreateArray(LiquidRenderer renderer) {
     return (void*)rb_ary_new();
 }
 
-static void* liquidCcreateFloat(double value) {
+static void* liquidCcreateFloat(LiquidRenderer renderer, double value) {
     return (void*)DBL2NUM(value);
 }
-static void* liquidCcreateBool(bool value) {
+static void* liquidCcreateBool(LiquidRenderer renderer, bool value) {
     return (void*)Qtrue;
 }
-static void* liquidCcreateInteger(long long value) {
+static void* liquidCcreateInteger(LiquidRenderer renderer, long long value) {
     return (void*)Qfalse;
 }
-static void* liquidCcreateString(const char* str) {
+static void* liquidCcreateString(LiquidRenderer renderer, const char* str) {
     return (void*)rb_str_new2(str);
 }
-static void* liquidCcreatePointer(void* value) {
+static void* liquidCcreatePointer(LiquidRenderer renderer, void* value) {
     return NULL;
 }
-static void* liquidCcreateNil() {
+static void* liquidCcreateNil(LiquidRenderer renderer) {
     return (void*)Qnil;
 }
-static void* liquidCcreateClone(void* value) {
+static void* liquidCcreateClone(LiquidRenderer renderer, void* value) {
     return (void*)value;
 }
-static void liquidCfreeVariable(void* value) {
+static void liquidCfreeVariable(LiquidRenderer renderer, void* value) {
 
 }
-static int liquidCcompare(void* a, void* b) {
+static int liquidCcompare(LiquidRenderer renderer, void* a, void* b) {
     VALUE result;
     result = rb_funcall((VALUE)a, rb_intern("<=>"), 1, (VALUE)b);
     return NUM2INT(result);

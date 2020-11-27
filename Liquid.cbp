@@ -71,17 +71,12 @@
 		<Unit filename="src/cppvariable.h" />
 		<Unit filename="src/dialect.cpp" />
 		<Unit filename="src/dialect.h" />
-		<Unit filename="src/exception.h">
-			<Option target="executable" />
-		</Unit>
 		<Unit filename="src/interface.cpp" />
 		<Unit filename="src/interface.h" />
 		<Unit filename="src/lexer.h">
 			<Option target="executable" />
 		</Unit>
-		<Unit filename="src/main.cpp">
-			<Option target="executable" />
-		</Unit>
+		<Unit filename="src/liquid.h" />
 		<Unit filename="src/parser.cpp" />
 		<Unit filename="src/parser.h">
 			<Option target="executable" />
