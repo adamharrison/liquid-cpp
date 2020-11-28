@@ -142,7 +142,7 @@ namespace Liquid {
             for (size_t i = 1; i < node.children.size(); ++i) {
                 if (((i - 1) % 2) == 0) {
                     if (node.children[i]->type != elseNode && node.children[i]->type != elsifNode)
-                        return Parser::Error(Parser::Error::Type::INVALID_SYMBOL);
+                        return Parser::Error(Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL);
                 }
             }
             return Parser::Error();

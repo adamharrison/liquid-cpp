@@ -12,43 +12,40 @@ namespace Liquid {
     struct Parser {
         const Context& context;
 
-        struct Error {
-            enum Type {
-                NONE,
-                // Self-explamatory.
-                UNKNOWN_TAG,
-                UNKNOWN_OPERATOR,
-                UNKNOWN_OPERATOR_OR_QUALIFIER,
-                UNKNOWN_FILTER,
-                // Weird symbol in weird place.
-                INVALID_SYMBOL,
-                // Was expecting somthing else, i.e. {{ i + }}; was expecting a number there.
-                UNEXPECTED_END,
-                UNBALANCED_GROUP
-            };
+        struct Error : LiquidParserError {
+            typedef LiquidParserErrorType Type;
 
-            Type type;
-            size_t column;
-            size_t row;
             std::string message;
 
-            Error() : type(Type::NONE) { }
+            Error() {
+                type = Type::LIQUID_PARSER_ERROR_TYPE_NONE;
+            }
             Error(const Error& error) = default;
             Error(Error&& error) = default;
 
             template <class T>
-            Error(T& lexer, Type type) : type(type), column(lexer.column), row(lexer.row) {
-
+            Error(T& lexer, Type type) {
+                column = lexer.column;
+                row = lexer.row;
+                this->type = type;
             }
             template <class T>
-            Error(T& lexer, Type type, const std::string& message) : type(type), column(lexer.column), row(lexer.row), message(message) {
+            Error(T& lexer, Type type, const std::string& message) : message(message) {
+                this->type = type;
+                column = lexer.column;
+                row = lexer.row;
 
             }
-            Error(Type type) : type(type), column(0), row(0) {
-
+            Error(Type type) {
+                column = 0;
+                row = 0;
+                this->type = type;
             }
-            Error(Type type, const std::string& message) : type(type), column(0), row(0), message(message) {
 
+            Error(Type type, const std::string& message) : message(message) {
+                column = 0;
+                row = 0;
+                this->type = type;
             }
         };
 
@@ -117,29 +114,29 @@ namespace Liquid {
             Exception(const Parser::Error& error) : parserError(error) {
                 char buffer[512];
                 switch (parserError.type) {
-                    case Parser::Error::Type::NONE: break;
-                    case Parser::Error::Type::UNKNOWN_TAG:
+                    case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_NONE: break;
+                    case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_TAG:
                         sprintf(buffer, "Unknown tag '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
                     break;
-                    case Parser::Error::Type::UNKNOWN_OPERATOR:
+                    case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_OPERATOR:
                         sprintf(buffer, "Unknown operator '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
                     break;
-                    case Parser::Error::Type::UNKNOWN_OPERATOR_OR_QUALIFIER:
+                    case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_OPERATOR_OR_QUALIFIER:
                         sprintf(buffer, "Unknown operator, or qualifier '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
                     break;
-                    case Parser::Error::Type::UNKNOWN_FILTER:
+                    case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_FILTER:
                         sprintf(buffer, "Unknown filter '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
                     break;
-                    case Parser::Error::Type::INVALID_SYMBOL:
+                    case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL:
                         sprintf(buffer, "Invalid symbol '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
                     break;
-                    case Parser::Error::Type::UNEXPECTED_END: {
+                    case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END: {
                         if (!error.message.empty())
                             sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
                         else
                             sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.row, error.column);
                     } break;
-                    case Parser::Error::Type::UNBALANCED_GROUP:
+                    case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNBALANCED_GROUP:
                         sprintf(buffer, "Unbalanced end to group on line %lu, column %lu.", error.row, error.column);
                     break;
                 }
@@ -149,8 +146,8 @@ namespace Liquid {
             Exception(const Lexer::Error& error) : lexerError(error) {
                 char buffer[512];
                 switch (lexerError.type) {
-                    case Lexer::Error::Type::NONE: break;
-                    case Lexer::Error::Type::UNEXPECTED_END:
+                    case Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_NONE: break;
+                    case Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END:
                         if (!error.message.empty())
                             sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
                         else

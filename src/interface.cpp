@@ -34,6 +34,7 @@ LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, s
         tmpl = parser.parse(buffer, size);
     } catch (Parser::Exception exp) {
         liquidSetError(exp.what());
+        return LiquidTemplate({ NULL });
     }
     return LiquidTemplate({ new Node(std::move(tmpl)) });
 }

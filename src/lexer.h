@@ -21,31 +21,29 @@ namespace Liquid {
 
 
         struct Error {
-            enum Type {
-                NONE,
-                UNEXPECTED_END
-            };
+            typedef LiquidLexerErrorType Type;
+            LiquidLexerErrorType type;
 
-            Type type;
             size_t column;
             size_t row;
+
             std::string message;
 
-            Error() : type(Type::NONE) { }
+            Error() : type(Type::LIQUID_LEXER_ERROR_TYPE_NONE) { }
             Error(const Error& error) = default;
             Error(Error&& error) = default;
 
-            Error(Lexer& lexer, Type type) : type(type), column(lexer.column), row(lexer.row) {
-
+            Error(Lexer& lexer, Type type) : column(lexer.column), row(lexer.row) {
+                this->type = type;
             }
-            Error(Lexer& lexer, Type type, const std::string& message) : type(type), column(lexer.column), row(lexer.row), message(message) {
-
+            Error(Lexer& lexer, Type type, const std::string& message) : column(lexer.column), row(lexer.row), message(message) {
+                this->type = type;
             }
-            Error(Type type) : type(type), column(0), row(0) {
-
+            Error(Type type) : column(0), row(0) {
+                this->type = type;
             }
-            Error(Type type, const std::string& message) : type(type), column(0), row(0), message(message) {
-
+            Error(Type type, const std::string& message) : column(0), row(0), message(message) {
+                this->type = type;
             }
         };
 
@@ -144,7 +142,7 @@ namespace Liquid {
                                         if (i < size && str[i] == '-')
                                             ++i;
                                         if (i >= size - 2 || str[i] != '%' || str[i+1] != '}')
-                                            return Lexer::Error(*this, Lexer::Error::Type::UNEXPECTED_END);
+                                            return Lexer::Error(*this, Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END);
                                         lastInitial = i+2;
                                         state = State::RAW;
                                     } else {
@@ -320,13 +318,13 @@ namespace Liquid {
                             }
                         } while (++offset < size);
                         if (state == State::RAW)
-                            return Lexer::Error(*this, Lexer::Error::Type::UNEXPECTED_END, "raw");
+                            return Lexer::Error(*this, Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END, "raw");
                     } break;
                 }
             }
             if (ongoing) {
                 if (state != State::INITIAL) {
-                    return Error(*this, Error::Type::UNEXPECTED_END);
+                    return Error(*this, Error::Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END);
                 } else {
                     if (offset > lastInitial) {
                         static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial);

@@ -8,6 +8,37 @@
 extern "C" {
 #endif
 
+    enum ELiquidParserErrorType {
+        LIQUID_PARSER_ERROR_TYPE_NONE,
+        // Self-explamatory.
+        LIQUID_PARSER_ERROR_TYPE_UNKNOWN_TAG,
+        LIQUID_PARSER_ERROR_TYPE_UNKNOWN_OPERATOR,
+        LIQUID_PARSER_ERROR_TYPE_UNKNOWN_OPERATOR_OR_QUALIFIER,
+        LIQUID_PARSER_ERROR_TYPE_UNKNOWN_FILTER,
+        // Weird symbol in weird place.
+        LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL,
+        // Was expecting somthing else, i.e. {{ i + }}; was expecting a number there.
+        LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END,
+        LIQUID_PARSER_ERROR_TYPE_UNBALANCED_GROUP
+    };
+
+    typedef enum ELiquidParserErrorType LiquidParserErrorType;
+
+
+    struct LiquidParserError {
+        LiquidParserErrorType type;
+        size_t column;
+        size_t row;
+    };
+
+
+    enum ELiquidLexerErrorType {
+        LIQUID_LEXER_ERROR_TYPE_NONE,
+        LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END
+    };
+
+    typedef enum ELiquidLexerErrorType LiquidLexerErrorType;
+
     enum ETagType {
         LIQUID_TAG_TYPE_ENCLOSING,
         LIQUID_TAG_TYPE_FREE
@@ -105,6 +136,8 @@ extern "C" {
     typedef struct SLiquidVariableResolver LiquidVariableResolver;
 
     LiquidContext liquidCreateContext(LiquidContextSettings settings);
+    const char* liquidGetContextError(LiquidContext context);
+
     void liquidFreeContext(LiquidContext context);
     void liquidImplementStandardDialect(LiquidContext context);
     LiquidRenderer liquidCreateRenderer(LiquidContext context);

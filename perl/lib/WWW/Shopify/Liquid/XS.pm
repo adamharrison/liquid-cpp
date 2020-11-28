@@ -1,6 +1,13 @@
 use strict;
 use warnings;
 
+package WWW::Shopify::Liquid::XS::Execption;
+
+sub new {
+    my ($package) = @_;
+    return bless { }, $package;
+}
+
 package WWW::Shopify::Liquid::XS::Renderer;
 
 sub new {
@@ -22,7 +29,10 @@ package WWW::Shopify::Liquid::XS::Template;
 
 sub new {
     my ($package, $context, $text) = @_;
-    return bless { template => WWW::Shopify::Liquid::XS::createTemplate($context, $text) }, $package;
+    my $template = WWW::Shopify::Liquid::XS::createTemplate($context, $text);
+    if (!$template)
+        die new WWW::Shopify::Liquid::XS::Execption(WWW::Shopify::Liquid::XS::getError());
+    return bless { template => $template }, $package;
 }
 
 sub DESTROY {
