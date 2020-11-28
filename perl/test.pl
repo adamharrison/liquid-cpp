@@ -1,3 +1,7 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
 
 use WWW::Shopify::Liquid::XS;
 
