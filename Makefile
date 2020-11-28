@@ -47,6 +47,8 @@ $(ODIR)/%.o: $(SDIR)/%.c $(ODIR)/%.d
 
 library: $(LIBRARY)
 
+cleanlibrary: clean
+
 directories: $(ODIR) $(BDIR) $(TDIR)
 
 cleantest: clean
@@ -65,3 +67,4 @@ testdir:
 
 clean: directories
 	rm -f $(ODIR)/*.o $(ODIR)/*.d $(LIBRARY)
+

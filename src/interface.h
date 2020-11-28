@@ -9,8 +9,21 @@ extern "C" {
 #endif
 
     enum ETagType {
-        TAG_TYPE_ENCLOSING,
-        TAG_TYPE_FREE
+        LIQUID_TAG_TYPE_ENCLOSING,
+        LIQUID_TAG_TYPE_FREE
+    };
+
+    enum ELiquidOperatorArity {
+        LIQUID_OPERATOR_ARITY_NONARY,
+        LIQUID_OPERATOR_ARITY_UNARY,
+        LIQUID_OPERATOR_ARITY_BINARY,
+        LIQUID_OPERATOR_ARITY_NARY
+    };
+
+    enum ELiquidOperatorFixness {
+        LIQUID_OPERATOR_FIXNESS_PREFIX,
+        LIQUID_OPERATOR_FIXNESS_INFIX,
+        LIQUID_OPERATOR_FIXNESS_AFFIX
     };
 
     struct SLiquidContext {
@@ -97,17 +110,6 @@ extern "C" {
     LiquidRenderer liquidCreateRenderer(LiquidContext context);
     void liquidFreeRenderer(LiquidRenderer context);
 
-    void liquidFilterGetOperand(void* targetVariable, LiquidRenderer renderer, LiquidNode filter, void* variableStore);
-    void liquidGetArgument(void* targetVariable, LiquidRenderer renderer, LiquidNode node, void* variableStore, int idx);
-    typedef void* (*LiquidRenderFunction)(LiquidRenderer renderer, LiquidNode node, void* variableStore);
-
-    // Passing -1 to min/maxArguments means no min or max.
-    void liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction);
-    void liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction);
-    void liquidRegisterDotFilter(LiquidContext context, const char* symbol, LiquidRenderFunction renderFunction);
-    void liquidRegisterOperator(LiquidContext context, const char* symbol, int priority, LiquidRenderFunction renderFunction);
-    void liquidRegisterVariableResolver(LiquidContext context, LiquidVariableResolver resolver);
-
     LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size);
     void liquidFreeTemplate(LiquidTemplate tmpl);
 
@@ -120,6 +122,18 @@ extern "C" {
     const char* liquidGetError();
     void liquidClearError();
     void liquidSetError(const char* message);
+
+
+    void liquidFilterGetOperand(void* targetVariable, LiquidRenderer renderer, LiquidNode filter, void* variableStore);
+    void liquidGetArgument(void* targetVariable, LiquidRenderer renderer, LiquidNode node, void* variableStore, int idx);
+    typedef void* (*LiquidRenderFunction)(LiquidRenderer renderer, LiquidNode node, void* variableStore);
+
+    // Passing -1 to min/maxArguments means no min or max.
+    void liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction);
+    void liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction);
+    void liquidRegisterDotFilter(LiquidContext context, const char* symbol, LiquidRenderFunction renderFunction);
+    void liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity airty, enum ELiquidOperatorFixness fixness, int priority, LiquidRenderFunction renderFunction);
+    void liquidRegisterVariableResolver(LiquidContext context, LiquidVariableResolver resolver);
 
 #ifdef __cplusplus
 }

@@ -1,0 +1,8 @@
+MYMETA.json
+MYMETA.yml
+*.o
+pm_to_blib
+blib
+Makefile
+XS.bs
+XS.c

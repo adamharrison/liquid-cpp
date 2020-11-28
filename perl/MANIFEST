@@ -1,0 +1,8 @@
+Changes
+Makefile.PL
+MANIFEST
+ppport.h
+README
+XS.xs
+t/WWW-Shopify-Liquid-XS.t
+lib/WWW/Shopify/Liquid/XS.pm

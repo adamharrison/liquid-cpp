@@ -15,8 +15,8 @@
 			<SilentBuild command="$make -f $makefile $target -j 4 &gt; $(CMD_NULL)" />
 		</MakeCommands>
 		<Build>
-			<Target title="executable">
-				<Option output="bin/feinoff" prefix_auto="1" extension_auto="1" />
+			<Target title="library">
+				<Option output="bin/libliquid" prefix_auto="1" extension_auto="1" />
 				<Option working_dir="bin" />
 				<Option object_output="obj/" />
 				<Option type="1" />
@@ -35,6 +35,14 @@
 				<Option output="bin/01sanity" prefix_auto="1" extension_auto="1" />
 				<Option type="1" />
 				<Option compiler="gcc" />
+				<MakeCommands>
+					<Build command="$make -f $makefile $target -j 4" />
+					<CompileFile command="$make -f $makefile $file" />
+					<Clean command="$make -f $makefile clean$target" />
+					<DistClean command="$make -f $makefile distclean$target" />
+					<AskRebuildNeeded command="$make -q -f $makefile $target" />
+					<SilentBuild command="$make -f $makefile $target -j 4 &gt; $(CMD_NULL)" />
+				</MakeCommands>
 			</Target>
 		</Build>
 		<Compiler>
@@ -53,9 +61,16 @@
 			<Add library="libtokyocabinet" />
 		</Linker>
 		<Unit filename="Makefile">
-			<Option target="executable" />
+			<Option target="library" />
 		</Unit>
 		<Unit filename="README.md" />
+		<Unit filename="perl/Makefile.PL" />
+		<Unit filename="perl/XS.pm" />
+		<Unit filename="perl/liquid.xs">
+			<Option compilerVar="CC" />
+			<Option compile="1" />
+			<Option link="1" />
+		</Unit>
 		<Unit filename="ruby/Makefile" />
 		<Unit filename="ruby/extconf.rb" />
 		<Unit filename="ruby/liquid.c">
@@ -63,10 +78,10 @@
 		</Unit>
 		<Unit filename="src/common.h" />
 		<Unit filename="src/context.cpp">
-			<Option target="executable" />
+			<Option target="library" />
 		</Unit>
 		<Unit filename="src/context.h">
-			<Option target="executable" />
+			<Option target="library" />
 		</Unit>
 		<Unit filename="src/cppvariable.h" />
 		<Unit filename="src/dialect.cpp" />
@@ -74,16 +89,16 @@
 		<Unit filename="src/interface.cpp" />
 		<Unit filename="src/interface.h" />
 		<Unit filename="src/lexer.h">
-			<Option target="executable" />
+			<Option target="library" />
 		</Unit>
 		<Unit filename="src/liquid.h" />
 		<Unit filename="src/parser.cpp" />
 		<Unit filename="src/parser.h">
-			<Option target="executable" />
+			<Option target="library" />
 		</Unit>
 		<Unit filename="src/renderer.cpp" />
 		<Unit filename="src/renderer.h">
-			<Option target="executable" />
+			<Option target="library" />
 		</Unit>
 		<Unit filename="t/01sanity.cpp" />
 		<Extensions />
