@@ -4,7 +4,7 @@
 #include "XSUB.h"
 
 #include "ppport.h"
-#include "../../src/liquid.h"
+#include "../src/liquid.h"
 
 LiquidVariableType lpGetType(void* variable) {
     return LIQUID_VARIABLE_TYPE_NIL;
