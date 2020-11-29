@@ -252,7 +252,7 @@ namespace Liquid {
                 return false;
             if (idx >= a.size())
                 return false;
-            *variable = &((const_cast<CPPVariable*>(this))[idx]);
+            *variable = &((*const_cast<CPPVariable*>(this))[idx]);
             return true;
         }
 
@@ -261,7 +261,7 @@ namespace Liquid {
                 return nullptr;
             if (idx >= a.size())
                 a.resize(idx+1);
-            a[idx] = make_unique<CPPVariable>(target);
+            a[idx] = make_unique<CPPVariable>(*target);
             return a[idx].get();
         }
 

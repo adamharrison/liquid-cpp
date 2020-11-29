@@ -20,30 +20,38 @@ namespace Liquid {
         };
 
 
-        struct Error {
+        struct Error : LiquidLexerError {
             typedef LiquidLexerErrorType Type;
-            LiquidLexerErrorType type;
 
-            size_t column;
-            size_t row;
-
-            std::string message;
-
-            Error() : type(Type::LIQUID_LEXER_ERROR_TYPE_NONE) { }
+            Error() {
+                type = Type::LIQUID_LEXER_ERROR_TYPE_NONE;
+                message[0] = 0;
+            }
             Error(const Error& error) = default;
             Error(Error&& error) = default;
 
-            Error(Lexer& lexer, Type type) : column(lexer.column), row(lexer.row) {
+            Error(Lexer& lexer, Type type) {
+                this->row = lexer.row;
+                this->column = lexer.column;
                 this->type = type;
             }
-            Error(Lexer& lexer, Type type, const std::string& message) : column(lexer.column), row(lexer.row), message(message) {
+            Error(Lexer& lexer, Type type, const std::string& message) {
+                this->row = lexer.row;
+                this->column = lexer.column;
                 this->type = type;
+                strcpy(this->message, message.data());
             }
-            Error(Type type) : column(0), row(0) {
+            Error(Type type) {
+                this->row = 0;
+                this->column = 0;
                 this->type = type;
+                message[0] = 0;
             }
-            Error(Type type, const std::string& message) : column(0), row(0), message(message) {
+            Error(Type type, const std::string& message) {
+                this->row = 0;
+                this->column = 0;
                 this->type = type;
+                strcpy(this->message, message.data());
             }
         };
 
@@ -242,19 +250,24 @@ namespace Liquid {
                                 default:
                                     // In the case where we change from symbol to word, word to symbol, or from number to either, we process a control chunk and split the thing up.
                                     isNumber = false;
-                                    if (isalpha(str[offset])) {
-                                        if (!isWord) {
-                                            ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
-                                            processComplete = true;
-                                        } else {
-                                            isSymbol = false;
-                                        }
+                                    if (hasPoint) {
+                                        ongoing = static_cast<T*>(this)->dot();
+                                        processComplete = true;
                                     } else {
-                                        if (!isSymbol) {
-                                            ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
-                                            processComplete = true;
+                                        if (isalpha(str[offset]) || str[offset] == '_') {
+                                            if (!isWord) {
+                                                ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                                processComplete = true;
+                                            } else {
+                                                isSymbol = false;
+                                            }
                                         } else {
-                                            isWord = false;
+                                            if (!isSymbol) {
+                                                ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                                processComplete = true;
+                                            } else {
+                                                isWord = false;
+                                            }
                                         }
                                     }
                                 break;

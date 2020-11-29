@@ -344,7 +344,9 @@ namespace Liquid {
             auto& resolver = variableType->resolver;
             ForLoopContext forLoopContext = { renderer, node, store, *variableNode.get(), iterator };
 
+
             forLoopContext.length = result.variant.type == Variant::Type::ARRAY ? result.variant.a.size() : resolver.getArraySize(result.variant.p);
+
             if (!hasLimit)
                 limit = forLoopContext.length;
             else if (limit < 0)
@@ -577,10 +579,10 @@ namespace Liquid {
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            if (!op1.type || !op1.variant.isTruthy())
+            if (op1.type || !op1.variant.isTruthy())
                 return Node(Variant(false));
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            return Node(Variant(op2.type && op2.variant.isTruthy()));
+            return Node(Variant(!op2.type && op2.variant.isTruthy()));
         }
     };
     struct OrOperatorNode : OperatorNodeType {
@@ -588,10 +590,36 @@ namespace Liquid {
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            if (op1.type && op1.variant.isTruthy())
+            if (!op1.type && op1.variant.isTruthy())
                 return Node(Variant(true));
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            return Node(Variant(op2.type && op2.variant.isTruthy()));
+            return Node(Variant(!op2.type && op2.variant.isTruthy()));
+        }
+    };
+
+
+    struct ContainsOperatorNode : OperatorNodeType {
+        ContainsOperatorNode() : OperatorNodeType("contains", Arity::BINARY, 1) { }
+
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            if (!op1.type)
+                return Node();
+            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+            if (!op2.type || op2.variant.type != Variant::Type::STRING)
+                return Node();
+            switch (op1.variant.type) {
+                case Variant::Type::STRING:
+                    return Variant(op1.variant.s.find(op2.getString()) != string::npos);
+                case Variant::Type::ARRAY:
+                    for (size_t i = 0; i < op1.variant.a.size(); ++i) {
+                        if (op1.variant.a[i].type == Variant::Type::STRING && op1.variant.a[i].s.find(op2.getString()) != string::npos)
+                            return Variant(true);
+                    }
+                    return Variant(false);
+                default:
+                    return Node();
+            }
         }
     };
 
@@ -1140,7 +1168,7 @@ namespace Liquid {
     struct JoinFilterNode : ArrayFilterNodeType {
         JoinFilterNode() : ArrayFilterNodeType("join", 0, 1) { }
 
-        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) {
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             struct JoinStruct {
                 const Context& context;
                 string accumulator;
@@ -1166,7 +1194,7 @@ namespace Liquid {
             return Node(joinStruct.accumulator);
         }
 
-        Node variantOperate(Renderer& renderer, const Node& node, Variable store, Variant operand) {
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant& operand) const {
             string accumulator;
             if (operand.type != Variant::Type::ARRAY || operand.a.size() == 0)
                 return Node();
@@ -1180,6 +1208,17 @@ namespace Liquid {
                 accumulator.append(operand.a[i].getString());
             }
             return operand.a[operand.a.size()-1];
+        }
+
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            auto operand = getOperand(renderer, node, store);
+            if (operand.type)
+                return Node();
+            if (operand.variant.type == Variant::Type::ARRAY)
+                return variantOperate(renderer, node, store, operand.variant);
+            else if (operand.variant.type == Variant::Type::VARIABLE)
+                return variableOperate(renderer, node, store, operand.variant.v);
+            return Node();
         }
     };
 
@@ -1664,6 +1703,7 @@ namespace Liquid {
         context.registerType<AndOperatorNode>();
         context.registerType<OrOperatorNode>();
         context.registerType<RangeOperatorNode>();
+        context.registerType<ContainsOperatorNode>();
 
         // Math filters.
         context.registerType<PlusFilterNode>();

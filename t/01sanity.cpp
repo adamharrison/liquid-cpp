@@ -260,6 +260,10 @@ TEST(sanity, forloop) {
     ASSERT_EQ(str, "345");
 
 
+    ast = getParser().parse("{% for i in (0..2) %}{{ i }}{% endfor %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "012");
+
     ast = getParser().parse("{% for i in list reversed %}{{ i }}{% else %}fdsfdf{% endfor %}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "201051");
@@ -330,6 +334,41 @@ TEST(sanity, filters) {
     ast = getParser().parse("{{ a.size }}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "4");
+}
+
+TEST(sanity, composite) {
+    CPPVariable hash, order, transaction;
+    Node ast;
+    std::string str;
+
+
+
+    CPPVariable line_item, product, product_option1, product_option2;
+    product_option1["name"] = "Color";
+    product_option2["name"] = "Size";
+    product["options"] = CPPVariable({ product_option1, product_option2 });
+    line_item["variant_title"] = "Red / adsfds";
+    line_item["product"] = move(product);
+    hash["line_item"] = move(line_item);
+
+    ast = getParser().parse("{% for i in (0..2) %}{% if line_item.product.options[i].name == \"Color\" %}{% assign groups = line_item.variant_title | split: \" / \" %}{{ groups[i] }}{% endif %}{% endfor %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "Red");
+
+
+    transaction["id"] = 12445324;
+    transaction["kind"] = "refund";
+    transaction["status"] = "success";
+    order["transactions"] = CPPVariable({ transaction });
+
+    hash["order"] = order;
+
+
+    ast = getParser().parse("{% for trans in order.transactions %}{% if trans.status == 'success' and trans.kind == 'refund' %}{% unless forloop.first %}, {% endunless %}{{ trans.id }}{% endif %}{% endfor %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "12445324");
+
+
 }
 
 TEST(sanity, error) {

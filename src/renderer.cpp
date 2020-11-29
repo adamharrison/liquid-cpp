@@ -95,13 +95,35 @@ namespace Liquid {
             case LIQUID_VARIABLE_TYPE_STRING: {
                 string s;
                 long long size = resolver.getStringLength(variable);
-                s.resize(size);
-                if (resolver.getString(variable, const_cast<char*>(s.data())))
-                    return Variant(std::move(s));
+                if (size >= 0) {
+                    s.resize(size);
+                    if (resolver.getString(variable, const_cast<char*>(s.data())))
+                        return Variant(move(s));
+                }
             } break;
             case LIQUID_VARIABLE_TYPE_NIL:
                 return Variant();
         }
         return Variant();
+    }
+
+
+    std::string Renderer::getString(const Node& node) {
+        const LiquidVariableResolver& resolver = context.getVariableResolver();
+
+        if (!node.type) {
+            if (node.variant.type == Variant::Type::VARIABLE) {
+                string s;
+                long long size = resolver.getStringLength(node.variant.v.pointer);
+                if (size >= 0) {
+                    s.resize(size);
+                    if (resolver.getString(node.variant.v.pointer, const_cast<char*>(s.data())))
+                        return move(s);
+                }
+            } else {
+                return node.variant.getString();
+            }
+        }
+        return string();
     }
 }

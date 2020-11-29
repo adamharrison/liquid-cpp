@@ -1,11 +1,45 @@
 use strict;
 use warnings;
 
-package WWW::Shopify::Liquid::XS::Execption;
+package WWW::Shopify::Liquid::XS::Exception;
+use overload
+	fallback => 1,
+	'""' => sub { return $_[0]->english . ($_[0]->line ? " on line " . $_[0]->line . ", character " . $_[0]->{line}->[1] .  ($_[0]->{line}->[3] ? ", file " . $_[0]->{line}->[3] : '') : ''); };
+sub line { return $_[0]->{line} ? (ref($_[0]->{line}) && ref($_[0]->{line}) eq "ARRAY" ? $_[0]->{line}->[0] : $_[0]->{line}) : undef; }
+sub column { return $_[0]->{line} && ref($_[0]->{line}) && ref($_[0]->{line}) eq "ARRAY" ? $_[0]->{line}->[1] : undef; }
+sub stack { return $_[0]->{stack}; }
+sub error { return $_[0]->{error}; }
 
 sub new {
-    my ($package) = @_;
-    return bless { }, $package;
+    my ($package, $error) = @_;
+    return bless {
+        error => $error->[0],
+        data => $error->[3],
+        line => [$error->[1], $error->[2]]
+    }, $package;
+}
+sub english {
+    my ($self) = @_;
+    my $message;
+
+    my @codes = (
+        "No error",
+        "Unexpected end to block",
+        "Unknown tag",
+        "Unknown operator",
+        "Unknown operator or qualifier",
+        "Unknown filter",
+        "Invalid symbol",
+        "Unbalanced end to group"
+    );
+
+    if (defined $self->{error} && $self->{error} < int(@codes)) {
+        $message = $codes[$self->{error}];
+        $message .= " '" . $self->{data} . "'" if defined $self->{data};
+    }
+    $message = "Unknown error" if !$message;
+
+    return $message;
 }
 
 package WWW::Shopify::Liquid::XS::Renderer;
@@ -22,16 +56,17 @@ sub DESTROY {
 
 sub render {
     my ($self, $hash, $template) = @_;
-    return WWW::Shopify::Liquid::XS::renderTemplate($self->{renderer}, $hash, $template->{template});
+    my $error = [];
+    return WWW::Shopify::Liquid::XS::renderTemplate($self->{renderer}, $hash, $template->{template}, $error);
 }
 
 package WWW::Shopify::Liquid::XS::Template;
 
 sub new {
     my ($package, $context, $text) = @_;
-    my $template = WWW::Shopify::Liquid::XS::createTemplate($context, $text);
-    if (!$template)
-        die new WWW::Shopify::Liquid::XS::Execption(WWW::Shopify::Liquid::XS::getError());
+    my $error = [];
+    my $template = WWW::Shopify::Liquid::XS::createTemplate($context, $text, $error);
+    die WWW::Shopify::Liquid::XS::Exception->new($error) if !$template;
     return bless { template => $template }, $package;
 }
 
@@ -126,6 +161,11 @@ sub render_text {
 sub render_file {
     my ($self, $hash, $text) = @_;
     my $template = $self->parse_file($text);
+    return $self->renderer->render($hash, $template);
+}
+
+sub render_ast {
+    my ($self, $hash, $template) = @_;
     return $self->renderer->render($hash, $template);
 }
 

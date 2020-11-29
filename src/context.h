@@ -165,7 +165,7 @@ namespace Liquid {
                 assert(node.children.size() == 1);
                 auto& argumentNode = node.children.front();
                 assert(argumentNode->children.size() == 1);
-                return renderer.retrieveRenderedNode(*argumentNode->children[0].get(), store);
+                return Variant(renderer.getString(renderer.retrieveRenderedNode(*argumentNode->children[0].get(), store)));
             }
         };
 
@@ -348,6 +348,8 @@ namespace Liquid {
         bool resolveVariableString(string& target, void* variable) const {
             const LiquidVariableResolver& resolver = getVariableResolver();
             long long length = resolver.getStringLength(variable);
+            if (length < 0)
+                return false;
             target.resize(length);
             if (!resolver.getString(variable, const_cast<char*>(target.data())))
                 return false;

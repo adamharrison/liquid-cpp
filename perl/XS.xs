@@ -7,6 +7,20 @@
 #include "../src/liquid.h"
 
 LiquidVariableType lpGetType(void* variable) {
+    if (SvROK((SV*)variable)) {
+        if (SvTYPE(SvRV((SV*)variable)) == SVt_PVAV)
+            return LIQUID_VARIABLE_TYPE_ARRAY;
+        if (SvTYPE(SvRV((SV*)variable)) == SVt_PVHV)
+            return LIQUID_VARIABLE_TYPE_DICTIONARY;
+        return LIQUID_VARIABLE_TYPE_OTHER;
+    } else {
+        if (SvIOKp((SV*)variable))
+            return LIQUID_VARIABLE_TYPE_INT;
+        if (SvNOKp((SV*)variable))
+            return LIQUID_VARIABLE_TYPE_FLOAT;
+        if (SvPOKp((SV*)variable))
+            return LIQUID_VARIABLE_TYPE_STRING;
+    }
     return LIQUID_VARIABLE_TYPE_NIL;
 }
 
@@ -25,17 +39,33 @@ bool lpGetString(void* variable, char* target) {
     dTHX;
     STRLEN len;
     char* ptr;
-    ptr = SvPV((SV*)variable, len);
+    SV* sv = (SV*)variable;
+    if (SvROK(sv)) {
+        if (sv_isobject(sv)) {
+            ptr = SvPV(sv, len);
+        } else {
+            ptr = SvPV(SvRV(sv), len);
+        }
+    } else
+        ptr = SvPV(sv, len);
     memcpy(target, ptr, len);
     target[len] = 0;
-    return false;
+    return true;
 }
 
 long long lpGetStringLength(void* variable) {
     dTHX;
     STRLEN len;
     char* ptr;
-    ptr = SvPV((SV*)variable, len);
+    SV* sv = (SV*)variable;
+    if (SvROK(sv)) {
+        if (sv_isobject(sv)) {
+            ptr = SvPV(sv, len);
+        } else {
+            ptr = SvPV(SvRV(sv), len);
+        }
+    } else
+        ptr = SvPV(sv, len);
     return len;
 }
 
@@ -65,7 +95,7 @@ bool lpGetDictionaryVariable(void* variable, const char* key, void** target) {
 
 bool lpGetArrayVariable(void* variable, size_t idx, void** target) {
     dTHX;
-    if (SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
+    if (!SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
         return false;
     AV* av = (AV*)SvRV((SV*)variable);
     SV** sv = av_fetch(av, idx, 0);
@@ -77,17 +107,18 @@ bool lpGetArrayVariable(void* variable, size_t idx, void** target) {
 
 bool lpIterate(void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) {
     dTHX;
-    if (SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
+    if (!SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
         return false;
     AV* av = (AV*)SvRV((SV*)variable);
-    int length = av_top_index(av);
+    int length = av_top_index(av)+1;
     if (length > limit)
         length = limit;
     length = length - 1;
     if (length < 0)
-        length += av_top_index(av);
+        length += av_top_index(av)+1;
+
     if (reverse) {
-        start = av_top_index(av) - start - 1;
+        start = av_top_index(av) - start;
         for (size_t i = length; i >= start; --i) {
             SV** sv = av_fetch(av, i, 0);
             if (sv)
@@ -108,7 +139,7 @@ long long lpGetArraySize(void* variable) {
     if (SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
         return false;
     AV* av = (AV*)SvRV((SV*)variable);
-    return av_top_index(av);
+    return av_top_index(av)+1;
 }
 
 void* lpSetDictionaryVariable(LiquidRenderer renderer, void* variable, const char* key, void* target) {
@@ -150,12 +181,12 @@ void* lpCreateFloat(LiquidRenderer renderer, double value) {
 
 void* lpCreateBool(LiquidRenderer renderer, bool value) {
     dTHX;
-    return (void*)newSVnv(value ? 1.0 : 0.0);
+    return (void*)newSViv(value ? 1 : 0);
 }
 
 void* lpCreateInteger(LiquidRenderer renderer, long long value) {
     dTHX;
-    return (void*)newSVnv(value);
+    return (void*)newSViv(value);
 }
 
 void* lpCreateString(LiquidRenderer renderer, const char* str) {
@@ -175,7 +206,7 @@ void* lpCreateNil(LiquidRenderer renderer) {
 
 void* lpCreateClone(LiquidRenderer renderer, void* value) {
     dTHX;
-    return (void*)newSV(0);
+    return newSVsv(value);
 }
 
 void lpFreeVariable(LiquidRenderer renderer, void* value) {
@@ -253,11 +284,22 @@ freeRenderer(renderer)
         liquidFreeRenderer(*(LiquidRenderer*)&renderer);
 
 void*
-createTemplate(context, str)
+createTemplate(context, str, error)
     void* context;
     char* str;
+    SV* error;
     CODE:
-        RETVAL = liquidCreateTemplate(*(LiquidContext*)&context, str, strlen(str)).ast;
+        LiquidParserError parserError;
+        RETVAL = liquidCreateTemplate(*(LiquidContext*)&context, str, strlen(str), &parserError).ast;
+        if (SvROK(error)) {
+            if (parserError.type) {
+                AV* av = (AV*)SvRV(error);
+                av_push(av, newSVnv(parserError.type));
+                av_push(av, newSVnv(parserError.row));
+                av_push(av, newSVnv(parserError.column));
+                av_push(av, newSVpvn(parserError.message, strlen(parserError.message)));
+            }
+        }
     OUTPUT:
         RETVAL
 
@@ -268,12 +310,23 @@ freeTemplate(tmpl)
         liquidFreeTemplate(*(LiquidTemplate*)&tmpl);
 
 SV*
-renderTemplate(renderer, store, tmpl)
+renderTemplate(renderer, store, tmpl, error)
     void* renderer;
     SV* store;
     void* tmpl;
+    SV* error;
     CODE:
-        LiquidTemplateRender render = liquidRenderTemplate(*(LiquidRenderer*)&renderer, store, *(LiquidTemplate*)&tmpl);
+        LiquidRenderError renderError;
+        LiquidTemplateRender render = liquidRenderTemplate(*(LiquidRenderer*)&renderer, store, *(LiquidTemplate*)&tmpl, &renderError);
+        if (SvROK(error)) {
+            if (renderError.type) {
+                AV* av = (AV*)SvRV(error);
+                av_push(av, newSVnv(renderError.type));
+                av_push(av, newSVnv(renderError.row));
+                av_push(av, newSVnv(renderError.column));
+                av_push(av, newSVpvn(renderError.message, strlen(renderError.message)));
+            }
+        }
         RETVAL = newSVpvn(liquidTemplateRenderGetBuffer(render), liquidTemplateRenderGetSize(render));
         liquidFreeTemplateRender(render);
     OUTPUT:

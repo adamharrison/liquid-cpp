@@ -27,13 +27,14 @@ void liquidFreeRenderer(LiquidRenderer renderer) {
     delete (Renderer*)renderer.renderer;
 }
 
-LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size) {
+LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size, LiquidParserError* error) {
     Parser parser(*static_cast<Context*>(context.context));
     Node tmpl;
     try {
         tmpl = parser.parse(buffer, size);
-    } catch (Parser::Exception exp) {
-        liquidSetError(exp.what());
+    } catch (Parser::Exception& exp) {
+        if (error)
+            *error = exp.parserError;
         return LiquidTemplate({ NULL });
     }
     return LiquidTemplate({ new Node(std::move(tmpl)) });
@@ -43,7 +44,7 @@ void liquidFreeTemplate(LiquidTemplate tmpl) {
     delete (Node*)tmpl.ast;
 }
 
-LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl) {
+LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRenderError* error) {
     std::string* str = new std::string(std::move(static_cast<Renderer*>(renderer.renderer)->render(*static_cast<Node*>(tmpl.ast), Variable({ variableStore }))));
     return LiquidTemplateRender({ str });
 }

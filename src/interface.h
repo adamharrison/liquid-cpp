@@ -8,8 +8,11 @@
 extern "C" {
 #endif
 
+    #define LIQUID_ERROR_MESSAGE_MAX_LENGTH 256
+
     enum ELiquidParserErrorType {
         LIQUID_PARSER_ERROR_TYPE_NONE,
+        LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END,
         // Self-explamatory.
         LIQUID_PARSER_ERROR_TYPE_UNKNOWN_TAG,
         LIQUID_PARSER_ERROR_TYPE_UNKNOWN_OPERATOR,
@@ -18,19 +21,9 @@ extern "C" {
         // Weird symbol in weird place.
         LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL,
         // Was expecting somthing else, i.e. {{ i + }}; was expecting a number there.
-        LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END,
         LIQUID_PARSER_ERROR_TYPE_UNBALANCED_GROUP
     };
-
     typedef enum ELiquidParserErrorType LiquidParserErrorType;
-
-
-    struct LiquidParserError {
-        LiquidParserErrorType type;
-        size_t column;
-        size_t row;
-    };
-
 
     enum ELiquidLexerErrorType {
         LIQUID_LEXER_ERROR_TYPE_NONE,
@@ -38,6 +31,38 @@ extern "C" {
     };
 
     typedef enum ELiquidLexerErrorType LiquidLexerErrorType;
+
+    struct SLiquidLexerError {
+        LiquidLexerErrorType type;
+        size_t row;
+        size_t column;
+        char message[LIQUID_ERROR_MESSAGE_MAX_LENGTH];
+    };
+    typedef struct SLiquidLexerError LiquidLexerError;
+
+    struct SLiquidParserError {
+        LiquidParserErrorType type;
+        size_t row;
+        size_t column;
+        char message[LIQUID_ERROR_MESSAGE_MAX_LENGTH];
+    };
+    typedef struct SLiquidParserError LiquidParserError;
+
+
+
+    enum ELiquidRenderErrorType {
+        LIQUID_RENDER_ERROR_TYPE_NONE,
+    };
+    typedef enum ELiquidRenderErrorType LiquidRenderErrorType;
+
+    struct SLiquidRenderError {
+        LiquidRenderErrorType type;
+        size_t row;
+        size_t column;
+        char message[LIQUID_ERROR_MESSAGE_MAX_LENGTH];
+    };
+    typedef struct SLiquidRenderError LiquidRenderError;
+
 
     enum ETagType {
         LIQUID_TAG_TYPE_ENCLOSING,
@@ -143,10 +168,10 @@ extern "C" {
     LiquidRenderer liquidCreateRenderer(LiquidContext context);
     void liquidFreeRenderer(LiquidRenderer context);
 
-    LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size);
+    LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size, LiquidParserError* error);
     void liquidFreeTemplate(LiquidTemplate tmpl);
 
-    LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl);
+    LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRenderError* error);
     void liquidFreeTemplateRender(LiquidTemplateRender render);
 
     const char* liquidTemplateRenderGetBuffer(LiquidTemplateRender render);
@@ -155,7 +180,6 @@ extern "C" {
     const char* liquidGetError();
     void liquidClearError();
     void liquidSetError(const char* message);
-
 
     void liquidFilterGetOperand(void* targetVariable, LiquidRenderer renderer, LiquidNode filter, void* variableStore);
     void liquidGetArgument(void* targetVariable, LiquidRenderer renderer, LiquidNode node, void* variableStore, int idx);

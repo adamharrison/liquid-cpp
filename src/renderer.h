@@ -36,6 +36,7 @@ namespace Liquid {
 
         void inject(Variable& variable, const Variant& variant);
         Variant parseVariant(Variable variable);
+        string getString(const Node& node);
     };
 }
 

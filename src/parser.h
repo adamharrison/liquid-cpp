@@ -15,10 +15,9 @@ namespace Liquid {
         struct Error : LiquidParserError {
             typedef LiquidParserErrorType Type;
 
-            std::string message;
-
             Error() {
                 type = Type::LIQUID_PARSER_ERROR_TYPE_NONE;
+                message[0] = 0;
             }
             Error(const Error& error) = default;
             Error(Error&& error) = default;
@@ -28,24 +27,27 @@ namespace Liquid {
                 column = lexer.column;
                 row = lexer.row;
                 this->type = type;
+                message[0] = 0;
             }
             template <class T>
-            Error(T& lexer, Type type, const std::string& message) : message(message) {
+            Error(T& lexer, Type type, const std::string& message) {
                 this->type = type;
                 column = lexer.column;
                 row = lexer.row;
-
+                strcpy(this->message, message.data());
             }
             Error(Type type) {
                 column = 0;
                 row = 0;
                 this->type = type;
+                message[0] = 0;
             }
 
-            Error(Type type, const std::string& message) : message(message) {
+            Error(Type type, const std::string& message) {
                 column = 0;
                 row = 0;
                 this->type = type;
+                strcpy(this->message, message.data());
             }
         };
 
@@ -116,23 +118,23 @@ namespace Liquid {
                 switch (parserError.type) {
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_NONE: break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_TAG:
-                        sprintf(buffer, "Unknown tag '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                        sprintf(buffer, "Unknown tag '%s' on line %lu, column %lu.", error.message, error.row, error.column);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_OPERATOR:
-                        sprintf(buffer, "Unknown operator '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                        sprintf(buffer, "Unknown operator '%s' on line %lu, column %lu.", error.message, error.row, error.column);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_OPERATOR_OR_QUALIFIER:
-                        sprintf(buffer, "Unknown operator, or qualifier '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                        sprintf(buffer, "Unknown operator, or qualifier '%s' on line %lu, column %lu.", error.message, error.row, error.column);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_FILTER:
-                        sprintf(buffer, "Unknown filter '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                        sprintf(buffer, "Unknown filter '%s' on line %lu, column %lu.", error.message, error.row, error.column);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL:
-                        sprintf(buffer, "Invalid symbol '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                        sprintf(buffer, "Invalid symbol '%s' on line %lu, column %lu.", error.message, error.row, error.column);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END: {
-                        if (!error.message.empty())
-                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                        if (error.message[0])
+                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.message, error.row, error.column);
                         else
                             sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.row, error.column);
                     } break;
@@ -148,8 +150,8 @@ namespace Liquid {
                 switch (lexerError.type) {
                     case Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_NONE: break;
                     case Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END:
-                        if (!error.message.empty())
-                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.message.data(), error.row, error.column);
+                        if (error.message[0])
+                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.message, error.row, error.column);
                         else
                             sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.row, error.column);
                     break;
