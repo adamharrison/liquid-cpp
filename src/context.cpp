@@ -20,15 +20,19 @@ namespace Liquid {
         string s;
         if (++renderer.currentRenderingDepth > renderer.maximumRenderingDepth) {
             --renderer.currentRenderingDepth;
+            renderer.error = LIQUID_RENDER_ERROR_TYPE_EXCEEDED_DEPTH;
             return Node();
         }
         for (auto& child : node.children) {
             s.append(renderer.retrieveRenderedNode(*child.get(), store).getString());
+            if (renderer.error != LIQUID_RENDER_ERROR_TYPE_NONE)
+                return Node();
             if (renderer.control != Renderer::Control::NONE) {
                 --renderer.currentRenderingDepth;
                 return Node(s);
             }
         }
+        --renderer.currentRenderingDepth;
         return Node(s);
     }
 

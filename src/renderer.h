@@ -19,7 +19,48 @@ namespace Liquid {
         // The current state of the break. Allows us to have break/continue statements.
         Control control = Control::NONE;
 
-        LiquidRenderErrorType renderError = LiquidRenderErrorType::LIQUID_RENDER_ERROR_TYPE_NONE;
+        LiquidRenderErrorType error = LiquidRenderErrorType::LIQUID_RENDER_ERROR_TYPE_NONE;
+
+        struct Error : LiquidRenderError {
+            typedef LiquidRenderErrorType Type;
+
+            Error() {
+                column = 0;
+                row = 0;
+                type = Type::LIQUID_RENDER_ERROR_TYPE_NONE;
+                message[0] = 0;
+            }
+            Error(const Error& error) = default;
+            Error(Error&& error) = default;
+
+            template <class T>
+            Error(Type type) {
+                column = 0;
+                row = 0;
+                this->type = type;
+                message[0] = 0;
+            }
+            template <class T>
+            Error(Type type, const std::string& message) {
+                column = 0;
+                row = 0;
+                this->type = type;
+                strcpy(this->message, message.data());
+            }
+            Error(Type type) {
+                column = 0;
+                row = 0;
+                this->type = type;
+                message[0] = 0;
+            }
+
+            Error(Type type, const std::string& message) {
+                column = 0;
+                row = 0;
+                this->type = type;
+                strcpy(this->message, message.data());
+            }
+        };
 
         // If set, this will stop rendering with an error if the limits here, in bytes are breached for this renderer. This is checked any time
         // the variable resolver is used.
