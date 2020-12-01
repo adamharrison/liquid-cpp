@@ -179,6 +179,36 @@ namespace Liquid {
             }
             return *this;
         }
+
+        Variant& operator = (Variant&& v) {
+            switch (v.type) {
+                case Type::STRING:
+                    if (type != Type::STRING) {
+                        if (v.type == Type::ARRAY)
+                            a.~vector<Variant>();
+                        else
+                            i = 0;
+                        new(&s) string;
+                    }
+                    s = move(v.s);
+                break;
+                case Type::ARRAY:
+                    if (type != Type::ARRAY) {
+                        if (v.type == Type::STRING)
+                            s.~string();
+                        else
+                            i = 0;
+                        new(&a) vector<Variant>();
+                    }
+                    a = move(v.a);
+                break;
+                default:
+                    f = v.f;
+                break;
+            }
+            return *this;
+        }
+
         bool operator == (const Variant& v) const {
             if (type != v.type)
                 return false;
@@ -346,7 +376,7 @@ namespace Liquid {
                 new(&children) vector<unique_ptr<Node>>();
                 children = move(n.children);
             } else {
-                new(&variant) Variant();
+                new(&variant) Variant(move(n.variant));
             }
             type = n.type;
             return *this;

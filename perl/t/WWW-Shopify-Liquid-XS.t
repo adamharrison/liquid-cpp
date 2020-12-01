@@ -1,3 +1,12 @@
+package WWW::Shopify::Liquid::XS::Filter::Test;
+use parent 'WWW::Shopify::Liquid::Filter';
+
+sub operate {
+	my ($self, $hash, $operand) = @_;
+	return reverse($operand);
+}
+
+package main;
 
 # Specific edge-cases which have come up through use in the various apps.
 my $string = '<img src=http://cdn.shopify.com/s/files/1/0291/4345/t/2/assets/logo.png?171> <alt=UCC Resources><br><br>
@@ -92,6 +101,11 @@ my $mountain = "{% unless product.tags contains 'pre-sale' %}
 {% endunless %}";
 $ast = $liquid->parse_text($mountain);
 ok($ast);
+
+$liquid->register_filter('WWW::Shopify::Liquid::XS::Filter::Test');
+
+#my $filter = $liquid->render_text('{{ "123456" | test }}');
+#is($filter, "654321");
 
 
 done_testing();

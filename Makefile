@@ -8,6 +8,8 @@ CFLAGS=-Wall -fexceptions -fPIC -g
 CXXFLAGS=$(CFLAGS) -std=c++17
 LDFLAGS=
 AR=ar
+RUBY_DIR=ruby
+PERL_DIR=perl
 SOURCES=$(wildcard $(SDIR)/*.cpp) $(wildcard $(SDIR)/*.c) $(wildcard $(TDIR)/*.cpp)
 TESTSOURCES=$(wildcard $(TDIR)/*.cpp)
 OBJECTS=$(patsubst %.cpp,%.o,$(patsubst %.c,%.o,$(patsubst $(SDIR)/%,$(ODIR)/%,$(SOURCES))))
@@ -44,6 +46,12 @@ $(ODIR)/%.o: $(SDIR)/%.c $(ODIR)/%.d
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PRECIOUS: $(ODIR)/%.d
+
+perl : $(LIBRARY)
+	cd $(PERL_DIR) && perl Makefile.PL && ln -f -s ../$(LIBRARY)
+	$(MAKE) -C $(PERL_DIR) clean
+	$(MAKE) -C $(PERL_DIR)
+
 
 library: $(LIBRARY)
 

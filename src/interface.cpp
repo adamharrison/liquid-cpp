@@ -49,6 +49,51 @@ LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variabl
     return LiquidTemplateRender({ str });
 }
 
+void liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data) {
+    Context* ctx = static_cast<Context*>(context.context);
+    unique_ptr<NodeType> registeredType = make_unique<TagNodeType>((TagNodeType::Composition)type, symbol, minArguments, maxArguments);
+    registeredType->userRenderFunction = renderFunction;
+    registeredType->userData = data;
+    ctx->registerType(move(registeredType));
+}
+void liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data) {
+    Context* ctx = static_cast<Context*>(context.context);
+    unique_ptr<NodeType> registeredType = make_unique<FilterNodeType>(symbol, minArguments, maxArguments);
+    registeredType->userRenderFunction = renderFunction;
+    registeredType->userData = data;
+    ctx->registerType(move(registeredType));
+}
+
+void liquidFilterGetOperand(void** targetVariable, LiquidRenderer lRenderer, LiquidNode filter, void* variableStore) {
+    Renderer& renderer = *static_cast<Renderer*>(lRenderer.renderer);
+    const Node& node = *static_cast<Node*>(filter.node);
+    Node op = static_cast<const FilterNodeType*>(node.type)->getOperand(renderer, node, variableStore);
+    if (!op.type) {
+        Variable v;
+        renderer.inject(v, op.variant);
+        *targetVariable = v;
+    }
+}
+
+void liquidRendererSetReturnValueString(LiquidRenderer renderer, const char* s, int length) {
+    static_cast<Renderer*>(renderer.renderer)->returnValue = move(Variant(string(s, length)));
+}
+
+void liquidRendererSetReturnValueNil(LiquidRenderer renderer) {
+    static_cast<Renderer*>(renderer.renderer)->returnValue = Variant();
+}
+
+void liquidRendererSetReturnValueInteger(LiquidRenderer renderer, long long i) {
+    static_cast<Renderer*>(renderer.renderer)->returnValue = Variant(i);
+}
+
+void liquidRendererSetReturnValueFloat(LiquidRenderer renderer, double f) {
+    static_cast<Renderer*>(renderer.renderer)->returnValue = Variant(f);
+}
+
+void liquidRendererSetReturnValueVariable(LiquidRenderer renderer, void* variable) {
+    static_cast<Renderer*>(renderer.renderer)->returnValue = Variant(Variable{variable});
+}
 
 void liquidRegisterVariableResolver(LiquidContext context, LiquidVariableResolver resolver) {
     Context* ctx = static_cast<Context*>(context.context);

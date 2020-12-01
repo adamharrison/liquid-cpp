@@ -25,26 +25,21 @@ namespace Liquid {
         Type type;
         string symbol;
         int maxChildren;
+        void* userData = nullptr;
+        LiquidRenderFunction userRenderFunction = nullptr;
 
         NodeType(Type type, string symbol = "", int maxChildren = -1) : type(type), symbol(symbol), maxChildren(maxChildren) { }
         NodeType(const NodeType&) = default;
         NodeType(NodeType&&) = default;
         ~NodeType() { }
 
-        // When a node is rendered, depending on its mode, it'll return a node.
-        virtual Node render(Renderer& renderer, const Node& node, Variable store) const = 0;
+        virtual Node render(Renderer& renderer, const Node& node, Variable store) const {
+            assert(userRenderFunction);
+            userRenderFunction(LiquidRenderer{&renderer}, LiquidNode{const_cast<Node*>(&node)}, store, userData);
+            return renderer.returnValue;
+        }
         virtual Parser::Error validate(const Context& context, const Node& node) const { return Parser::Error(); }
         virtual void optimize(const Context& context, Node& node, Variable store) const { }
-
-
-        Node (*renderFunction)(Renderer& renderer, const Node& node, Variable store) =
-            +[](Renderer& renderer, const Node& node, Variable store) {
-                return node.type->render(renderer, node, store);
-            };
-        void (*optimizeFunction)(const Context& context, Node& node, Variable store) =
-            +[](const Context& context, Node& node, Variable store) {
-                node.type->optimize(context, node, store);
-            };
     };
 
     struct TagNodeType : NodeType {

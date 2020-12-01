@@ -220,6 +220,84 @@ int lpCompare(void* a, void* b) {
 }
 
 
+static void lpRenderTag(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
+    dTHX;
+    SV* callback = (SV*)data;
+
+    dSP;
+
+    ENTER;
+    SAVETMPS;
+    PUSHMARK(SP);
+
+    EXTEND(SP, 2);
+    // Wrapped closure should look like:
+    // ($package, $renderer, $hash)
+    // the only thing we supply is the render, node, and hash.
+    PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
+    PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
+    PUSHs(sv_2mortal((SV*)variableStore));
+    PUTBACK;
+
+    int count = call_sv(SvRV(callback), G_SCALAR);
+
+    SPAGAIN;
+
+    if (count > 0) {
+        STRLEN len;
+        SV *sv = POPs;
+        const char *s = SvPV(sv, len);
+        liquidRendererSetReturnValueString(renderer, s, len);
+    } else {
+        liquidRendererSetReturnValueNil(renderer);
+    }
+
+    FREETMPS;
+    LEAVE;
+}
+
+
+static void lpRenderFilter(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
+    dTHX;
+    SV* callback = (SV*)data;
+
+    // Get the oeprand.
+    SV* operand = NULL;
+    liquidFilterGetOperand(&operand, renderer, node, variableStore);
+
+    dSP;
+
+    ENTER;
+    SAVETMPS;
+    PUSHMARK(SP);
+
+    EXTEND(SP, 4);
+    // Wrapped closure should look like:
+    // ($package, $renderer, $hash)
+    // the only thing we supply is the render, node, and hash.
+    PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
+    PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
+    PUSHs((SV*)variableStore);
+    PUSHs(sv_2mortal((SV*)operand));
+    PUTBACK;
+
+    int count = call_sv(callback, G_SCALAR);
+
+    SPAGAIN;
+
+    if (count > 0) {
+        STRLEN len;
+        SV *sv = POPs;
+        const char *s = SvPV(sv, len);
+        liquidRendererSetReturnValueString(renderer, s, len);
+    } else {
+        liquidRendererSetReturnValueNil(renderer);
+    }
+
+    FREETMPS;
+    LEAVE;
+}
+
 MODULE = WWW::Shopify::Liquid::XS		PACKAGE = WWW::Shopify::Liquid::XS
 
 void*
@@ -340,5 +418,41 @@ getError()
             RETVAL = newSVpvn(error, strlen(error));
         else
             RETVAL = newSV(0);
+    OUTPUT:
+        RETVAL
+
+int
+registerTag(context, symbol, type, minArguments, maxArguments, renderFunction)
+    void* context;
+    const char* symbol;
+    const char* type;
+    int minArguments;
+    int maxArguments;
+    SV* renderFunction;
+    CODE:
+        enum ETagType eType = strcmp(type, "free") == 0 ? LIQUID_TAG_TYPE_FREE : LIQUID_TAG_TYPE_ENCLOSING;
+        if (SvROK(renderFunction) && SvTYPE(SvRV(renderFunction)) == SVt_PVCV) {
+            liquidRegisterTag(*(LiquidContext*)&context, symbol, eType, minArguments, maxArguments, lpRenderTag, renderFunction);
+            RETVAL = 0;
+        } else {
+            RETVAL = -1;
+        }
+    OUTPUT:
+        RETVAL
+
+int
+registerFilter(context, symbol, minArguments, maxArguments, renderFunction)
+    void* context;
+    const char* symbol;
+    int minArguments;
+    int maxArguments;
+    SV* renderFunction;
+    CODE:
+        if (SvROK(renderFunction) && SvTYPE(SvRV(renderFunction)) == SVt_PVCV) {
+            liquidRegisterFilter(*(LiquidContext*)&context, symbol, minArguments, maxArguments, lpRenderFilter, SvREFCNT_inc(renderFunction));
+            RETVAL = 0;
+        } else {
+            RETVAL = -1;
+        }
     OUTPUT:
         RETVAL

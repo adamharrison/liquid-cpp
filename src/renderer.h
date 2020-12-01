@@ -33,20 +33,6 @@ namespace Liquid {
             Error(const Error& error) = default;
             Error(Error&& error) = default;
 
-            template <class T>
-            Error(Type type) {
-                column = 0;
-                row = 0;
-                this->type = type;
-                message[0] = 0;
-            }
-            template <class T>
-            Error(Type type, const std::string& message) {
-                column = 0;
-                row = 0;
-                this->type = type;
-                strcpy(this->message, message.data());
-            }
             Error(Type type) {
                 column = 0;
                 row = 0;
@@ -76,7 +62,8 @@ namespace Liquid {
         std::chrono::system_clock::time_point renderStartTime;
         unsigned int currentRenderingDepth;
 
-
+        // Used for the C interface.
+        Node returnValue;
 
         Renderer(const Context& context) : context(context) { }
 
