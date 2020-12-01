@@ -18,10 +18,16 @@ namespace Liquid {
 
     Node Context::ConcatenationNode::render(Renderer& renderer, const Node& node, Variable store) const {
         string s;
+        if (++renderer.currentRenderingDepth > renderer.maximumRenderingDepth) {
+            --renderer.currentRenderingDepth;
+            return Node();
+        }
         for (auto& child : node.children) {
             s.append(renderer.retrieveRenderedNode(*child.get(), store).getString());
-            if (renderer.control != Renderer::Control::NONE)
+            if (renderer.control != Renderer::Control::NONE) {
+                --renderer.currentRenderingDepth;
                 return Node(s);
+            }
         }
         return Node(s);
     }

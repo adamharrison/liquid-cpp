@@ -13,21 +13,33 @@ namespace Liquid {
         enum class Control {
             NONE,
             BREAK,
-            CONTINUE
+            CONTINUE,
+            EXIT
         };
         // The current state of the break. Allows us to have break/continue statements.
         Control control = Control::NONE;
 
-        // If set, this will stop rendering with an error if the limits here, in bytes are breached for this renderer.
+        LiquidRenderErrorType renderError = LiquidRenderErrorType::LIQUID_RENDER_ERROR_TYPE_NONE;
+
+        // If set, this will stop rendering with an error if the limits here, in bytes are breached for this renderer. This is checked any time
+        // the variable resolver is used.
         unsigned int maximumMemoryUsage = 0;
         // If set, this will stop rendering with an error if the limits here, in milisecnods, are breached for this renderer.
+        // This is checked between all concatenations.
         unsigned int maximumRenderingTime = 0;
+        // How many concatenation nodes are allowed at any given time. This roughly corresponds to the amount of nested tags. In non-malicious code
+        // this will probably rarely exceed 100.
+        unsigned int maximumRenderingDepth = 100;
+
+        unsigned int currentMemoryUsage;
+        std::chrono::system_clock::time_point renderStartTime;
+        unsigned int currentRenderingDepth;
+
+
 
         Renderer(const Context& context) : context(context) { }
 
-        std::chrono::system_clock::time_point renderStartTime;
-
-        void render(const Node& ast, Variable store, void (*)(const char* chunk, size_t size, void* data), void* data);
+        LiquidRenderErrorType render(const Node& ast, Variable store, void (*)(const char* chunk, size_t size, void* data), void* data);
         string render(const Node& ast, Variable store);
         Node retrieveRenderedNode(const Node& node, Variable store);
         std::chrono::duration<unsigned int,std::milli> getRenderedTime() const;

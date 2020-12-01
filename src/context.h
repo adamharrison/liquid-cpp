@@ -278,7 +278,8 @@ namespace Liquid {
         };
 
         unordered_map<string, unique_ptr<NodeType>> tagTypes;
-        unordered_map<string, unique_ptr<NodeType>> operatorTypes;
+        unordered_map<string, unique_ptr<NodeType>> unaryOperatorTypes;
+        unordered_map<string, unique_ptr<NodeType>> binaryOperatorTypes;
         unordered_map<string, unique_ptr<NodeType>> filterTypes;
         unordered_map<string, unique_ptr<NodeType>> dotFilterTypes;
         unique_ptr<NodeType> variableNodeType;
@@ -301,7 +302,19 @@ namespace Liquid {
                     variableNodeType = move(type);
                 break;
                 case NodeType::Type::OPERATOR:
-                    operatorTypes[type->symbol] = move(type);
+                    switch (static_cast<OperatorNodeType*>(type.get())->arity) {
+                        case OperatorNodeType::Arity::BINARY:
+                            assert(static_cast<OperatorNodeType*>(type.get())->fixness == OperatorNodeType::Fixness::INFIX);
+                            binaryOperatorTypes[type->symbol] = move(type);
+                        break;
+                        case OperatorNodeType::Arity::UNARY:
+                            assert(static_cast<OperatorNodeType*>(type.get())->fixness == OperatorNodeType::Fixness::PREFIX);
+                            unaryOperatorTypes[type->symbol] = move(type);
+                        break;
+                        default:
+                            assert(false);
+                        break;
+                    }
                 break;
                 case NodeType::Type::FILTER:
                     filterTypes[type->symbol] = move(type);
@@ -322,9 +335,16 @@ namespace Liquid {
                 return nullptr;
             return static_cast<TagNodeType*>(it->second.get());
         }
-        const OperatorNodeType* getOperatorType(string symbol) const {
-            auto it = operatorTypes.find(symbol);
-            if (it == operatorTypes.end())
+        const OperatorNodeType* getBinaryOperatorType(string symbol) const {
+            auto it = binaryOperatorTypes.find(symbol);
+            if (it == binaryOperatorTypes.end())
+                return nullptr;
+            return static_cast<OperatorNodeType*>(it->second.get());
+        }
+
+        const OperatorNodeType* getUnaryOperatorType(string symbol) const {
+            auto it = unaryOperatorTypes.find(symbol);
+            if (it == unaryOperatorTypes.end())
                 return nullptr;
             return static_cast<OperatorNodeType*>(it->second.get());
         }

@@ -78,6 +78,8 @@ namespace Liquid {
         vector<Error> errors;
 
         bool treatUnknownFiltersAsErrors = false;
+        // Any more depth than this, and we throw an error.
+        unsigned int maximumParseDepth = 100;
 
         void pushError(const Error& error) {
             errors.push_back(error);
@@ -172,6 +174,7 @@ namespace Liquid {
 
         Error validate(const Node& node) const;
 
+        bool pushNode(unique_ptr<Node> node, bool expectingNode = false);
         // Pops the last node in the stack, and then applies it as the last child of the node prior to it.
         bool popNode();
         // Pops nodes until it reaches a node of the given type.

@@ -5,12 +5,15 @@ namespace Liquid {
     struct Context;
 
 
-    void Renderer::render(const Node& ast, Variable store, void (*callback)(const char* chunk, size_t size, void* data), void* data) {
+    LiquidRenderErrorType Renderer::render(const Node& ast, Variable store, void (*callback)(const char* chunk, size_t size, void* data), void* data) {
         renderStartTime = std::chrono::system_clock::now();
+        currentMemoryUsage = 0;
+        currentRenderingDepth = 0;
         Node node = ast.type->render(*this, ast, store);
         assert(node.type == nullptr);
         auto s = node.getString();
         callback(s.data(), s.size(), data);
+        return LiquidRenderErrorType::LIQUID_RENDER_ERROR_TYPE_NONE;
     }
 
     string Renderer::render(const Node& ast, Variable store) {

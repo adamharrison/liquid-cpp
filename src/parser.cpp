@@ -206,9 +206,19 @@ namespace Liquid {
                     }
                 } else {
                     if (lastNode->type && lastNode->children.size() > 0 && !lastNode->children.back().get()) {
-                        unique_ptr<Node> node = make_unique<Node>(context.getVariableNodeType());
-                        node->children.push_back(make_unique<Node>(Variant(std::string(str, len))));
-                        parser.nodes.push_back(move(node));
+                        // Check for unray operators.
+                        std::string opName = std::string(str, len);
+                        const OperatorNodeType* op = context.getUnaryOperatorType(opName);
+                        if (op) {
+                            assert(op->fixness == OperatorNodeType::Fixness::PREFIX);
+                            unique_ptr<Node> node = make_unique<Node>(op);
+                            node->children.push_back(nullptr);
+                            parser.nodes.push_back(move(node));
+                        } else {
+                            unique_ptr<Node> node = make_unique<Node>(context.getVariableNodeType());
+                            node->children.push_back(make_unique<Node>(Variant(opName)));
+                            parser.nodes.push_back(move(node));
+                        }
                     } else {
                         // Check for operators.
                         std::string opName = std::string(str, len);
@@ -242,7 +252,7 @@ namespace Liquid {
                             parser.nodes.back()->children.push_back(nullptr);
                         } else {
                             // It's either an operator, or, if we're part of a tag, a qualifier. Check both. Operators first.
-                            const OperatorNodeType* op = context.getOperatorType(opName);
+                            const OperatorNodeType* op = context.getBinaryOperatorType(opName);
                             if (!op) {
                                 // If no operator found, check for a specified qualifier.
                                 const TagNodeType::QualifierNodeType* qualifier = nullptr;

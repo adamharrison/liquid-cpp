@@ -472,6 +472,21 @@ namespace Liquid {
         }
     };
 
+    struct UnaryMinusOperatorNode : OperatorNodeType {
+        UnaryMinusOperatorNode() : OperatorNodeType("-", Arity::UNARY, 10, Fixness::PREFIX) { }
+
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            if (op1.type)
+                return Node();
+            if (op1.variant.type == Variant::Type::INT)
+                return Variant(op1.variant.i * -1);
+            if (op1.variant.type == Variant::Type::FLOAT)
+                return Variant(op1.variant.f * -1);
+            return Node();
+        }
+    };
+
     template <class Function>
     struct NumericalComparaisonOperatorNode : OperatorNodeType {
         NumericalComparaisonOperatorNode(const std::string& symbol, int priority) : OperatorNodeType(symbol, Arity::BINARY, priority) { }
@@ -1691,6 +1706,7 @@ namespace Liquid {
         context.registerType<AssignOperator>();
         context.registerType<PlusOperatorNode>();
         context.registerType<MinusOperatorNode>();
+        context.registerType<UnaryMinusOperatorNode>();
         context.registerType<MultiplyOperatorNode>();
         context.registerType<DivideOperatorNode>();
         context.registerType<ModuloOperatorNode>();

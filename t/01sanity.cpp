@@ -58,8 +58,15 @@ TEST(sanity, addition) {
 TEST(sanity, subtraction) {
     CPPVariable variable;
     variable["a"] = 3;
-    auto ast = getParser().parse("asdbfsdf {{ a - 1 + 2 }} b");
-    auto str = getRenderer().render(ast, variable);
+    Node ast;
+    std::string str;
+
+    ast = getParser().parse("asdbfsdf {{ -a }} b");
+    str = getRenderer().render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf -3 b");
+
+    ast = getParser().parse("asdbfsdf {{ a - 1 + 2 }} b");
+    str = getRenderer().render(ast, variable);
     ASSERT_EQ(str, "asdbfsdf 4 b");
 }
 
@@ -340,8 +347,6 @@ TEST(sanity, composite) {
     CPPVariable hash, order, transaction;
     Node ast;
     std::string str;
-
-
 
     CPPVariable line_item, product, product_option1, product_option2;
     product_option1["name"] = "Color";

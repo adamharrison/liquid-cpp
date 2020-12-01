@@ -201,6 +201,8 @@ namespace Liquid {
                                     if (offset != startOfWord) {
                                         ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
                                         isNumber = false;
+                                    } else {
+                                        isWord = false;
                                     }
                                 break;
                                 case '.':

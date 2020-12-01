@@ -52,6 +52,9 @@ extern "C" {
 
     enum ELiquidRenderErrorType {
         LIQUID_RENDER_ERROR_TYPE_NONE,
+        LIQUID_RENDER_ERROR_TYPE_EXCEEDED_MEMORY,
+        LIQUID_RENDER_ERROR_TYPE_EXCEEDED_TIME,
+        LIQUID_RENDER_ERROR_TYPE_EXCEEDED_DEPTH
     };
     typedef enum ELiquidRenderErrorType LiquidRenderErrorType;
 
