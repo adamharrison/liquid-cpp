@@ -143,6 +143,9 @@ namespace Liquid {
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNBALANCED_GROUP:
                         sprintf(buffer, "Unbalanced end to group on line %lu, column %lu.", error.row, error.column);
                     break;
+                    case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_PARSE_DEPTH_EXCEEDED:
+                        sprintf(buffer, "Parse depth exceeded on line %lu, column %lu.", error.row, error.column);
+                    break;
                 }
                 message = buffer;
             }

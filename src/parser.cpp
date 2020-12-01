@@ -70,7 +70,7 @@ namespace Liquid {
                     return false;
                 }
                 parser.nodes.back()->children.push_back(nullptr);
-                parser.pushNode(make_unique<Node>(context.getGroupDereferenceNodeType()), true);
+                return parser.pushNode(make_unique<Node>(context.getGroupDereferenceNodeType()), true);
             break;
         }
         return true;
@@ -100,7 +100,7 @@ namespace Liquid {
                 return false;
             break;
             case Parser::State::ARGUMENT:
-                parser.pushNode(move(make_unique<Node>(Variant(std::string(str, len)))));
+                return parser.pushNode(move(make_unique<Node>(Variant(std::string(str, len)))));
             break;
         }
         return true;
@@ -113,7 +113,7 @@ namespace Liquid {
                 return false;
             break;
             case Parser::State::ARGUMENT: {
-                parser.pushNode(move(make_unique<Node>(Variant(i))));
+                return parser.pushNode(move(make_unique<Node>(Variant(i))));
             } break;
         }
         return true;
@@ -126,7 +126,7 @@ namespace Liquid {
                 return false;
             break;
             case Parser::State::ARGUMENT: {
-                parser.pushNode(move(make_unique<Node>(Variant(f))));
+                return parser.pushNode(move(make_unique<Node>(Variant(f))));
             } break;
         }
         return true;
@@ -176,7 +176,7 @@ namespace Liquid {
                             }
                             parser.state = Parser::State::ARGUMENT;
                             parser.pushNode(std::make_unique<Node>(type), true);
-                            parser.pushNode(std::make_unique<Node>(context.getArgumentsNodeType()), true);
+                            return parser.pushNode(std::make_unique<Node>(context.getArgumentsNodeType()), true);
                         }
                     } break;
                     case SUPER::State::OUTPUT:
@@ -208,7 +208,7 @@ namespace Liquid {
                         const OperatorNodeType* op = context.getUnaryOperatorType(opName);
                         if (op) {
                             assert(op->fixness == OperatorNodeType::Fixness::PREFIX);
-                            parser.pushNode(make_unique<Node>(op), true);
+                            return parser.pushNode(make_unique<Node>(op), true);
                         } else {
                             unique_ptr<Node> node = make_unique<Node>(context.getVariableNodeType());
                             node->children.push_back(make_unique<Node>(Variant(opName)));
@@ -306,8 +306,7 @@ namespace Liquid {
 
 
     bool Parser::Lexer::openParenthesis() {
-        parser.pushNode(make_unique<Node>(context.getGroupNodeType()), true);
-        return true;
+        return parser.pushNode(make_unique<Node>(context.getGroupNodeType()), true);
     }
     bool Parser::Lexer::closeParenthesis() {
         if (!parser.popNodeUntil(NodeType::Type::GROUP)) {
@@ -322,13 +321,14 @@ namespace Liquid {
     bool Parser::Lexer::startOutputBlock(bool suppress) {
         parser.state = Parser::State::ARGUMENT;
         parser.pushNode(make_unique<Node>(context.getOutputNodeType()), true);
-        parser.pushNode(make_unique<Node>(context.getArgumentsNodeType()), true);
-        return true;
+        return parser.pushNode(make_unique<Node>(context.getArgumentsNodeType()), true);
     }
 
     bool Parser::pushNode(unique_ptr<Node> node, bool expectingNode) {
-        if (nodes.size() > maximumParseDepth)
+        if (nodes.size() > maximumParseDepth) {
+            pushError(Parser::Error(lexer, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_PARSE_DEPTH_EXCEEDED));
             return false;
+        }
         nodes.push_back(move(node));
         if (expectingNode)
             nodes.back()->children.push_back(nullptr);

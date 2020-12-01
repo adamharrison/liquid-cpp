@@ -21,7 +21,8 @@ extern "C" {
         // Weird symbol in weird place.
         LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL,
         // Was expecting somthing else, i.e. {{ i + }}; was expecting a number there.
-        LIQUID_PARSER_ERROR_TYPE_UNBALANCED_GROUP
+        LIQUID_PARSER_ERROR_TYPE_UNBALANCED_GROUP,
+        LIQUID_PARSER_ERROR_TYPE_PARSE_DEPTH_EXCEEDED
     };
     typedef enum ELiquidParserErrorType LiquidParserErrorType;
 
