@@ -136,8 +136,8 @@ bool lpIterate(void* variable, bool (*callback)(void* variable, void* data), voi
 
 long long lpGetArraySize(void* variable) {
     dTHX;
-    if (SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
-        return false;
+    if (!SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
+        return -1;
     AV* av = (AV*)SvRV((SV*)variable);
     return av_top_index(av)+1;
 }
@@ -211,7 +211,7 @@ void* lpCreateClone(LiquidRenderer renderer, void* value) {
 
 void lpFreeVariable(LiquidRenderer renderer, void* value) {
     dTHX;
-
+    SvREFCNT_inc((SV*)value);
 }
 
 int lpCompare(void* a, void* b) {
@@ -289,22 +289,35 @@ static void lpRenderFilter(LiquidRenderer renderer, LiquidNode node, void* varia
     dTHX;
     SV* callback = (SV*)data;
 
-    SV* operand = NULL;
-    liquidFilterGetOperand((void**)&operand, renderer, node, variableStore);
+
     dSP;
 
     ENTER;
     SAVETMPS;
     PUSHMARK(SP);
 
-    EXTEND(SP, 4);
+
+    int argMax = liquidGetArgumentCount(node);
+
+    EXTEND(SP, 4+argMax);
     // Wrapped closure should look like:
     // ($package, $renderer, $hash)
     // the only thing we supply is the render, node, and hash.
     PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
     PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
     PUSHs((SV*)variableStore);
-    PUSHs(sv_2mortal((SV*)operand));
+
+    SV* operand = NULL;
+    liquidFilterGetOperand((void**)&operand, renderer, node, variableStore);
+    PUSHs(operand);
+
+
+    for (int i = 0; i < argMax; ++i) {
+        SV* arg = NULL;
+        liquidGetArgument((void**)&arg, renderer, node, variableStore, i);
+        PUSHs(arg);
+    }
+
     PUTBACK;
 
     int count = call_sv(callback, G_SCALAR);

@@ -10,6 +10,19 @@ sub operate {
 }
 
 
+package WWW::Shopify::Liquid::XS::Filter::Date;
+use parent 'WWW::Shopify::Liquid::Filter';
+
+sub min_arguments { 1; }
+
+sub operate {
+	my ($self, $hash, $operand, $format) = @_;
+	return "" unless ref($operand) eq 'DateTime';
+	return $operand->strftime($format);
+}
+
+
+
 package WWW::Shopify::Liquid::XS::Operator::Regex;
 use parent 'WWW::Shopify::Liquid::Filter';
 
@@ -121,12 +134,10 @@ my $mountain = "{% unless product.tags contains 'pre-sale' %}
 $ast = $liquid->parse_text($mountain);
 ok($ast);
 
-
 $liquid->register_filter('WWW::Shopify::Liquid::XS::Filter::Test');
 
 my $filter = $liquid->render_text({ }, '{{ "123456" | test }}');
 is($filter, "654321");
-
 
 $liquid->register_operator('WWW::Shopify::Liquid::XS::Operator::Regex');
 
@@ -176,99 +187,87 @@ $text = $liquid->render_text({
 is($text, "BASEASD|ASDBOTS");
 
 
+$text = $liquid->render_text({
+	line_item => {
+		sku => 'ASDTOPS',
+		loop_index => 0
+	},
+	order => {
+		line_items => [{
+			sku => 'ASDTOPS',
+			price => 10
+		}, {
+			sku => 'ASDBOTS',
+			price => 0
+		}]
+	}
+}, "{% if line_item.sku contains ' --- ' %}{{ line_item.sku | split: ' --- ' | last }}{% elsif order.line_items[line_item.loop_index+1] and order.line_items[line_item.loop_index+1].price == 0 %}{{ order.line_items[line_item.loop_index+1].sku }}{% endif %}");
+is($text, "ASDBOTS");
+
+
+$liquid->register_filter('WWW::Shopify::Liquid::XS::Filter::Date');
+
+$text = $liquid->render_text({
+	a => 1,
+	l => [1,2,3]
+}, "{{ l[a+1] }}{{ l[a+1] }}");
+is($text, "33");
+
+$text = $liquid->render_text({
+	order => {
+		gateway => "moneris",
+		payment_details => {
+			credit_card_company => "MasterCard"
+		}
+	}
+}, "{% if order.gateway == 'paypal' %}PayPal{% elsif order.payment_details.credit_card_company == 'Visa' %}Visa{% elsif order.payment_details.credit_card_company == 'MasterCard' %}MC{% elsif order.payment_details.credit_card_company == 'American Express' %}American Express{% else %}Void{% endif %}");
+is($text, "MC");
+
+use DateTime;
+$now = DateTime->now;
+$text = $liquid->render_text({
+	order => { fulfillments => [{ created_at => $now }] }
+}, "{{ order.fulfillments[0].created_at | date: '%m.%d.%y' }}");
+is($text, $now->strftime('%m.%d.%y'));
+
+my $block = '{% for line_item in order.line_items %}{% for property in line_item.properties %}{% if property.name == "Gift Email" and property.value == email %}{% assign li = line_item %}{% endif %}{% endfor %}{% endfor %}{{ li.id }}';
+$ast = $liquid->parse_text($block);
+my $order = {
+	line_items => [{
+		id => 1,
+		properties => [{
+			name => "Gift Email",
+			value => 'test1@gmail.com'
+		}, {
+			name => "Gift Image",
+			value => 1
+		}]
+	}, {
+		id => 2,
+		properties => [{
+			name => "Gift Email",
+			value => 'test2@gmail.com'
+		}, {
+			name => "Gift Image",
+			value => 2
+		}]
+	}]
+};
+
+
+$text = $liquid->render_ast({ order => $order, email => 'test1@gmail.com' }, $ast);
+is($text, 1);
+
+#$text = $liquid->renderer->render({ order => $order, email => 'test1@gmail.com' }, $ast);
+#is($text, 1);
+
+#$text = $liquid->renderer->render({ order => $order, email => 'test2@gmail.com' }, $ast);
+#is($text, 2);
+
+#$text = $liquid->render_text({ settings => { productspg_featured_limit => 3 } }, '{% for product in (1..10) limit: settings.productspg_featured_limit offset: 5 %}{{ forloop.index }}{% endfor %}');
+#is($text, '678');
+
 done_testing();
-
-# $text = $liquid->render_text({
-	# line_item => {
-		# sku => 'ASDTOPS',
-		# loop_index => 0
-	# },
-	# order => {
-		# line_items => [{
-			# sku => 'ASDTOPS',
-			# price => 10
-		# }, {
-			# sku => 'ASDBOTS',
-			# price => 0
-		# }]
-	# }
-# }, "{% if line_item.sku contains ' --- ' %}{{ line_item.sku | split: ' --- ' | last }}{% elsif order.line_items[line_item.loop_index+1] and order.line_items[line_item.loop_index+1].price == 0 %}{{ order.line_items[line_item.loop_index+1].sku }}{% endif %}");
-# is($text, "ASDBOTS");
-
-# $text = $liquid->render_text({
-	# a => 1,
-	# l => [1,2,3]
-# }, "{{ l[a+1] }}{{ l[a+1] }}");
-# is($text, "33");
-
-# $text = $liquid->render_text({
-	# order => {
-		# gateway => "moneris",
-		# payment_details => {
-			# credit_card_company => "MasterCard"
-		# }
-	# }
-# }, "{% if order.gateway == 'paypal' %}PayPal{% elsif order.payment_details.credit_card_company == 'Visa' %}Visa{% elsif order.payment_details.credit_card_company == 'MasterCard' %}MC{% elsif order.payment_details.credit_card_company == 'American Express' %}American Express{% else %}Void{% endif %}");
-# is($text, "MC");
-
-# use DateTime;
-# $now = DateTime->now;
-# $text = $liquid->render_text({
-	# order => { fulfillments => [{ created_at => $now }] }
-# }, "{{ order.fulfillments[0].created_at | date: '%m.%d.%y' }}");
-# is($text, $now->strftime('%m.%d.%y'));
-
-# # Big block.
-
-# my $block = '{% assign isa = orders.first.id %}
-# {{ now | date: "%y%m%d" }}*{{ now | date: "%h%m" }}*U*00400*{{ isa | sprintf: "%09d" }}*0*P*>~GS*PO*024662722*079254738*{{ now | date: "%y%m%d" }}*{{ now | date: "%h%m" }}*{{ isa }}*X*004030~
-# {% for order in orders %}
-# ST*850*{{ order.id }}~BEG*00*SA*{{ order.name }}~{% if order.payment_details %}REF*PQ*
-# {{ order.payment_details.credit_card_number | replace: " ", "" }}*{{ order.authorization }}~{% endif %}
-# {% for line_item in order.line_items %}PO1**{{line_item.quantity}}*EA*{{ line_item.price }}*EA*VN*{{ line_item.sku }}*UI*{{ line_item.barcode }}~{% endfor %}{% endfor %}SE*{{ total_segments }}~GE*1*{{ isa }}~IEA*1*{{ isa }}~';
-# @tokens = $liquid->lexer->parse_text($block);
-# $ast = $liquid->parser->parse_tokens(@tokens);
-
-# $block = "{% for note in order.note_attributes %}{% if note.name == 'Edition' %}{% assign notes = note.value | split: '\n' %}{% for line in notes %}{% if line contains line_item.title %}{% assign parts = line | split: 'edition: ' %}{{ parts | last }}{% endif %}{% endfor %}{% endif %}{% endfor %}";
-# @tokens = $liquid->lexer->parse_text($block);
-# $ast = $liquid->parser->parse_tokens(@tokens);
-# isa_ok($tokens[2], 'WWW::Shopify::Liquid::Token::Tag');
-# is($tokens[2]->tag, 'assign');
-
-# $block = '{% for line_item in order.line_items %}{% for property in line_item.properties %}{% if property.name == "Gift Email" and property.value == email %}{% assign li = line_item %}{% endif %}{% endfor %}{% endfor %}{{ li.id }}';
-# @tokens = $liquid->lexer->parse_text($block);
-# $ast = $liquid->parser->parse_tokens(@tokens);
-# my $order = {
-	# line_items => [{
-		# id => 1,
-		# properties => [{
-			# name => "Gift Email",
-			# value => 'test1@gmail.com'
-		# }, {
-			# name => "Gift Image",
-			# value => 1
-		# }]
-	# }, {
-		# id => 2,
-		# properties => [{
-			# name => "Gift Email",
-			# value => 'test2@gmail.com'
-		# }, {
-			# name => "Gift Image",
-			# value => 2
-		# }]
-	# }]
-# };
-
-
-# $text = $liquid->renderer->render({ order => $order, email => 'test1@gmail.com' }, $ast);
-# is($text, 1);
-
-# $text = $liquid->renderer->render({ order => $order, email => 'test2@gmail.com' }, $ast);
-# is($text, 2);
-
-# $text = $liquid->render_text({ settings => { productspg_featured_limit => 3 } }, '{% for product in (1..10) limit: settings.productspg_featured_limit offset: 5 %}{{ forloop.index }}{% endfor %}');
-# is($text, '678');
 
 # my $pattern = "{{ a | replace: \"\r\n\", \"\" }}";
 # @tokens = $liquid->parse_text($pattern);
