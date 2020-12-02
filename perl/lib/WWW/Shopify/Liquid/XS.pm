@@ -171,8 +171,8 @@ sub render_ast {
 
 sub register_tag {
     my ($self, $tag) = @_;
-    die "Requies tag to have an operate sub; currently custom processing is not supported." unless $tag->can('operate');
-    WWW::Shopify::Liquid::XS::registerTag($self->{context}, $tag->name, ($tag->is_enclosing ? "enclosing" : "free"), $tag->min_arguments, (defined $tag->max_arguments ? $tag->max_arguments : -1), sub {
+    die WWW::Shopify::Liquid::XS::Exception->new("Requies tag to have an operate sub; currently custom processing is not supported.") unless $tag->can('operate');
+    die WWW::Shopify::Liquid::XS::Exception->new("Can't register tag '" . $tag->name . "'.") unless WWW::Shopify::Liquid::XS::registerTag($self->{context}, $tag->name, ($tag->is_enclosing ? "enclosing" : "free"), $tag->min_arguments, (defined $tag->max_arguments ? $tag->max_arguments : -1), sub {
         my ($renderer, $node, $hash, @arguments) = @_;
         if ($tag->is_enclosing) {
             my $content = WWW::Shopify::Liquid::XS::getContents($renderer->{renderer}, $node, 0, $hash);
@@ -181,17 +181,29 @@ sub register_tag {
             my $result = $tag->operate($hash, @arguments);
             return $result;
         }
-    });
+    }) == 0;
 }
 
 sub register_filter {
     my ($self, $filter) = @_;
-    die "Requies filter to have an operate sub; currently custom processing is not supported." unless $filter->can('operate');
-    WWW::Shopify::Liquid::XS::registerFilter($self->{context}, $filter->name, $filter->min_arguments, (defined $filter->max_arguments ? $filter->max_arguments : -1), sub {
+    die WWW::Shopify::Liquid::XS::Exception->new("Requires filter to have an operate sub; currently custom processing is not supported.") unless $filter->can('operate');
+    die WWW::Shopify::Liquid::XS::Exception->new("Can't register filter '" . $filter->name . "'.") unless WWW::Shopify::Liquid::XS::registerFilter($self->{context}, $filter->name, $filter->min_arguments, (defined $filter->max_arguments ? $filter->max_arguments : -1), sub {
         my ($renderer, $node, $hash, $operand, @arguments) = @_;
         my $result = $filter->operate($hash, $operand, @arguments);
         return $result;
-    });
+    }) == 0;
+}
+
+
+sub register_operator {
+    my ($self, $operator) = @_;
+    die WWW::Shopify::Liquid::XS::Exception->new("Requires operator to have an operate sub; currently custom processing is not supported.") unless $operator->can('operate');
+
+    die WWW::Shopify::Liquid::XS::Exception->new("Can't register operator '" . $operator->symbol. "'.") unless WWW::Shopify::Liquid::XS::registerOperator($self->{context}, $operator->symbol, $operator->arity, $operator->fixness, $operator->priority, sub {
+        my ($renderer, $node, $hash, @operands) = @_;
+        my $result = $operator->operate($hash, @operands);
+        return $result;
+    }) == 0;
 }
 
 

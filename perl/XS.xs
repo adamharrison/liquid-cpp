@@ -219,6 +219,36 @@ int lpCompare(void* a, void* b) {
     return 0;
 }
 
+void lpSetReturnValue(PerlInterpreter* my_perl, LiquidRenderer renderer, SV* sv) {
+    switch (lpGetType((void*)sv)) {
+        case LIQUID_VARIABLE_TYPE_STRING: {
+            STRLEN len;
+            const char *s = SvPV(sv, len);
+            liquidRendererSetReturnValueString(renderer, s, len);
+        } break;
+        case LIQUID_VARIABLE_TYPE_BOOL: {
+            bool b;
+            lpGetBool(sv, &b);
+            liquidRendererSetReturnValueBool(renderer, b);
+        } break;
+        case LIQUID_VARIABLE_TYPE_NIL: {
+            liquidRendererSetReturnValueNil(renderer);
+        } break;
+        case LIQUID_VARIABLE_TYPE_FLOAT: {
+            double f;
+            lpGetFloat(sv, &f);
+            liquidRendererSetReturnValueBool(renderer, f);
+        } break;
+        case LIQUID_VARIABLE_TYPE_INT: {
+            long long i;
+            lpGetInteger(sv, &i);
+            liquidRendererSetReturnValueInteger(renderer, i);
+        } break;
+        default:{
+            liquidRendererSetReturnValueVariable(renderer, sv);
+        } break;
+    }
+}
 
 static void lpRenderTag(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
     dTHX;
@@ -244,10 +274,8 @@ static void lpRenderTag(LiquidRenderer renderer, LiquidNode node, void* variable
     SPAGAIN;
 
     if (count > 0) {
-        STRLEN len;
         SV *sv = POPs;
-        const char *s = SvPV(sv, len);
-        liquidRendererSetReturnValueString(renderer, s, len);
+        lpSetReturnValue(my_perl, renderer, sv);
     } else {
         liquidRendererSetReturnValueNil(renderer);
     }
@@ -261,10 +289,8 @@ static void lpRenderFilter(LiquidRenderer renderer, LiquidNode node, void* varia
     dTHX;
     SV* callback = (SV*)data;
 
-    // Get the oeprand.
     SV* operand = NULL;
-    liquidFilterGetOperand(&operand, renderer, node, variableStore);
-
+    liquidFilterGetOperand((void**)&operand, renderer, node, variableStore);
     dSP;
 
     ENTER;
@@ -286,10 +312,51 @@ static void lpRenderFilter(LiquidRenderer renderer, LiquidNode node, void* varia
     SPAGAIN;
 
     if (count > 0) {
-        STRLEN len;
         SV *sv = POPs;
-        const char *s = SvPV(sv, len);
-        liquidRendererSetReturnValueString(renderer, s, len);
+        lpSetReturnValue(my_perl, renderer, sv);
+    } else {
+        liquidRendererSetReturnValueNil(renderer);
+    }
+
+    FREETMPS;
+    LEAVE;
+}
+
+
+static void lpRenderBinaryInfixOperator(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
+    dTHX;
+    SV* callback = (SV*)data;
+    SV* op1 = NULL;
+    SV* op2 = NULL;
+
+    liquidGetChild((void**)&op1, renderer, node, variableStore, 0);
+    liquidGetChild((void**)&op2, renderer, node, variableStore, 1);
+
+
+    dSP;
+
+    ENTER;
+    SAVETMPS;
+    PUSHMARK(SP);
+
+    EXTEND(SP, 5);
+    // Wrapped closure should look like:
+    // ($package, $renderer, $hash)
+    // the only thing we supply is the render, node, and hash.
+    PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
+    PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
+    PUSHs((SV*)variableStore);
+    PUSHs(sv_2mortal((SV*)op1));
+    PUSHs(sv_2mortal((SV*)op2));
+    PUTBACK;
+
+    int count = call_sv(callback, G_ARRAY);
+
+    SPAGAIN;
+
+    if (count > 0) {
+        SV *sv = POPs;
+        lpSetReturnValue(my_perl, renderer, sv);
     } else {
         liquidRendererSetReturnValueNil(renderer);
     }
@@ -376,6 +443,7 @@ createTemplate(context, str, error)
                 av_push(av, newSVnv(parserError.row));
                 av_push(av, newSVnv(parserError.column));
                 av_push(av, newSVpvn(parserError.message, strlen(parserError.message)));
+                RETVAL = NULL;
             }
         }
     OUTPUT:
@@ -450,6 +518,28 @@ registerFilter(context, symbol, minArguments, maxArguments, renderFunction)
     CODE:
         if (SvROK(renderFunction) && SvTYPE(SvRV(renderFunction)) == SVt_PVCV) {
             liquidRegisterFilter(*(LiquidContext*)&context, symbol, minArguments, maxArguments, lpRenderFilter, SvREFCNT_inc(renderFunction));
+            RETVAL = 0;
+        } else {
+            RETVAL = -1;
+        }
+    OUTPUT:
+        RETVAL
+
+int
+registerOperator(context, symbol, arity, fixness, priority, renderFunction)
+    void* context;
+    const char* symbol;
+    const char* arity;
+    const char* fixness;
+    int priority;
+    SV* renderFunction;
+    CODE:
+        if (SvROK(renderFunction) && SvTYPE(SvRV(renderFunction)) == SVt_PVCV) {
+            LiquidOperatorArity eArity = strcmp(arity, "unary") == 0 ? LIQUID_OPERATOR_ARITY_UNARY : (strcmp(arity, "binary") == 0 ? LIQUID_OPERATOR_ARITY_BINARY : (strcmp(arity, "nonary") == 0 ? LIQUID_OPERATOR_ARITY_NONARY : LIQUID_OPERATOR_ARITY_NARY));
+            LiquidOperatorFixness eFixness = (strcmp(fixness, "prefix") == 0 ? LIQUID_OPERATOR_FIXNESS_PREFIX : (strcmp(fixness, "affix") == 0 ? LIQUID_OPERATOR_FIXNESS_AFFIX : LIQUID_OPERATOR_FIXNESS_INFIX));
+            assert(eArity == LIQUID_OPERATOR_ARITY_BINARY);
+            assert(eFixness == LIQUID_OPERATOR_FIXNESS_INFIX);
+            liquidRegisterOperator(*(LiquidContext*)&context, symbol, eArity, eFixness, priority, lpRenderBinaryInfixOperator, SvREFCNT_inc(renderFunction));
             RETVAL = 0;
         } else {
             RETVAL = -1;

@@ -1,9 +1,28 @@
+use strict;
+use warnings;
+
 package WWW::Shopify::Liquid::XS::Filter::Test;
 use parent 'WWW::Shopify::Liquid::Filter';
 
 sub operate {
 	my ($self, $hash, $operand) = @_;
 	return reverse($operand);
+}
+
+
+package WWW::Shopify::Liquid::XS::Operator::Regex;
+use parent 'WWW::Shopify::Liquid::Filter';
+
+sub symbol { '=~' }
+sub arity { "binary" }
+sub fixness { "infix" }
+sub priority { 10; }
+
+sub operate {
+	my ($self, $hash, $operand, $regex) = @_;
+    my @groups = $operand =~ m/$regex/;
+    return undef if int(@groups) == 0;
+    return \@groups;
 }
 
 package main;
@@ -102,19 +121,19 @@ my $mountain = "{% unless product.tags contains 'pre-sale' %}
 $ast = $liquid->parse_text($mountain);
 ok($ast);
 
+
 $liquid->register_filter('WWW::Shopify::Liquid::XS::Filter::Test');
 
-#my $filter = $liquid->render_text('{{ "123456" | test }}');
-#is($filter, "654321");
+my $filter = $liquid->render_text({ }, '{{ "123456" | test }}');
+is($filter, "654321");
 
 
-done_testing();
+$liquid->register_operator('WWW::Shopify::Liquid::XS::Operator::Regex');
 
-
-# my $text = $liquid->render_text({ product => {
-	# tags => "test, asd3, asiojdofs, 43266356, adfssdf, 139847, tags, tag2, 2teasf, thirdtag, 100"
-# } }, "{% assign tags = product.tags | split: ', ' %}{% assign is_first = 1 %}{% for tag in tags %}{% if tag =~ '^\\d+\$' %}{% unless is_first %}, {% endunless %}{% assign is_first = 0 %}{{ tag }}{% endif %}{% endfor %}");
-# is($text, "43266356, 139847, 100");
+my $text = $liquid->render_text({ product => {
+	tags => "test, asd3, asiojdofs, 43266356, adfssdf, 139847, tags, tag2, 2teasf, thirdtag, 100"
+} }, "{% assign tags = product.tags | split: ', ' %}{% assign is_first = 1 %}{% for tag in tags %}{% if tag =~ '^\\d+\$' %}{% unless is_first %}, {% endunless %}{% assign is_first = 0 %}{{ tag }}{% endif %}{% endfor %}");
+is($text, "43266356, 139847, 100");
 
 # $text = $liquid->render_text({
 	# variant => { id => 1, option1 => "Red", option2 => "Large", option3 => "Silk"},
@@ -155,6 +174,8 @@ done_testing();
 	# }
 # }, "{% if line_item.sku contains ' --- ' %}{{ line_item.sku | split: ' --- ' | last }}{% else %}{% assign base = (line_item.sku =~ '^(\\w+)TOP') %}BASE{{ base[0] }}|{% for line in order.line_items %}{% if line.sku != line_item.sku and line.sku contains base[0] %}{{ line.sku }}{% endif %}{% endfor %}{% endif %}");
 # is($text, "BASEASD|ASDBOTS");
+
+done_testing();
 
 # $text = $liquid->render_text({
 	# line_item => {
