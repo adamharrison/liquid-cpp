@@ -40,6 +40,11 @@ namespace Liquid {
         }
         virtual Parser::Error validate(const Context& context, const Node& node) const { return Parser::Error(); }
         virtual void optimize(const Context& context, Node& node, Variable store) const { }
+
+        Node getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const;
+        int getArgumentCount(const Node& node) const;
+        Node getChild(Renderer& renderer, const Node& node, Variable store, int idx) const;
+        int getChildCount(const Node& node) const;
     };
 
     struct TagNodeType : NodeType {
@@ -136,7 +141,6 @@ namespace Liquid {
 
 
         Node getOperand(Renderer& renderer, const Node& node, Variable store) const;
-        Node getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const;
     };
 
 

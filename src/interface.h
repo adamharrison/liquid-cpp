@@ -79,12 +79,14 @@ extern "C" {
         LIQUID_OPERATOR_ARITY_BINARY,
         LIQUID_OPERATOR_ARITY_NARY
     };
+    typedef enum ELiquidOperatorArity LiquidOperatorArity;
 
     enum ELiquidOperatorFixness {
         LIQUID_OPERATOR_FIXNESS_PREFIX,
         LIQUID_OPERATOR_FIXNESS_INFIX,
         LIQUID_OPERATOR_FIXNESS_AFFIX
     };
+    typedef enum ELiquidOperatorFixness LiquidOperatorFixness;
 
     struct SLiquidContext {
         void* context;
@@ -171,6 +173,7 @@ extern "C" {
 
     LiquidRenderer liquidCreateRenderer(LiquidContext context);
     void liquidRendererSetReturnValueNil(LiquidRenderer renderer);
+    void liquidRendererSetReturnValueBool(LiquidRenderer renderer, bool b);
     void liquidRendererSetReturnValueString(LiquidRenderer renderer, const char* s, int length);
     void liquidRendererSetReturnValueInteger(LiquidRenderer renderer, long long i);
     void liquidRendererSetReturnValueFloat(LiquidRenderer renderer, double f);
@@ -192,14 +195,16 @@ extern "C" {
 
     void liquidFilterGetOperand(void** targetVariable, LiquidRenderer renderer, LiquidNode filter, void* variableStore);
     void liquidGetArgument(void** targetVariable, LiquidRenderer renderer, LiquidNode node, void* variableStore, int idx);
+    void liquidGetChild(void** targetVariable, LiquidRenderer renderer, LiquidNode node, void* variablestore, int idx);
     int liquidGetArgumentCount(LiquidNode node);
+    int liquidGetChildCount(LiquidNode node);
     typedef void (*LiquidRenderFunction)(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data);
 
     // Passing -1 to min/maxArguments means no min or max.
     void liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data);
     void liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data);
-    void liquidRegisterDotFilter(LiquidContext context, const char* symbol, LiquidRenderFunction renderFunction);
-    void liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity airty, enum ELiquidOperatorFixness fixness, int priority, LiquidRenderFunction renderFunction);
+    void liquidRegisterDotFilter(LiquidContext context, const char* symbol, LiquidRenderFunction renderFunction, void* data);
+    void liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity arity, enum ELiquidOperatorFixness fixness, int priority, LiquidRenderFunction renderFunction, void* data);
     void liquidRegisterVariableResolver(LiquidContext context, LiquidVariableResolver resolver);
 
 #ifdef __cplusplus

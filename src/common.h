@@ -147,7 +147,8 @@ namespace Liquid {
                 (type == Variant::Type::INT && !i) ||
                 (type == Variant::Type::FLOAT && !f) ||
                 (type == Variant::Type::POINTER && !p) ||
-                (type == Variant::Type::NIL)
+                (type == Variant::Type::NIL) ||
+                (type == Variant::Type::STRING && s.size() == 0)
             );
         }
 

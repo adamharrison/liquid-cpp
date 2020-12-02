@@ -135,45 +135,46 @@ my $text = $liquid->render_text({ product => {
 } }, "{% assign tags = product.tags | split: ', ' %}{% assign is_first = 1 %}{% for tag in tags %}{% if tag =~ '^\\d+\$' %}{% unless is_first %}, {% endunless %}{% assign is_first = 0 %}{{ tag }}{% endif %}{% endfor %}");
 is($text, "43266356, 139847, 100");
 
-# $text = $liquid->render_text({
-	# variant => { id => 1, option1 => "Red", option2 => "Large", option3 => "Silk"},
-	# product => {
-		# variants => [{ id => 1, option1 => "Red", option2 => "Large", option3 => "Silk"}],
-		# options => [{ name => "Material", position => 3 }, { name => "Color", position => 1 }, { name => "Size", position => 2 }]
-	# }
-# }, "{% assign color = 1 %}{% if color %}{{ variant['option' + color] }}{% else %}B{% endif %}");
-# is($text, "Red");
+$text = $liquid->render_text({
+	variant => { id => 1, option1 => "Red", option2 => "Large", option3 => "Silk"},
+	product => {
+		variants => [{ id => 1, option1 => "Red", option2 => "Large", option3 => "Silk"}],
+		options => [{ name => "Material", position => 3 }, { name => "Color", position => 1 }, { name => "Size", position => 2 }]
+	}
+}, "{% assign color = 1 %}{% if color %}{{ variant['option' + color] }}{% else %}B{% endif %}");
+is($text, "Red");
 
-# $text = $liquid->render_text({
-	# line_item => {
-		# sku => 'ASDTOPS',
-		# loop_index => 0
-	# },
-	# order => {
-		# line_items => [{
-			# sku => 'ASDTOPS',
-			# price => 10
-		# }, {
-			# sku => 'ASDBOTS',
-			# price => 0
-		# }]
-	# }
-# }, "{{ order.line_items[line_item.loop_index].sku }}");
-# is($text, "ASDTOPS");
+$text = $liquid->render_text({
+	line_item => {
+		sku => 'ASDTOPS',
+		loop_index => 0
+	},
+	order => {
+		line_items => [{
+			sku => 'ASDTOPS',
+			price => 10
+		}, {
+			sku => 'ASDBOTS',
+			price => 0
+		}]
+	}
+}, "{{ order.line_items[line_item.loop_index].sku }}");
+is($text, "ASDTOPS");
 
-# $text = $liquid->render_text({
-	# line_item => {
-		# sku => 'ASDTOPS'
-	# },
-	# order => {
-		# line_items => [{
-			# sku => 'ASDTOPS'
-		# }, {
-			# sku => 'ASDBOTS'
-		# }]
-	# }
-# }, "{% if line_item.sku contains ' --- ' %}{{ line_item.sku | split: ' --- ' | last }}{% else %}{% assign base = (line_item.sku =~ '^(\\w+)TOP') %}BASE{{ base[0] }}|{% for line in order.line_items %}{% if line.sku != line_item.sku and line.sku contains base[0] %}{{ line.sku }}{% endif %}{% endfor %}{% endif %}");
-# is($text, "BASEASD|ASDBOTS");
+$text = $liquid->render_text({
+	line_item => {
+		sku => 'ASDTOPS'
+	},
+	order => {
+		line_items => [{
+			sku => 'ASDTOPS'
+		}, {
+			sku => 'ASDBOTS'
+		}]
+	}
+}, "{% if line_item.sku contains ' --- ' %}{{ line_item.sku | split: ' --- ' | last }}{% else %}{% assign base = (line_item.sku =~ '^(\\w+)TOP') %}BASE{{ base[0] }}|{% for line in order.line_items %}{% if line.sku != line_item.sku and line.sku contains base[0] %}{{ line.sku }}{% endif %}{% endfor %}{% endif %}");
+is($text, "BASEASD|ASDBOTS");
+
 
 done_testing();
 

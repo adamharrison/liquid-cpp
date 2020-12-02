@@ -30,6 +30,8 @@ void liquidFreeRenderer(LiquidRenderer renderer) {
 LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size, LiquidParserError* error) {
     Parser parser(*static_cast<Context*>(context.context));
     Node tmpl;
+    if (error)
+        error->type = LiquidParserErrorType::LIQUID_PARSER_ERROR_TYPE_NONE;
     try {
         tmpl = parser.parse(buffer, size);
     } catch (Parser::Exception& exp) {
@@ -64,6 +66,15 @@ void liquidRegisterFilter(LiquidContext context, const char* symbol, int minArgu
     ctx->registerType(move(registeredType));
 }
 
+void liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity arity, enum ELiquidOperatorFixness fixness, int priority, LiquidRenderFunction renderFunction, void* data) {
+    Context* ctx = static_cast<Context*>(context.context);
+    unique_ptr<NodeType> registeredType = make_unique<OperatorNodeType>(symbol, (OperatorNodeType::Arity)arity, priority, (OperatorNodeType::Fixness)fixness);
+    registeredType->userRenderFunction = renderFunction;
+    registeredType->userData = data;
+    ctx->registerType(move(registeredType));
+}
+
+
 void liquidFilterGetOperand(void** targetVariable, LiquidRenderer lRenderer, LiquidNode filter, void* variableStore) {
     Renderer& renderer = *static_cast<Renderer*>(lRenderer.renderer);
     const Node& node = *static_cast<Node*>(filter.node);
@@ -75,12 +86,53 @@ void liquidFilterGetOperand(void** targetVariable, LiquidRenderer lRenderer, Liq
     }
 }
 
+
+void liquidGetArgument(void** targetVariable, LiquidRenderer lRenderer, LiquidNode parent, void* variableStore, int idx) {
+    Renderer& renderer = *static_cast<Renderer*>(lRenderer.renderer);
+    const Node& node = *static_cast<Node*>(parent.node);
+
+    Node arg = static_cast<const NodeType*>(node.type)->getArgument(renderer, node, variableStore, idx);
+    if (!arg.type) {
+        Variable v;
+        renderer.inject(v, arg.variant);
+        *targetVariable = v;
+    }
+}
+
+int liquidGetArgumentCount(LiquidNode parent) {
+    const Node& node = *static_cast<Node*>(parent.node);
+    return static_cast<const NodeType*>(node.type)->getArgumentCount(node);
+}
+
+
+void liquidGetChild(void** targetVariable, LiquidRenderer lRenderer, LiquidNode parent, void* variableStore, int idx) {
+    Renderer& renderer = *static_cast<Renderer*>(lRenderer.renderer);
+    const Node& node = *static_cast<Node*>(parent.node);
+
+    Node child = static_cast<const NodeType*>(node.type)->getChild(renderer, node, variableStore, idx);
+    if (!child.type) {
+        Variable v;
+        renderer.inject(v, child.variant);
+        *targetVariable = v;
+    }
+}
+
+int liquidGetChildCount(LiquidNode parent) {
+    const Node& node = *static_cast<Node*>(parent.node);
+    return static_cast<const NodeType*>(node.type)->getChildCount(node);
+}
+
+
 void liquidRendererSetReturnValueString(LiquidRenderer renderer, const char* s, int length) {
     static_cast<Renderer*>(renderer.renderer)->returnValue = move(Variant(string(s, length)));
 }
 
 void liquidRendererSetReturnValueNil(LiquidRenderer renderer) {
     static_cast<Renderer*>(renderer.renderer)->returnValue = Variant();
+}
+
+void liquidRendererSetReturnValueBool(LiquidRenderer renderer, bool b) {
+    static_cast<Renderer*>(renderer.renderer)->returnValue = Variant(b);
 }
 
 void liquidRendererSetReturnValueInteger(LiquidRenderer renderer, long long i) {

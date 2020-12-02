@@ -10,11 +10,25 @@ namespace Liquid {
     }
 
 
-    Node FilterNodeType::getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const {
+    Node NodeType::getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const {
         if (idx >= (int)node.children[1]->children.size())
             return Node();
+        assert(node.children[1]->type->type == NodeType::Type::ARGUMENTS);
         return renderer.retrieveRenderedNode(*node.children[1]->children[idx].get(), store);
     }
+    int NodeType::getArgumentCount(const Node& node) const {
+        return node.children[1]->children.size();
+    }
+
+    Node NodeType::getChild(Renderer& renderer, const Node& node, Variable store, int idx) const {
+        if (idx >= (int)node.children.size())
+            return Node();
+        return renderer.retrieveRenderedNode(*node.children[idx].get(), store);
+    }
+    int NodeType::getChildCount(const Node& node) const {
+        return node.children.size();
+    }
+
 
     Node Context::ConcatenationNode::render(Renderer& renderer, const Node& node, Variable store) const {
         string s;

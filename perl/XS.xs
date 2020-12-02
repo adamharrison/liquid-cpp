@@ -245,7 +245,7 @@ void lpSetReturnValue(PerlInterpreter* my_perl, LiquidRenderer renderer, SV* sv)
             liquidRendererSetReturnValueInteger(renderer, i);
         } break;
         default:{
-            liquidRendererSetReturnValueVariable(renderer, sv);
+            liquidRendererSetReturnValueVariable(renderer, SvREFCNT_inc(sv));
         } break;
     }
 }

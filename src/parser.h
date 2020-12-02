@@ -16,6 +16,8 @@ namespace Liquid {
             typedef LiquidParserErrorType Type;
 
             Error() {
+                column = 0;
+                row = 0;
                 type = Type::LIQUID_PARSER_ERROR_TYPE_NONE;
                 message[0] = 0;
             }

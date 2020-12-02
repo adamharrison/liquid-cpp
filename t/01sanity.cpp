@@ -348,7 +348,21 @@ TEST(sanity, composite) {
     Node ast;
     std::string str;
 
-    CPPVariable line_item, product, product_option1, product_option2;
+    CPPVariable line_item, line_item1, line_item2, product, product_option1, product_option2, product_option3;
+
+
+
+    line_item1["sku"] = "ASDTOPS";
+    line_item2["sku"] = "ASDBOTS";
+    order["line_items"] = { line_item1, line_item2 };
+    hash["order"] = move(order);
+    hash["line_item"] = line_item1;
+
+
+    ast = getParser().parse("{% if line_item.sku contains ' --- ' %}{{ line_item.sku | split: ' --- ' | last }}{% else %}{% assign base = \"ASD\" %}BASE{{ base }}|{% for line in order.line_items %}{% if line.sku != line_item.sku and line.sku contains base %}{{ line.sku }}{% endif %}{% endfor %}{% endif %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "BASEASD|ASDBOTS");
+
     product_option1["name"] = "Color";
     product_option2["name"] = "Size";
     product["options"] = CPPVariable({ product_option1, product_option2 });
@@ -359,6 +373,31 @@ TEST(sanity, composite) {
     ast = getParser().parse("{% for i in (0..2) %}{% if line_item.product.options[i].name == \"Color\" %}{% assign groups = line_item.variant_title | split: \" / \" %}{{ groups[i] }}{% endif %}{% endfor %}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "Red");
+
+
+    CPPVariable variant;
+    variant["id"] = 1;
+    variant["option1"] = "Red";
+    variant["option2"] = "Large";
+    variant["option3"] = "Silk";
+    product = CPPVariable();
+    product["variants"] = { variant };
+    product_option1["name"] = "Material";
+    product_option1["position"] = 3;
+    product_option2["name"] = "Color";
+    product_option2["position"] = 1;
+    product_option3["name"] = "Size";
+    product_option3["position"] = 2;
+    product["options"] = { product_option1, product_option2, product_option3 };
+    hash["variant"] = move(variant);
+    hash["product"] = move(product);
+
+    ast = getParser().parse("{% assign color = 1 %}{% if color %}{{ variant['option1'] }}{{ variant['option' + color] }}{% else %}B{% endif %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "RedRed");
+
+
+
 
 
     transaction["id"] = 12445324;

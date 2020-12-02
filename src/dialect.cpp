@@ -96,7 +96,6 @@ namespace Liquid {
             auto& arguments = node.children.front();
             auto result = renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
             assert(result.type == nullptr);
-
             bool truthy = result.variant.isTruthy();
             if (Inverse)
                 truthy = !truthy;
@@ -430,6 +429,11 @@ namespace Liquid {
                         case Variant::Type::FLOAT:
                             return Node(Variant(operate(op1.variant.i, op2.variant.f)));
                         break;
+                        case Variant::Type::STRING:
+                            if (symbol != "+")
+                                return Node();
+                            return Node(op1.variant.getString() + op2.variant.getString());
+                        break;
                         default:
                         break;
                     }
@@ -442,9 +446,19 @@ namespace Liquid {
                         case Variant::Type::FLOAT:
                             return Node(Variant(operate(op1.variant.f, op2.variant.f)));
                         break;
+                        case Variant::Type::STRING:
+                            if (symbol != "+")
+                                return Node();
+                            return Node(op1.variant.getString() + op2.variant.getString());
+                        break;
                         default:
                         break;
                     }
+                break;
+                case Variant::Type::STRING:
+                    if (symbol != "+")
+                        return Node();
+                    return Node(op1.variant.getString() + op2.variant.getString());
                 break;
                 default:
                 break;
@@ -542,6 +556,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+
             if (op1.type || op2.type)
                 return Node();
             switch (op1.variant.type) {
@@ -572,7 +587,7 @@ namespace Liquid {
                 break;
                 case Variant::Type::STRING:
                     if (op2.variant.type != Variant::Type::STRING)
-                        return Node(Variant(false));
+                        return Node(Variant(true));
                     return Node(Variant(operate(op1.variant.s, op2.variant.s)));
                 break;
                 default:
@@ -597,7 +612,8 @@ namespace Liquid {
             if (op1.type || !op1.variant.isTruthy())
                 return Node(Variant(false));
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            return Node(Variant(!op2.type && op2.variant.isTruthy()));
+            Variant ret = Variant(!op2.type && op2.variant.isTruthy());
+            return Node(ret);
         }
     };
     struct OrOperatorNode : OperatorNodeType {
@@ -614,14 +630,15 @@ namespace Liquid {
 
 
     struct ContainsOperatorNode : OperatorNodeType {
-        ContainsOperatorNode() : OperatorNodeType("contains", Arity::BINARY, 1) { }
+        ContainsOperatorNode() : OperatorNodeType("contains", Arity::BINARY, 2) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            if (!op1.type)
+            if (op1.type)
                 return Node();
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            if (!op2.type || op2.variant.type != Variant::Type::STRING)
+
+            if (op2.type || op2.variant.type != Variant::Type::STRING)
                 return Node();
             switch (op1.variant.type) {
                 case Variant::Type::STRING:
