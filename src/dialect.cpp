@@ -99,7 +99,6 @@ namespace Liquid {
             bool truthy = result.variant.isTruthy();
             if (Inverse)
                 truthy = !truthy;
-
             if (truthy)
                 return renderer.retrieveRenderedNode(*node.children[1].get(), store);
             else {
@@ -350,6 +349,9 @@ namespace Liquid {
                 limit = forLoopContext.length;
             else if (limit < 0)
                 limit = std::max((int)(limit+forLoopContext.length), 0);
+
+            forLoopContext.idx = start;
+
             if (result.variant.type == Variant::Type::ARRAY) {
                 int endIndex = std::min(limit+start-1, (int)forLoopContext.length-1);
                 if (reversed) {

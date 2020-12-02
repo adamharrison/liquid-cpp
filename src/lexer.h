@@ -34,6 +34,7 @@ namespace Liquid {
                 this->row = lexer.row;
                 this->column = lexer.column;
                 this->type = type;
+                message[0] = 0;
             }
             Error(Lexer& lexer, Type type, const std::string& message) {
                 this->row = lexer.row;

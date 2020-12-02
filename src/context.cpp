@@ -17,6 +17,7 @@ namespace Liquid {
         return renderer.retrieveRenderedNode(*node.children[1]->children[idx].get(), store);
     }
     int NodeType::getArgumentCount(const Node& node) const {
+        assert(node.children[1]->type->type == NodeType::Type::ARGUMENTS);
         return node.children[1]->children.size();
     }
 

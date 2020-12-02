@@ -113,7 +113,7 @@ namespace Liquid {
             new(&this->d) unordered_map<string, unique_ptr<CPPVariable>>();
             type = LIQUID_VARIABLE_TYPE_DICTIONARY;
             for (auto it = d.begin(); it != d.end(); ++it)
-                this->d[it->first] = make_unique<CPPVariable>(*it->second);
+                this->d[it->first] = make_unique<CPPVariable>(*it->second.get());
         }
         void assign(const CPPVariable& v) {
             clear();

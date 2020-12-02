@@ -12,6 +12,15 @@ namespace Liquid {
     bool Parser::Lexer::colon() {
         if (parser.filterState == Parser::EFilterState::COLON) {
             parser.filterState = Parser::EFilterState::ARGUMENTS;
+            parser.nodes.back()->children.push_back(nullptr);
+            return true;
+        }
+        if (parser.nodes.back()->type && parser.nodes.back()->type->type == NodeType::Type::QUALIFIER) {
+            if (static_cast<const TagNodeType::QualifierNodeType*>(parser.nodes.back()->type)->arity == TagNodeType::QualifierNodeType::Arity::NONARY) {
+                parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_OPERAND, parser.nodes.back()->type->symbol));
+                return false;
+            }
+            parser.nodes.back()->children.push_back(nullptr);
             return true;
         }
         if (parser.nodes.back()->type != context.getVariableNodeType() || parser.nodes.back()->children.size() != 1) {
@@ -145,8 +154,7 @@ namespace Liquid {
                                 parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_TAG, std::string(str, len)));
                                 return false;
                             }
-                            parser.popNodeUntil(NodeType::Type::TAG);
-                            if (parser.nodes.back()->type != type) {
+                            if (!parser.popNodeUntil(NodeType::Type::TAG) || parser.nodes.back()->type != type) {
                                 parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END, std::string(str, len)));
                                 return false;
                             }
@@ -175,8 +183,7 @@ namespace Liquid {
                                 return false;
                             }
                             parser.state = Parser::State::ARGUMENT;
-                            parser.pushNode(std::make_unique<Node>(type), true);
-                            return parser.pushNode(std::make_unique<Node>(context.getArgumentsNodeType()), true);
+                            return parser.pushNode(std::make_unique<Node>(type), true) && parser.pushNode(std::make_unique<Node>(context.getArgumentsNodeType()), true);
                         }
                     } break;
                     case SUPER::State::OUTPUT:
@@ -244,7 +251,6 @@ namespace Liquid {
                             operatorNode->children.push_back(nullptr);
                             parser.nodes.back() = move(operatorNode);
                             parser.nodes.push_back(std::make_unique<Node>(context.getArgumentsNodeType()));
-                            parser.nodes.back()->children.push_back(nullptr);
                         } else {
                             // It's either an operator, or, if we're part of a tag, a qualifier. Check both. Operators first.
                             const OperatorNodeType* op = context.getBinaryOperatorType(opName);
@@ -272,9 +278,8 @@ namespace Liquid {
                                 }
                                 parser.popNodeUntil(NodeType::Type::ARGUMENTS);
                                 parser.nodes.back()->children.push_back(nullptr);
-                                parser.nodes.push_back(std::make_unique<Node>(qualifier));
-                                if (qualifier->arity == TagNodeType::QualifierNodeType::Arity::UNARY)
-                                    parser.nodes.back()->children.push_back(nullptr);
+                                if (!parser.pushNode(std::make_unique<Node>(qualifier)))
+                                    return false;
                                 return true;
                             }
                             assert(op->fixness == OperatorNodeType::Fixness::INFIX);
@@ -320,8 +325,7 @@ namespace Liquid {
 
     bool Parser::Lexer::startOutputBlock(bool suppress) {
         parser.state = Parser::State::ARGUMENT;
-        parser.pushNode(make_unique<Node>(context.getOutputNodeType()), true);
-        return parser.pushNode(make_unique<Node>(context.getArgumentsNodeType()), true);
+        return parser.pushNode(make_unique<Node>(context.getOutputNodeType()), true) && parser.pushNode(make_unique<Node>(context.getArgumentsNodeType()), true);
     }
 
     bool Parser::pushNode(unique_ptr<Node> node, bool expectingNode) {
@@ -340,6 +344,7 @@ namespace Liquid {
             return false;
         unique_ptr<Node> argumentNode = move(nodes.back());
         nodes.pop_back();
+
         validate(*argumentNode.get());
 
         if (nodes.back()->children.size() == 0 || nodes.back()->children.back().get())

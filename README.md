@@ -19,19 +19,20 @@ The C++ library, which is built with the normal Makefile can be linked in as a s
 
 int(int argc, char* argv[]) {
     Liquid::Context context;
-    Liquid::Parser parser(context);
     Liquid::StandardDialect::implement(context);
     context.registerType<Liquid::CPPVariableNode>();
 
+    Liquid::Parser parser(context);
+
     const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
     // Throws an exception if there's a parsing error.
-    Node ast = parser.parseFile(exampleFile, sizeof(exampleFile)-1);
-    Renderer renderer(context);
+    Liquid::Node ast = parser.parseFile(exampleFile, sizeof(exampleFile)-1);
+    Liquid::Renderer renderer(context);
 
     Liquid::CPPVariable store;
     store["a"] = 10;
 
-    std::string result = result = renderer.render(ast, store);
+    std::string result = renderer.render(ast, store);
     fprintf(stdout, "%s\n", result.data());
     return 0;
 }
@@ -101,7 +102,7 @@ puts renderer.render({ "a" => 1 }, template)
 Or, alternatively, one can use the "drop in replacement" function, which will register the exact same constructs as the normal liquid library.
 
 This is generally discouraged, as you lose some useful features of the library; like the ability to have independent liquid contexts with different
-tags, filters, operators, and settings; and you have thread-safe rendering of shared templates, vs. just shoving everything into a global namespace.
+tags, filters, operators, and settings; and you have explicit thread-safe rendering of shared templates, vs. just shoving everything into a global namespace.
 But, it's of course, up to you.
 
 ```ruby
@@ -116,7 +117,18 @@ May eventually stick the "drop in replacement" into a separate module, that just
 
 #### Perl
 
-Coming Soon! Will likely be called `WWW::Shopify::Liquid::XS`.
+Uses the exact same interface as `WWW::Shopify::Liquid`, and is basically almost fully compatible with it as `WWW::Shopify::Liquid::XS`.
+
+All core constrcuts are overriden, and there is no optimizer at present, but all top-level functions should work correctly; and most dialects that have tags, filters and operators,
+that use `operate` instead of `process` or `render` should function without changes.
+
+```perl
+    use WWW::Shopify::Liquid::XS;
+
+    my $liquid = WWW::Shopify::Liquid::XS->new;
+    my $text = $liquid->render_file({ }, "myfile.liquid");
+    print "$text\n";
+```
 
 ## Features / Roadmap
 
@@ -129,23 +141,23 @@ This is what I'm aiming for at any rate.
 * Contextualized set of filters, operators, and tags per liquid object instantaited; no global state as in the regular Shopify gem, easily allowing for many flavours of liquid in the same process.
 * Ability to easily specify additions of filters, operators, and tags called `Dialects`, which can be mixed and matched.
 * Small footprint. Aiming for under 5K SLOC, with full standard Liquid as part of the core library.
+* Fully featured `extern "C"` interface for easy linking to most scripting languages. OOB bindings for both Ruby and Perl will be provided, that will act as drop-in replacements for `Liquid` and `WWW::Shopify::Liquid`.
+* Significant speedup over ruby-based liquid. (Need to do benchmarks; but at first glance seems like a minimum of a 6-fold speedup over regular Liquid)
 
 ### Partial
 
 * Togglable extra features, such as real operators, parentheses, etc.. (This is in, but not togglable).
 * Line accurate, and helpful error messages. (Some are accurate and helpful, others are not).
-* Significant speedup over ruby-based liquid. (Need to do benchmarks; seems like a minimum of a 6-fold speedup over regular Liquid)
 * Ability to step through and examine the liquid AST. (AST is generated, but no mechanisms to step through yet)
 * Full test suite that runs all major examples from Shopify's doucmentation. (Test suite runs some examples, but not all).
 * Extremely easy to embed in other libraries, software, and langauges. Possiblilty of having it as a header-only library. (Emebedding easy; header-only, not yet).
-* Fully featured `extern "C"` interface for easy linking to most scripting languages. OOB bindings for both Ruby and Perl will be provided, that will act as drop-in replacements for `Liquid` and `WWW::Shopify::Liquid`. (Ruby, but not Perl yet).
+* Fully compatible with both `Liquid`, Shopify's ruby gem, and `WWW::Shopify::Liquid`, the perl implementation. (most compatible, need to dig into details)
+* Ability to set limits on memory consumed, and time spent rendering. (Partially implemented).
 
 ### TODO
 
 * Ability to partially render content, then spit back out the remaining liquid that genreated it.
-* Fully compatible with both `Liquid`, Shopify's ruby gem, and `WWW::Shopify::Liquid`, the perl implementation.
 * Optional compatibilty with rapidjson to allow for JSON reading.
-* Ability to set limits on memory consumed, and time spent rendering.
 * Built-in optimizer that will do things like loop unrolling, conditional elimiation, etc...
 
 

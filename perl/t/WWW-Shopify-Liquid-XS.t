@@ -258,14 +258,14 @@ my $order = {
 $text = $liquid->render_ast({ order => $order, email => 'test1@gmail.com' }, $ast);
 is($text, 1);
 
-#$text = $liquid->renderer->render({ order => $order, email => 'test1@gmail.com' }, $ast);
-#is($text, 1);
+$text = $liquid->renderer->render({ order => $order, email => 'test1@gmail.com' }, $ast);
+is($text, 1);
 
-#$text = $liquid->renderer->render({ order => $order, email => 'test2@gmail.com' }, $ast);
-#is($text, 2);
+$text = $liquid->renderer->render({ order => $order, email => 'test2@gmail.com' }, $ast);
+is($text, 2);
 
-#$text = $liquid->render_text({ settings => { productspg_featured_limit => 3 } }, '{% for product in (1..10) limit: settings.productspg_featured_limit offset: 5 %}{{ forloop.index }}{% endfor %}');
-#is($text, '678');
+$text = $liquid->render_text({ settings => { productspg_featured_limit => 3 } }, '{% for product in (1..10) limit: settings.productspg_featured_limit offset: 5 %}{{ forloop.index }}{% endfor %}');
+is($text, '678');
 
 done_testing();
 

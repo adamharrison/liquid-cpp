@@ -55,7 +55,7 @@ namespace Liquid {
                 variable = resolver.createBool(*this, variant.b);
             break;
             case Variant::Type::VARIABLE:
-                variable = variant.v;
+                variable = resolver.createClone(*this, variant.v.pointer);
             break;
             case Variant::Type::ARRAY: {
                 variable = resolver.createArray(*this);

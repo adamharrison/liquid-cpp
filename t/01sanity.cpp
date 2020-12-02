@@ -275,6 +275,15 @@ TEST(sanity, forloop) {
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "201051");
 
+
+    ast = getParser().parse("{% for i in list limit: 2 %}{{ i }}{% else %}fdsfdf{% endfor %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "15");
+
+    ast = getParser().parse("{% for i in list limit: 2 offset: 2 %}{{ i }}{% else %}fdsfdf{% endfor %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "1020");
+
     ast = getParser().parse("{% for i in list %}{{ i }}{% endfor %}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "151020");
@@ -350,6 +359,36 @@ TEST(sanity, composite) {
 
     CPPVariable line_item, line_item1, line_item2, product, product_option1, product_option2, product_option3;
 
+    order["id"] = 2;
+    hash["order"] = order;
+
+    ast = getParser().parse("{% assign b = order %}{{ b.id }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "2");
+
+
+
+    CPPVariable lip1, lip2, lip3, lip4;
+
+    lip1["name"] = "Gift Email";
+    lip1["value"] = "test1@gmail.com";
+    lip2["name"] = "Gift Image";
+    lip2["value"] = 1;
+    line_item1["id"] = 1;
+    line_item1["properties"] = { lip1, lip2 };
+    lip3["name"] = "Gift Email";
+    lip3["value"] = "test2@gmail.com";
+    lip4["name"] = "Gift Image";
+    lip4["value"] = 2;
+    line_item2["id"] = 1;
+    line_item2["properties"] = { lip3, lip4 };
+    order["line_items"] = { line_item1, line_item2 };
+    hash["order"] = order;
+
+    ast = getParser().parse("{% for line_item in order.line_items %}{% for property in line_item.properties %}{% if property.name == \"Gift Email\" and property.value == email %}{% assign li = line_item %}{% endif %}{% endfor %}{% endfor %}{{ li.id }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "1");
+
 
 
     line_item1["sku"] = "ASDTOPS";
@@ -411,8 +450,6 @@ TEST(sanity, composite) {
     ast = getParser().parse("{% for trans in order.transactions %}{% if trans.status == 'success' and trans.kind == 'refund' %}{% unless forloop.first %}, {% endunless %}{{ trans.id }}{% endif %}{% endfor %}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "12445324");
-
-
 }
 
 

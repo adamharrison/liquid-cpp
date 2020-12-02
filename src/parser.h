@@ -130,6 +130,12 @@ namespace Liquid {
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_OPERATOR_OR_QUALIFIER:
                         sprintf(buffer, "Unknown operator, or qualifier '%s' on line %lu, column %lu.", error.message, error.row, error.column);
                     break;
+                    case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_OPERAND:
+                        sprintf(buffer, "Unexpected operand for qualifier '%s' on line %lu, column %lu.", error.message, error.row, error.column);
+                    break;
+                    case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS:
+                        sprintf(buffer, "Invalid arguments for '%s' on line %lu, column %lu; expected %d, got %d.", error.message, error.row, error.column, 0, 0);
+                    break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_FILTER:
                         sprintf(buffer, "Unknown filter '%s' on line %lu, column %lu.", error.message, error.row, error.column);
                     break;
