@@ -216,7 +216,7 @@ void lpFreeVariable(LiquidRenderer renderer, void* value) {
 
 int lpCompare(void* a, void* b) {
     dTHX;
-    return 0;
+    return sv_cmp((SV*)a, (SV*)b);
 }
 
 void lpSetReturnValue(PerlInterpreter* my_perl, LiquidRenderer renderer, SV* sv) {
@@ -250,7 +250,7 @@ void lpSetReturnValue(PerlInterpreter* my_perl, LiquidRenderer renderer, SV* sv)
     }
 }
 
-static void lpRenderTag(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
+static void lpRenderEnclosingTag(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
     dTHX;
     SV* callback = (SV*)data;
 
@@ -260,13 +260,19 @@ static void lpRenderTag(LiquidRenderer renderer, LiquidNode node, void* variable
     SAVETMPS;
     PUSHMARK(SP);
 
-    EXTEND(SP, 2);
+    EXTEND(SP, 4);
     // Wrapped closure should look like:
     // ($package, $renderer, $hash)
     // the only thing we supply is the render, node, and hash.
     PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
     PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
-    PUSHs(sv_2mortal((SV*)variableStore));
+    PUSHs((SV*)variableStore);
+
+    SV* child = NULL;
+    liquidGetChild((void**)&child, renderer, node, variableStore, 1);
+    PUSHs(child);
+
+
     PUTBACK;
 
     int count = call_sv(SvRV(callback), G_SCALAR);
@@ -283,6 +289,43 @@ static void lpRenderTag(LiquidRenderer renderer, LiquidNode node, void* variable
     FREETMPS;
     LEAVE;
 }
+
+
+static void lpRenderFreeTag(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
+    dTHX;
+    SV* callback = (SV*)data;
+
+    dSP;
+
+    ENTER;
+    SAVETMPS;
+    PUSHMARK(SP);
+
+    EXTEND(SP, 3);
+    // Wrapped closure should look like:
+    // ($package, $renderer, $hash)
+    // the only thing we supply is the render, node, and hash.
+    PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
+    PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
+    PUSHs((SV*)variableStore);
+
+    PUTBACK;
+
+    int count = call_sv(SvRV(callback), G_SCALAR);
+
+    SPAGAIN;
+
+    if (count > 0) {
+        SV *sv = POPs;
+        lpSetReturnValue(my_perl, renderer, sv);
+    } else {
+        liquidRendererSetReturnValueNil(renderer);
+    }
+
+    FREETMPS;
+    LEAVE;
+}
+
 
 
 static void lpRenderFilter(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
@@ -513,7 +556,7 @@ registerTag(context, symbol, type, minArguments, maxArguments, renderFunction)
     CODE:
         enum ETagType eType = strcmp(type, "free") == 0 ? LIQUID_TAG_TYPE_FREE : LIQUID_TAG_TYPE_ENCLOSING;
         if (SvROK(renderFunction) && SvTYPE(SvRV(renderFunction)) == SVt_PVCV) {
-            liquidRegisterTag(*(LiquidContext*)&context, symbol, eType, minArguments, maxArguments, lpRenderTag, renderFunction);
+            liquidRegisterTag(*(LiquidContext*)&context, symbol, eType, minArguments, maxArguments, (eType == LIQUID_TAG_TYPE_FREE ? lpRenderFreeTag : lpRenderEnclosingTag), SvREFCNT_inc(renderFunction));
             RETVAL = 0;
         } else {
             RETVAL = -1;

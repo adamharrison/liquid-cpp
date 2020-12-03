@@ -49,8 +49,8 @@ namespace Liquid {
 
     struct TagNodeType : NodeType {
         enum class Composition {
-            FREE,
-            ENCLOSED
+            ENCLOSED,
+            FREE
         };
 
         // This is insanely stupid.

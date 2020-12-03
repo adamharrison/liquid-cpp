@@ -172,15 +172,12 @@ sub render_ast {
 sub register_tag {
     my ($self, $tag) = @_;
     die WWW::Shopify::Liquid::XS::Exception->new("Requies tag to have an operate sub; currently custom processing is not supported.") unless $tag->can('operate');
-    die WWW::Shopify::Liquid::XS::Exception->new("Can't register tag '" . $tag->name . "'.") unless WWW::Shopify::Liquid::XS::registerTag($self->{context}, $tag->name, ($tag->is_enclosing ? "enclosing" : "free"), $tag->min_arguments, (defined $tag->max_arguments ? $tag->max_arguments : -1), sub {
+    die WWW::Shopify::Liquid::XS::Exception->new("Can't register tag '" . $tag->name . "'.") unless WWW::Shopify::Liquid::XS::registerTag($self->{context}, $tag->name, ($tag->is_enclosing ? "enclosing" : "free"), $tag->min_arguments, (defined $tag->max_arguments ? $tag->max_arguments : -1), $tag->is_enclosing ? sub {
+        my ($renderer, $node, $hash, $contents, @arguments) = @_;
+        return $tag->operate($hash, $contents, @arguments);
+    } : sub {
         my ($renderer, $node, $hash, @arguments) = @_;
-        if ($tag->is_enclosing) {
-            my $content = WWW::Shopify::Liquid::XS::getContents($renderer->{renderer}, $node, 0, $hash);
-            return $tag->operate($hash, $content, @arguments);
-        } else {
-            my $result = $tag->operate($hash, @arguments);
-            return $result;
-        }
+        return $tag->operate($hash, @arguments);
     }) == 0;
 }
 

@@ -148,9 +148,9 @@ namespace Liquid {
                     case SUPER::State::CONTROL: {
                         if (len > 3 && strncmp(str, "end", 3) == 0) {
                             std::string typeName = std::string(&str[3], len - 3);
-                            const NodeType* type = SUPER::context.getTagType(typeName);
+                            const TagNodeType* type = static_cast<const TagNodeType*>(SUPER::context.getTagType(typeName));
 
-                            if (!type) {
+                            if (!type || type->composition != TagNodeType::Composition::ENCLOSED) {
                                 parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_TAG, std::string(str, len)));
                                 return false;
                             }
