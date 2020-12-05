@@ -19,7 +19,7 @@ namespace Liquid {
         // The current state of the break. Allows us to have break/continue statements.
         Control control = Control::NONE;
 
-        LiquidRenderErrorType error = LiquidRenderErrorType::LIQUID_RENDER_ERROR_TYPE_NONE;
+        LiquidRenderErrorType error = LiquidRenderErrorType::LIQUID_RENDERER_ERROR_TYPE_NONE;
 
         struct Error : LiquidRenderError {
             typedef LiquidRenderErrorType Type;
@@ -27,7 +27,7 @@ namespace Liquid {
             Error() {
                 column = 0;
                 row = 0;
-                type = Type::LIQUID_RENDER_ERROR_TYPE_NONE;
+                type = Type::LIQUID_RENDERER_ERROR_TYPE_NONE;
                 message[0] = 0;
             }
             Error(const Error& error) = default;
@@ -47,6 +47,32 @@ namespace Liquid {
                 strcpy(this->message, message.data());
             }
         };
+
+        struct Exception : Liquid::Exception {
+            Renderer::Error rendererError;
+            std::string message;
+            Exception(const Renderer::Error& error) : rendererError(error) {
+                char buffer[512];
+                switch (rendererError.type) {
+                    case Renderer::Error::Type::LIQUID_RENDERER_ERROR_TYPE_NONE: break;
+                    case Renderer::Error::Type::LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_MEMORY:
+                        sprintf(buffer, "Exceeded memory.");
+                    break;
+                    case Renderer::Error::Type::LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_TIME:
+                        sprintf(buffer, "Exceeded rendering time.");
+                    break;
+                    case Renderer::Error::Type::LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_DEPTH:
+                        sprintf(buffer, "Exceeded stack depth.");
+                    break;
+                }
+                message = buffer;
+            }
+
+            const char* what() const noexcept {
+               return message.data();
+            }
+        };
+
 
         // If set, this will stop rendering with an error if the limits here, in bytes are breached for this renderer. This is checked any time
         // the variable resolver is used.

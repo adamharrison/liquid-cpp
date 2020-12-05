@@ -9,7 +9,7 @@ namespace Liquid {
         renderStartTime = std::chrono::system_clock::now();
         currentMemoryUsage = 0;
         currentRenderingDepth = 0;
-        error = Error::Type::LIQUID_RENDER_ERROR_TYPE_NONE;
+        error = Error::Type::LIQUID_RENDERER_ERROR_TYPE_NONE;
         Node node = ast.type->render(*this, ast, store);
         assert(node.type == nullptr);
         auto s = node.getString();
@@ -23,7 +23,7 @@ namespace Liquid {
             string* accumulator = (string*)data;
             accumulator->append(chunk, size);
         }, &accumulator);
-        if (error != LIQUID_RENDER_ERROR_TYPE_NONE)
+        if (error != LIQUID_RENDERER_ERROR_TYPE_NONE)
             throw Error(error);
         return accumulator;
     }

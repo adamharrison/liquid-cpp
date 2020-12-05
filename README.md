@@ -143,6 +143,7 @@ This is what I'm aiming for at any rate.
 * Small footprint. Aiming for under 5K SLOC, with full standard Liquid as part of the core library.
 * Fully featured `extern "C"` interface for easy linking to most scripting languages. OOB bindings for both Ruby and Perl will be provided, that will act as drop-in replacements for `Liquid` and `WWW::Shopify::Liquid`.
 * Significant speedup over ruby-based liquid. (Need to do benchmarks; but at first glance seems like a minimum of a 6-fold speedup over regular Liquid)
+* Fully compatible with both `Liquid`, Shopify's ruby gem, and `WWW::Shopify::Liquid`, the perl implementation. The only thing we're missing is optimizer, or AST walk capabilities.
 
 ### Partial
 
@@ -150,8 +151,6 @@ This is what I'm aiming for at any rate.
 * Line accurate, and helpful error messages. (Some are accurate and helpful, others are not).
 * Ability to step through and examine the liquid AST. (AST is generated, but no mechanisms to step through yet)
 * Full test suite that runs all major examples from Shopify's doucmentation. (Test suite runs some examples, but not all).
-* Extremely easy to embed in other libraries, software, and langauges. Possiblilty of having it as a header-only library. (Emebedding easy; header-only, not yet).
-* Fully compatible with both `Liquid`, Shopify's ruby gem, and `WWW::Shopify::Liquid`, the perl implementation. (most compatible, need to dig into details)
 * Ability to set limits on memory consumed, and time spent rendering. (Partially implemented).
 
 ### TODO
@@ -159,6 +158,8 @@ This is what I'm aiming for at any rate.
 * Ability to partially render content, then spit back out the remaining liquid that genreated it.
 * Optional compatibilty with rapidjson to allow for JSON reading.
 * Built-in optimizer that will do things like loop unrolling, conditional elimiation, etc...
+* Use a standard build system; like cmake, instead of a manual make.
+* Header-only library version.
 
 
 ## License

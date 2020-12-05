@@ -200,6 +200,8 @@ namespace Liquid {
             Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
         };
 
+        EFalsiness falsiness = FALSY_FALSE;
+
         struct VariableNode : NodeType {
             /* Things like .size, etc.. */
             struct UnaryVariableFilterNode : FilterNodeType {
@@ -208,7 +210,7 @@ namespace Liquid {
 
             unordered_map<std::string, unique_ptr<NodeType>> filters;
 
-            LiquidVariableResolver resolver;
+            LiquidVariableResolver variableResolver;
 
             VariableNode() : NodeType(Type::VARIABLE) { }
 
@@ -218,12 +220,12 @@ namespace Liquid {
                     auto node = renderer.retrieveRenderedNode(*link.get(), store);
                     switch (node.variant.type) {
                         case Variant::Type::INT:
-                            if (!resolver.getArrayVariable(storePointer, node.variant.i, storePointer)) {
+                            if (!variableResolver.getArrayVariable(storePointer, node.variant.i, storePointer)) {
                                 storePointer = Variable({ nullptr });
                             }
                         break;
                         case Variant::Type::STRING:
-                            if (!resolver.getDictionaryVariable(storePointer, node.variant.s.data(), storePointer))
+                            if (!variableResolver.getDictionaryVariable(storePointer, node.variant.s.data(), storePointer))
                                 storePointer = Variable({ nullptr });
                         break;
                         default:
@@ -244,20 +246,20 @@ namespace Liquid {
                     if (i == node.children.size() - 1) {
                         switch (part.variant.type) {
                             case Variant::Type::INT:
-                                return resolver.setArrayVariable(renderer, storePointer, part.variant.i, value);
+                                return variableResolver.setArrayVariable(renderer, storePointer, part.variant.i, value);
                             case Variant::Type::STRING:
-                                return resolver.setDictionaryVariable(renderer, storePointer, part.variant.s.data(), value);
+                                return variableResolver.setDictionaryVariable(renderer, storePointer, part.variant.s.data(), value);
                             default:
                                 return false;
                         }
                     } else {
                         switch (part.variant.type) {
                             case Variant::Type::INT:
-                                if (!resolver.getArrayVariable(storePointer, part.variant.i, storePointer))
+                                if (!variableResolver.getArrayVariable(storePointer, part.variant.i, storePointer))
                                     return false;
                             break;
                             case Variant::Type::STRING:
-                                if (!resolver.getDictionaryVariable(storePointer, part.variant.s.data(), storePointer))
+                                if (!variableResolver.getDictionaryVariable(storePointer, part.variant.s.data(), storePointer))
                                     return false;
                             break;
                             default:
@@ -363,7 +365,7 @@ namespace Liquid {
 
         void optimize(Node& ast, Variable store);
 
-        const LiquidVariableResolver& getVariableResolver() const { return getVariableNodeType()->resolver; }
+        const LiquidVariableResolver& getVariableResolver() const { return getVariableNodeType()->variableResolver; }
         bool resolveVariableString(string& target, void* variable) const {
             const LiquidVariableResolver& resolver = getVariableResolver();
             long long length = resolver.getStringLength(variable);

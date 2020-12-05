@@ -15,7 +15,7 @@ Context& getContext() {
     static bool setup = false;
     static Context context;
     if (!setup) {
-        StandardDialect::implement(context);
+        StandardDialect::implementPermissive(context);
         context.registerType<CPPVariableNode>();
         setup = true;
     }

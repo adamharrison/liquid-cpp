@@ -7,7 +7,7 @@ using namespace Liquid;
 
 char* liquidError = nullptr;
 
-LiquidContext liquidCreateContext(ELiquidContextSettings settings) {
+LiquidContext liquidCreateContext() {
     return LiquidContext({ new Context() });
 }
 
@@ -15,8 +15,11 @@ void liquidFreeContext(LiquidContext context) {
     delete (Context*)context.context;
 }
 
-void liquidImplementStandardDialect(LiquidContext context) {
-    StandardDialect::implement(*static_cast<Context*>(context.context));
+void liquidImplementStrictStandardDialect(LiquidContext context) {
+    StandardDialect::implementStrict(*static_cast<Context*>(context.context));
+}
+void liquidImplementPermissiveStandardDialect(LiquidContext context) {
+    StandardDialect::implementPermissive(*static_cast<Context*>(context.context));
 }
 
 LiquidRenderer liquidCreateRenderer(LiquidContext context) {
@@ -47,7 +50,16 @@ void liquidFreeTemplate(LiquidTemplate tmpl) {
 }
 
 LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRenderError* error) {
-    std::string* str = new std::string(std::move(static_cast<Renderer*>(renderer.renderer)->render(*static_cast<Node*>(tmpl.ast), Variable({ variableStore }))));
+    if (error)
+        error->type = LIQUID_RENDERER_ERROR_TYPE_NONE;
+    std::string* str;
+    try {
+        str = new std::string(std::move(static_cast<Renderer*>(renderer.renderer)->render(*static_cast<Node*>(tmpl.ast), Variable({ variableStore }))));
+    } catch (Renderer::Exception& exp) {
+        if (error)
+            *error = exp.rendererError;
+        return LiquidTemplateRender({ NULL });
+    }
     return LiquidTemplateRender({ str });
 }
 
@@ -150,7 +162,7 @@ void liquidRendererSetReturnValueVariable(LiquidRenderer renderer, void* variabl
 void liquidRegisterVariableResolver(LiquidContext context, LiquidVariableResolver resolver) {
     Context* ctx = static_cast<Context*>(context.context);
     unique_ptr<NodeType> type = make_unique<Context::VariableNode>();
-    static_cast<Context::VariableNode*>(type.get())->resolver = resolver;
+    static_cast<Context::VariableNode*>(type.get())->variableResolver = resolver;
     ctx->registerType(move(type));
 }
 

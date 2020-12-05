@@ -124,7 +124,7 @@ sub liquid_render_file {
 sub new {
     my ($package) = @_;
     my $self = bless { context => createContext() }, $package;
-    WWW::Shopify::Liquid::XS::implementStandardDialect($self->{context});
+    WWW::Shopify::Liquid::XS::implementPermissiveStandardDialect($self->{context});
     return $self;
 }
 

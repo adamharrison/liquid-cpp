@@ -59,6 +59,12 @@ namespace Liquid {
         bool exists() const { return pointer; }
     };
 
+    enum EFalsiness {
+        FALSY_FALSE             = 0,
+        FALSY_0                 = 1,
+        FALSY_EMPTY_STRING      = 2,
+        FALSY_NIL               = 4
+    };
     // Represents everything that can be addressed by textual liquid. A built-in type.
     struct Variant {
 
@@ -141,14 +147,14 @@ namespace Liquid {
             }
         }
 
-        bool isTruthy() const {
+        bool isTruthy(EFalsiness falsiness) const {
             return !(
                 (type == Variant::Type::BOOL && !b) ||
-                (type == Variant::Type::INT && !i) ||
-                (type == Variant::Type::FLOAT && !f) ||
-                (type == Variant::Type::POINTER && !p) ||
-                (type == Variant::Type::NIL) ||
-                (type == Variant::Type::STRING && s.size() == 0)
+                ((falsiness & FALSY_0) && type == Variant::Type::INT && !i) ||
+                ((falsiness & FALSY_0) && type == Variant::Type::FLOAT && !f) ||
+                ((falsiness & FALSY_NIL) && type == Variant::Type::POINTER && !p) ||
+                ((falsiness & FALSY_NIL) && type == Variant::Type::NIL) ||
+                ((falsiness & FALSY_EMPTY_STRING) && type == Variant::Type::STRING && s.size() == 0)
             );
         }
 

@@ -9,6 +9,7 @@ extern "C" {
 #endif
 
     #define LIQUID_ERROR_MESSAGE_MAX_LENGTH 256
+    #define LIQUID_FILE_MAX_LENGTH 256
 
     enum ELiquidParserErrorType {
         LIQUID_PARSER_ERROR_TYPE_NONE,
@@ -39,6 +40,7 @@ extern "C" {
         LiquidLexerErrorType type;
         size_t row;
         size_t column;
+        char file[LIQUID_FILE_MAX_LENGTH];
         char message[LIQUID_ERROR_MESSAGE_MAX_LENGTH];
     };
     typedef struct SLiquidLexerError LiquidLexerError;
@@ -47,6 +49,7 @@ extern "C" {
         LiquidParserErrorType type;
         size_t row;
         size_t column;
+        char file[LIQUID_FILE_MAX_LENGTH];
         char message[LIQUID_ERROR_MESSAGE_MAX_LENGTH];
     };
     typedef struct SLiquidParserError LiquidParserError;
@@ -54,10 +57,10 @@ extern "C" {
 
 
     enum ELiquidRenderErrorType {
-        LIQUID_RENDER_ERROR_TYPE_NONE,
-        LIQUID_RENDER_ERROR_TYPE_EXCEEDED_MEMORY,
-        LIQUID_RENDER_ERROR_TYPE_EXCEEDED_TIME,
-        LIQUID_RENDER_ERROR_TYPE_EXCEEDED_DEPTH
+        LIQUID_RENDERER_ERROR_TYPE_NONE,
+        LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_MEMORY,
+        LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_TIME,
+        LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_DEPTH
     };
     typedef enum ELiquidRenderErrorType LiquidRenderErrorType;
 
@@ -65,6 +68,7 @@ extern "C" {
         LiquidRenderErrorType type;
         size_t row;
         size_t column;
+        char file[LIQUID_FILE_MAX_LENGTH];
         char message[LIQUID_ERROR_MESSAGE_MAX_LENGTH];
     };
     typedef struct SLiquidRenderError LiquidRenderError;
@@ -111,15 +115,6 @@ extern "C" {
         void* internal;
     };
     typedef struct SLiquidTemplateRender LiquidTemplateRender;
-
-    enum ELiquidContextSettings {
-        LIQUID_CONTEXT_SETTINGS_DEFAULT = 0,
-        // Can do {% assign a[1] = ... %}.
-        LIQUID_CONTEXT_SETTINGS_EXTENDED_ASSIGNMENT_SYNTAX = (1 << 1),
-        // Can use parentheses, operators, and everything in all expressions, not just assignments.
-        LIQUID_CONTEXT_SETTINGS_EXTENDED_EXPRESSION_SYNTAX = (1 << 2)
-    };
-    typedef enum ELiquidContextSettings LiquidContextSettings;
 
     enum ELiquidVariableType {
         LIQUID_VARIABLE_TYPE_NIL,
@@ -168,10 +163,11 @@ extern "C" {
     };
     typedef struct SLiquidVariableResolver LiquidVariableResolver;
 
-    LiquidContext liquidCreateContext(LiquidContextSettings settings);
+    LiquidContext liquidCreateContext();
     const char* liquidGetContextError(LiquidContext context);
     void liquidFreeContext(LiquidContext context);
-    void liquidImplementStandardDialect(LiquidContext context);
+    void liquidImplementStrictStandardDialect(LiquidContext context);
+    void liquidImplementPermissiveStandardDialect(LiquidContext context);
 
     LiquidRenderer liquidCreateRenderer(LiquidContext context);
     void liquidRendererSetReturnValueNil(LiquidRenderer renderer);

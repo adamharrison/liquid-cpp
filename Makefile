@@ -4,7 +4,7 @@ BDIR=bin
 TDIR=t
 CXX=g++
 CC=gcc
-CFLAGS=-Wall -fexceptions -fPIC -g
+CFLAGS=-Wall -fexceptions -fPIC
 CXXFLAGS=$(CFLAGS) -std=c++17
 LDFLAGS=
 AR=ar
@@ -52,7 +52,6 @@ perl : $(LIBRARY)
 	$(MAKE) -C $(PERL_DIR) clean
 	$(MAKE) -C $(PERL_DIR)
 
-
 library: $(LIBRARY)
 
 cleanlibrary: clean
@@ -70,9 +69,12 @@ $(TDIR):
 
 -include $(DEPENDS)
 
-testdir:
-	@echo $(DEPENDS)
+libraryRelease: CFLAGS := $(CFLAGS) -O3 -s
+libraryRelease: library
 
-clean: directories
+libraryDebug: CFLAGS := $(CFLAGS) -g
+libraryDebug: library
+
+clean:
 	rm -f $(ODIR)/*.o $(ODIR)/*.d $(LIBRARY)
 

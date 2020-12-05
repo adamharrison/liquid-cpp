@@ -426,7 +426,7 @@ MODULE = WWW::Shopify::Liquid::XS		PACKAGE = WWW::Shopify::Liquid::XS
 void*
 createContext()
     CODE:
-        LiquidContext context = liquidCreateContext(LIQUID_CONTEXT_SETTINGS_DEFAULT);
+        LiquidContext context = liquidCreateContext();
         LiquidVariableResolver resolver = {
             lpGetType,
             lpGetBool,
@@ -465,10 +465,16 @@ freeContext(context)
         liquidFreeContext(*(LiquidContext*)&context);
 
 void
-implementStandardDialect(context)
+implementPermissiveStandardDialect(context)
     void* context;
     CODE:
-        liquidImplementStandardDialect(*(LiquidContext*)&context);
+        liquidImplementPermissiveStandardDialect(*(LiquidContext*)&context);
+
+void
+implementStrictStandardDialect(context)
+    void* context;
+    CODE:
+        liquidImplementStrictStandardDialect(*(LiquidContext*)&context);
 
 void*
 createRenderer(context)

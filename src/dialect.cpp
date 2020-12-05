@@ -6,6 +6,7 @@
 #include <unordered_set>
 
 namespace Liquid {
+
     struct AssignNode : TagNodeType {
         AssignNode() : TagNodeType(Composition::FREE, "assign", 1, 1) { }
 
@@ -39,7 +40,7 @@ namespace Liquid {
             auto& variableNode = argumentNode->children.front();
             const Context::VariableNode* variableTypeNode = static_cast<const Context::VariableNode*>(variableNode->type);
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable targetVariable = variableTypeNode->resolver.createString(renderer, renderer.retrieveRenderedNode(*node.children[1].get(), store).getString().data());
+                Variable targetVariable = variableTypeNode->variableResolver.createString(renderer, renderer.retrieveRenderedNode(*node.children[1].get(), store).getString().data());
                 variableTypeNode->setVariable(renderer, *variableNode.get(), store, targetVariable);
             }
             return Node();
@@ -57,8 +58,8 @@ namespace Liquid {
                 Variable targetVariable = variableNodeType->getVariable(renderer, *variableNode.get(), store);
                 if (targetVariable.exists()) {
                     long long i = -1;
-                    if (variableNodeType->resolver.getInteger(targetVariable,&i))
-                        variableNodeType->setVariable(renderer, *variableNode.get(), targetVariable, variableNodeType->resolver.createInteger(renderer, i+1));
+                    if (variableNodeType->variableResolver.getInteger(targetVariable,&i))
+                        variableNodeType->setVariable(renderer, *variableNode.get(), targetVariable, variableNodeType->variableResolver.createInteger(renderer, i+1));
                 }
             }
             return Node();
@@ -76,8 +77,8 @@ namespace Liquid {
                 Variable targetVariable = variableNodeType->getVariable(renderer, *variableNode.get(), store);
                 if (targetVariable.exists()) {
                     long long i = -1;
-                    if (variableNodeType->resolver.getInteger(targetVariable,&i))
-                        variableNodeType->setVariable(renderer, *variableNode.get(), targetVariable, variableNodeType->resolver.createInteger(renderer, i-1));
+                    if (variableNodeType->variableResolver.getInteger(targetVariable,&i))
+                        variableNodeType->setVariable(renderer, *variableNode.get(), targetVariable, variableNodeType->variableResolver.createInteger(renderer, i-1));
                 }
             }
             return Node();
@@ -96,7 +97,7 @@ namespace Liquid {
             auto& arguments = node.children.front();
             auto result = renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
             assert(result.type == nullptr);
-            bool truthy = result.variant.isTruthy();
+            bool truthy = result.variant.isTruthy(renderer.context.falsiness);
             if (Inverse)
                 truthy = !truthy;
             if (truthy)
@@ -105,7 +106,7 @@ namespace Liquid {
                 // Loop through the elsifs and elses, and anything that's true, run the next concatenation.
                 for (size_t i = 2; i < node.children.size()-1; i += 2) {
                     auto conditionalResult = renderer.retrieveRenderedNode(*node.children[i].get(), store);
-                    if (!conditionalResult.type && conditionalResult.variant.isTruthy())
+                    if (!conditionalResult.type && conditionalResult.variant.isTruthy(renderer.context.falsiness))
                         return renderer.retrieveRenderedNode(*node.children[i+1].get(), store);
                 }
                 return Node();
@@ -312,7 +313,7 @@ namespace Liquid {
             auto iterator = +[](ForLoopContext& forLoopContext) {
                 Variable forLoopVariable;
                 const Context::VariableNode* variableType = forLoopContext.renderer.context.getVariableNodeType();
-                auto& resolver = variableType->resolver;
+                auto& resolver = variableType->variableResolver;
 
                 if (!resolver.getDictionaryVariable(forLoopContext.store, "forloop", forLoopVariable))
                     forLoopVariable = resolver.setDictionaryVariable(forLoopContext.renderer, forLoopContext.store, "forloop", resolver.createHash(forLoopContext.renderer));
@@ -339,7 +340,7 @@ namespace Liquid {
             };
 
             const Context::VariableNode* variableType = renderer.context.getVariableNodeType();
-            auto& resolver = variableType->resolver;
+            auto& resolver = variableType->variableResolver;
             ForLoopContext forLoopContext = { renderer, node, store, *variableNode.get(), iterator };
 
 
@@ -375,7 +376,7 @@ namespace Liquid {
                 resolver.iterate(result.variant.v, +[](void* variable, void* data) {
                     ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
                     const Context::VariableNode* variableType = forLoopContext.renderer.context.getVariableNodeType();
-                    variableType->setVariable(forLoopContext.renderer, forLoopContext.variableNode, forLoopContext.store, variableType->resolver.createClone(forLoopContext.renderer, variable));
+                    variableType->setVariable(forLoopContext.renderer, forLoopContext.variableNode, forLoopContext.store, variableType->variableResolver.createClone(forLoopContext.renderer, variable));
                     return forLoopContext.iterator(forLoopContext);
                 }, const_cast<void*>((void*)&forLoopContext), start, limit, reversed);
             }
@@ -393,7 +394,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             assert(node.children.size() == 1 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
-            const LiquidVariableResolver& resolver = renderer.context.getVariableNodeType()->resolver;
+            const LiquidVariableResolver& resolver = renderer.context.getVariableNodeType()->variableResolver;
             Variable forloopVariable;
             if (resolver.getDictionaryVariable(store, "forloop", forloopVariable)) {
                 Variable index0;
@@ -611,10 +612,10 @@ namespace Liquid {
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            if (op1.type || !op1.variant.isTruthy())
+            if (op1.type || !op1.variant.isTruthy(renderer.context.falsiness))
                 return Node(Variant(false));
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            Variant ret = Variant(!op2.type && op2.variant.isTruthy());
+            Variant ret = Variant(!op2.type && op2.variant.isTruthy(renderer.context.falsiness));
             return Node(ret);
         }
     };
@@ -623,10 +624,10 @@ namespace Liquid {
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            if (!op1.type && op1.variant.isTruthy())
+            if (!op1.type && op1.variant.isTruthy(renderer.context.falsiness))
                 return Node(Variant(true));
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            return Node(Variant(!op2.type && op2.variant.isTruthy()));
+            return Node(Variant(!op2.type && op2.variant.isTruthy(renderer.context.falsiness)));
         }
     };
 
@@ -1692,14 +1693,17 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type || operand.variant.isTruthy())
+            if (operand.type || operand.variant.isTruthy(renderer.context.falsiness))
                 return operand;
             return argument;
         }
     };
 
 
-    void StandardDialect::implement(Context& context) {
+
+    void StandardDialect::implement(Context& context, bool globalAssignsOnly, bool disallowParentheses, bool assignOperatorsOnly, EFalsiness falsiness) {
+
+        context.falsiness = falsiness;
         // Control flow tags.
         context.registerType<IfNode>();
         context.registerType<UnlessNode>();
@@ -1776,13 +1780,6 @@ namespace Liquid {
         context.registerType<TruncateFilterNode>();
         context.registerType<TruncateWordsFilterNode>();
         context.registerType<UpcaseFilterNode>();
-
-        // context.registerType<EscapeFilterNode>();
-        // context.registerType<MD5FilterNode>();
-        // context.registerType<SHA1FilterNode>();
-        // context.registerType<SHA256FilterNode>();
-        // context.registerType<NewlineToBr>();
-        // context.registerType<StripHTML>();
 
         // Array filters.
         context.registerType<JoinFilterNode>();
