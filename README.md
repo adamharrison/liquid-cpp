@@ -19,7 +19,7 @@ The C++ library, which is built with the normal Makefile can be linked in as a s
 
 int(int argc, char* argv[]) {
     Liquid::Context context;
-    Liquid::StandardDialect::implement(context);
+    Liquid::StandardDialect::implementPermissive(context);
     context.registerType<Liquid::CPPVariableNode>();
 
     Liquid::Parser parser(context);
@@ -47,13 +47,13 @@ The C library, which is built with the normal Makefile can be linked in as a sta
 
 int(int argc, char* argv[]) {
     // The liquid context represents all registered tags, operators, filters, and a way to resolve variables.
-    LiquidContext context = liquidCreateContext(LIQUID_SETTINGS_DEFAULT);
+    LiquidContext context = liquidCreateContext();
 
     // Very few of the bits of liquid are part of the 'core'; instead, they are implemented as dialects. In order to
     // stick in most of the default bits of Liquid, you can ask the context to implement the standard dialect, but this
     // is not necessary. The only default tag available is {% raw %}, as this is less a tag, and more a lexing hint. No
     // filters, or operators, other than the unary - operator, are available by default; they are are all part of the liquid standard dialect.
-    liquidImplementStandardDialect(context);
+    liquidImplementPermissiveStandardDialect(context);
     // In addition, dialects can be layered. Implementing one dialects does not forgo implementating another; and dialects
     // can override one another; whichever dialect was applied last will apply its proper tags, operators, and filters.
     // Currently, there is no way to deregsiter a tag, operator, or filter once registered.
@@ -92,7 +92,7 @@ int(int argc, char* argv[]) {
 There're two ways to get the ruby library working;
 
 ```ruby
-require 'liquid-c'
+require 'liquidc'
 context = LiquidC.new()
 renderer = LiquidC::Renderer.new(context)
 template = LiquidC::Template.new(context, "{% if a %}asdfghj {{ a }}{% endif %}")

@@ -1,0 +1,5 @@
+require "rake/extensiontask"
+
+Rake::ExtensionTask.new "liquidc" do |ext|
+	ext.lib_dir = "lib/liquidc"
+end

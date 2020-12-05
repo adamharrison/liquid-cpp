@@ -2,13 +2,13 @@
 
 require 'mkmf'
 
-extension_name = 'LiquidC'
+extension_name = 'liquidc'
 
 dir_config(extension_name);
 
 $CFLAGS += " -O3"
 
 $libs = append_library($libs, "stdc++");
-$libs = append_library($libs, "liquid");
+$libs += "-L" + File.absolute_path(File.dirname(__FILE__) + "/../../../bin") + " -lliquid";
 
 create_makefile(extension_name);
