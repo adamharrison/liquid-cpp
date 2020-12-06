@@ -60,6 +60,7 @@
 			<Add library="libz" />
 			<Add library="libtokyocabinet" />
 		</Linker>
+		<Unit filename="CMakeLists.txt" />
 		<Unit filename="Makefile">
 			<Option target="library" />
 		</Unit>
@@ -68,11 +69,14 @@
 		<Unit filename="perl/lib/WWW/Shopify/Liquid/XS.pm" />
 		<Unit filename="perl/t/WWW-Shopify-Liquid-XS.t" />
 		<Unit filename="perl/test.pl" />
-		<Unit filename="ruby/Makefile" />
-		<Unit filename="ruby/extconf.rb" />
-		<Unit filename="ruby/liquid.c">
+		<Unit filename="ruby/ext/liquidc/extconf.rb" />
+		<Unit filename="ruby/ext/liquidc/liquid.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="ruby/lib/liquidc.rb" />
+		<Unit filename="ruby/liquidc-0.0.0.gem" />
+		<Unit filename="ruby/liquidc.gemspec" />
+		<Unit filename="ruby/t/test.rb" />
 		<Unit filename="src/common.h" />
 		<Unit filename="src/context.cpp">
 			<Option target="library" />
