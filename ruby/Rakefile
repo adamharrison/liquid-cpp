@@ -5,16 +5,17 @@ Rake::ExtensionTask.new "liquidc" do |ext|
 end
 
 spec = Gem::Specification.new "liquidc", "0.1.0" do |s|
-	s.name		= 'liquidc'
-	s.version	= '0.1.0'
-	s.date		= '2020-12-05'
-	s.summary	= "LiquidC"
+	s.name		    = 'liquidc'
+	s.version	    = '0.1.0'
+	s.date		    = '2020-12-05'
+	s.summary	    = "LiquidC"
 	s.description	= "The ruby gem that hooks into the liquid-cpp library."
-	s.authors	= ["Adam Harrison"]
-	s.email		= 'adamdharrison@gmail.com'
-	s.homepage	= 'https://github.com/adamharrison/liquid-cpp'
-	s.license	= 'MIT'
-	s.extensions 	= ["ext/liquidc/extconf.rb", "ext/liquidc/liquid.c"]
+	s.authors	    = ["Adam Harrison"]
+	s.email		    = 'adamdharrison@gmail.com'
+	s.homepage	    = 'https://github.com/adamharrison/liquid-cpp'
+	s.license	    = 'MIT'
+	s.extensions    = ["ext/liquidc/extconf.rb"]
+	s.files         = ["ext/liquidc/extconf.rb", "ext/liquidc/liquid.c"]
 end
 
 Gem::PackageTask.new(spec) do |pkg|

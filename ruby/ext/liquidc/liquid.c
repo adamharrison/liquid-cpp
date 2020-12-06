@@ -1,5 +1,5 @@
 #include <ruby.h>
-#include <liquid/interface.h>
+#include <liquid/liquid.h>
 
 VALUE liquidC = Qnil;
 
@@ -393,7 +393,7 @@ VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
     return str;
 }
 
-void Init_LiquidC() {
+void Init_liquidC() {
 	VALUE liquidC, liquidCRenderer, liquidCTemplate;
 	liquidC = rb_define_class("LiquidC", rb_cData);
 	liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cData);

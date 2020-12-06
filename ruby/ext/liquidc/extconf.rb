@@ -6,9 +6,9 @@ extension_name = 'liquidc'
 
 dir_config(extension_name);
 
-$CFLAGS += " -O3 -I" + File.absolute_path(File.dirname(__FILE__) + "/../../../src")
+$CFLAGS += " -O3"
 
 $libs = append_library($libs, "stdc++");
-$libs += "-L" + File.absolute_path(File.dirname(__FILE__) + "/../../../bin") + " -lliquid";
+$libs = append_library($libs, "liquid");
 
 create_makefile(extension_name);

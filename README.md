@@ -9,54 +9,76 @@ In development. Currently a bit all over the place.
 
 ### Quick Start
 
+### Building
+
+Building the library is easy; so long as you have the appropriate build-system; currently the library uses cmake to build across platforms.
+
+It can be built and installed like so, from the main directory:
+
+```
+mkdir -p build && cd build && cmake .. && make && sudo make install
+```
+
+Eventually, I'll have a .deb that can be downloaded from somewhere for Ubuntu distros, but that's not quite up yet.
+
 #### C++
 
 The C++ library, which is built with the normal Makefile can be linked in as a static library. Will eventually be available as a header-only library.
 
 ```c++
 #include <cstdio>
-#include "liquid.h"
+#include <liquid/liquid.h>
 
 int(int argc, char* argv[]) {
+    // The liquid context represents all registered tags, operators, filters, and a way to resolve variables.
     Liquid::Context context;
+    // Very few of the bits of liquid are part of the 'core'; instead, they are implemented as dialects. In order to
+    // stick in most of the default bits of Liquid, you can ask the context to implement the standard dialect, but this
+    // is not necessary. The only default tag available is {% raw %}, as this is less a tag, and more a lexing hint. No
+    // filters, or operators, other than the unary - operator, are available by default; they are are all part of the liquid standard dialect.
+    // In addition to setting all these nodes up, this also sets the 'truthiness' of variables to evaluted in a loose manner; meaning
+    // that in addition to false and nil, being not true; 0, and empty string are also considered not true.
+    // In order to implement the stricter Shopify ruby version of things, use `implementStrict` instead.
     Liquid::StandardDialect::implementPermissive(context);
+    // In addition, dialects can be layered. Implementing one dialect does not forgo implementating another; and dialects
+    // can override one another; whichever dialect was applied last will apply its proper tags, operators, and filters.
+    // Currently, there is no way to deregsiter a tag, operator, or filter once registered.
+
+    // Register the standard, out of the box variable implementation that lets us pass a type union'd variant that can hold either a long long, double, pointer, string, vector, or unordered_map<string, ...> .
     context.registerType<Liquid::CPPVariableNode>();
 
+    // Initialize a parser. These should be thread-local. One parser can parse many files.
     Liquid::Parser parser(context);
 
     const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
     // Throws an exception if there's a parsing error.
     Liquid::Node ast = parser.parseFile(exampleFile, sizeof(exampleFile)-1);
+    // Initialize a renderer. These should be thread-local. One renderer can render many templates.
     Liquid::Renderer renderer(context);
 
     Liquid::CPPVariable store;
     store["a"] = 10;
 
     std::string result = renderer.render(ast, store);
+    // Should output "123423"
     fprintf(stdout, "%s\n", result.data());
     return 0;
 }
 ```
 
+This program should be linked with `-lliquid`.
+
 #### C
 
-The C library, which is built with the normal Makefile can be linked in as a static library.
+The following program below is analogous to the one above, only using the external C interface.
 
 ```c
 #include <stdio.h>
+#include <liquid/liquid.h>
 
 int(int argc, char* argv[]) {
-    // The liquid context represents all registered tags, operators, filters, and a way to resolve variables.
     LiquidContext context = liquidCreateContext();
-
-    // Very few of the bits of liquid are part of the 'core'; instead, they are implemented as dialects. In order to
-    // stick in most of the default bits of Liquid, you can ask the context to implement the standard dialect, but this
-    // is not necessary. The only default tag available is {% raw %}, as this is less a tag, and more a lexing hint. No
-    // filters, or operators, other than the unary - operator, are available by default; they are are all part of the liquid standard dialect.
     liquidImplementPermissiveStandardDialect(context);
-    // In addition, dialects can be layered. Implementing one dialects does not forgo implementating another; and dialects
-    // can override one another; whichever dialect was applied last will apply its proper tags, operators, and filters.
-    // Currently, there is no way to deregsiter a tag, operator, or filter once registered.
 
     // If no LiquidVariableResolver is specified; an internal default is used that won't read anything you pass in, but will funciton for {% assign %}, {% capture %} and other tags.
     LiquidVariableResolver resolver = {
@@ -87,7 +109,19 @@ int(int argc, char* argv[]) {
 }
 ```
 
+This program should be linked with `-lliquid -lstdc++`.
+
 #### Ruby
+
+##### Install
+
+Currently the package isn't uploaded on rubygems, so it has to be build manually. Luckily; this is easy:
+
+```
+cd ruby && rake compile && rake gem && gem install pkg/*.gem && cd -
+```
+
+##### Usage
 
 There're two ways to get the ruby library working;
 
@@ -99,23 +133,32 @@ template = LiquidC::Template.new(context, "{% if a %}asdfghj {{ a }}{% endif %}"
 puts renderer.render({ "a" => 1 }, template)
 ```
 
-Or, alternatively, one can use the "drop in replacement" function, which will register the exact same constructs as the normal liquid library.
-
-This is generally discouraged, as you lose some useful features of the library; like the ability to have independent liquid contexts with different
-tags, filters, operators, and settings; and you have explicit thread-safe rendering of shared templates, vs. just shoving everything into a global namespace.
-But, it's of course, up to you.
+Or, alternatively, one can use the "drop in replacement" module, which wraps all this, which will register the exact same constructs as the normal liquid library. (Coming Soon!)
 
 ```ruby
-require 'liquid-c'
-LiquidC::DIR()
+require 'liquid-creplacement'
 
 template = Liquid::Template.parse("{% if a %}asdfghj {{ a }}{% endif %}")
 puts template.render({ "a" => 1 }, template)
 ```
 
-May eventually stick the "drop in replacement" into a separate module, that just calls it a in single include.
+This is generally discouraged, as you lose some useful features of the library; like the ability to have independent liquid contexts with different
+tags, filters, operators, and settings; and you have explicit thread-safe rendering of shared templates, vs. just shoving everything into a global namespace.
+But, it's of course, up to you.
 
 #### Perl
+
+##### Install
+
+Currently the module hasn't been uploaded to CPAN, but can be built and installed like so;
+
+```
+cd perl && perl Makefile.PL && make && sudo make install && cd -
+```
+
+Will eventually upload this.
+
+##### Usage
 
 Uses the exact same interface as `WWW::Shopify::Liquid`, and is basically almost fully compatible with it as `WWW::Shopify::Liquid::XS`.
 
@@ -129,6 +172,10 @@ that use `operate` instead of `process` or `render` should function without chan
     my $text = $liquid->render_file({ }, "myfile.liquid");
     print "$text\n";
 ```
+
+### Python
+
+This will probably come around at some point; but currently, there are no bindings for Python.
 
 ## Features / Roadmap
 
@@ -144,6 +191,7 @@ This is what I'm aiming for at any rate.
 * Fully featured `extern "C"` interface for easy linking to most scripting languages. OOB bindings for both Ruby and Perl will be provided, that will act as drop-in replacements for `Liquid` and `WWW::Shopify::Liquid`.
 * Significant speedup over ruby-based liquid. (Need to do benchmarks; but at first glance seems like a minimum of a 6-fold speedup over regular Liquid)
 * Fully compatible with both `Liquid`, Shopify's ruby gem, and `WWW::Shopify::Liquid`, the perl implementation. The only thing we're missing is optimizer, or AST walk capabilities.
+* Use a standard build system; like cmake, instead of a manual make.
 
 ### Partial
 
@@ -158,8 +206,6 @@ This is what I'm aiming for at any rate.
 * Ability to partially render content, then spit back out the remaining liquid that genreated it.
 * Optional compatibilty with rapidjson to allow for JSON reading.
 * Built-in optimizer that will do things like loop unrolling, conditional elimiation, etc...
-* Use a standard build system; like cmake, instead of a manual make.
-* Header-only library version.
 
 
 ## License
