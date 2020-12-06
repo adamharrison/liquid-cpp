@@ -1,5 +1,5 @@
 #include <ruby.h>
-#include "../../../src/interface.h"
+#include <liquid/interface.h>
 
 VALUE liquidC = Qnil;
 

@@ -3,3 +3,4 @@ Makefile
 *.so
 tmp
 *.gem
+pkg
