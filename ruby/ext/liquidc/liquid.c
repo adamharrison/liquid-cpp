@@ -3,7 +3,6 @@
 
 VALUE liquidC = Qnil;
 
-
 static LiquidVariableType liquidCgetType(void* variable) {
     switch (TYPE(variable)) {
         case T_FIXNUM:
@@ -393,7 +392,7 @@ VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
     return str;
 }
 
-void Init_liquidC() {
+void Init_liquidc() {
 	VALUE liquidC, liquidCRenderer, liquidCTemplate;
 	liquidC = rb_define_class("LiquidC", rb_cData);
 	liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cData);

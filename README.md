@@ -15,9 +15,7 @@ Building the library is easy; so long as you have the appropriate build-system; 
 
 It can be built and installed like so, from the main directory:
 
-```
-mkdir -p build && cd build && cmake .. && make && sudo make install
-```
+```mkdir -p build && cd build && cmake .. && make && sudo make install```
 
 Eventually, I'll have a .deb that can be downloaded from somewhere for Ubuntu distros, but that's not quite up yet.
 
@@ -113,13 +111,13 @@ This program should be linked with `-lliquid -lstdc++`.
 
 #### Ruby
 
+The ruby module uses the C interface to interface with the liquid library.
+
 ##### Install
 
 Currently the package isn't uploaded on rubygems, so it has to be build manually. Luckily; this is easy:
 
-```
-cd ruby && rake compile && rake gem && gem install pkg/*.gem && cd -
-```
+```cd ruby && rake compile && rake gem && gem install pkg/*.gem && cd -```
 
 ##### Usage
 
@@ -133,10 +131,14 @@ template = LiquidC::Template.new(context, "{% if a %}asdfghj {{ a }}{% endif %}"
 puts renderer.render({ "a" => 1 }, template)
 ```
 
-Or, alternatively, one can use the "drop in replacement" module, which wraps all this, which will register the exact same constructs as the normal liquid library. (Coming Soon!)
+###### Coming Soon!
+
+Or, alternatively, one can use the "drop in replacement" module, which wraps all this, which will register the exact same constructs as the normal liquid library.
+The advantage of this is that by simply replacing your include statements, you should be able to use your existing code; but it'll be close to an order of magnitude
+faster.
 
 ```ruby
-require 'liquid-creplacement'
+require 'liquidc-dir'
 
 template = Liquid::Template.parse("{% if a %}asdfghj {{ a }}{% endif %}")
 puts template.render({ "a" => 1 }, template)
@@ -148,13 +150,13 @@ But, it's of course, up to you.
 
 #### Perl
 
+The perl module uses the C interface to interface with the liquid library.
+
 ##### Install
 
 Currently the module hasn't been uploaded to CPAN, but can be built and installed like so;
 
-```
-cd perl && perl Makefile.PL && make && sudo make install && cd -
-```
+```cd perl && perl Makefile.PL && make && sudo make install && cd -```
 
 Will eventually upload this.
 
@@ -173,9 +175,13 @@ that use `operate` instead of `process` or `render` should function without chan
     print "$text\n";
 ```
 
-### Python
+#### Python
 
 This will probably come around at some point; but currently, there are no bindings for Python.
+
+#### Javascript
+
+This *may* happen. *Maybe*.
 
 ## Features / Roadmap
 

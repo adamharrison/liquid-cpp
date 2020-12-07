@@ -1,5 +1,5 @@
 require 'liquid'
-require './LiquidC'
+require 'liquidc'
 
 context = LiquidC.new("strict")
 renderer = LiquidC::Renderer.new(context)
@@ -13,7 +13,6 @@ start = Time.now
 (1..10000).each { |x| 
 	template = LiquidC::Template.new(context, templateContent)
 	s = renderer.render({ "a" => 0 }, template)
-	raise s
 }
 
 puts (Time.now - start)*1000
