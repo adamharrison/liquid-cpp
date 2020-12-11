@@ -357,6 +357,10 @@ TEST(sanity, composite) {
     Node ast;
     std::string str;
 
+    ast = getParser().parse("{% if a %}asdfghj {{ a }}{% else %}asdfjlsjkhgsjlkhglsdfjkgdfhs{% for i in (1..10) %}{{ i }}fasdfsdf{% endfor %}{% endif %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "asdfjlsjkhgsjlkhglsdfjkgdfhs1fasdfsdf2fasdfsdf3fasdfsdf4fasdfsdf5fasdfsdf6fasdfsdf7fasdfsdf8fasdfsdf9fasdfsdf10fasdfsdf");
+
     CPPVariable line_item, line_item1, line_item2, product, product_option1, product_option2, product_option3;
 
     order["id"] = 2;

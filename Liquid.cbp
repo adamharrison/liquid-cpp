@@ -35,6 +35,7 @@
 				<Option output="bin/01sanity" prefix_auto="1" extension_auto="1" />
 				<Option type="1" />
 				<Option compiler="gcc" />
+				<Option parameters="--gtest_filter=sanity.composite" />
 				<MakeCommands>
 					<Build command="$make -f $makefile $target -j 4" />
 					<CompileFile command="$make -f $makefile $file" />
@@ -69,13 +70,12 @@
 		<Unit filename="perl/lib/WWW/Shopify/Liquid/XS.pm" />
 		<Unit filename="perl/t/WWW-Shopify-Liquid-XS.t" />
 		<Unit filename="perl/test.pl" />
+		<Unit filename="ruby/Rakefile" />
 		<Unit filename="ruby/ext/liquidc/extconf.rb" />
 		<Unit filename="ruby/ext/liquidc/liquid.c">
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="ruby/lib/liquidc.rb" />
-		<Unit filename="ruby/liquidc-0.0.0.gem" />
-		<Unit filename="ruby/liquidc.gemspec" />
 		<Unit filename="ruby/t/test.rb" />
 		<Unit filename="src/common.h" />
 		<Unit filename="src/context.cpp">

@@ -5,7 +5,7 @@ Is a soon-to-be fully featured C++17 renderer for Liquid; Shopify's templating l
 
 ## Status
 
-In development. Currently a bit all over the place.
+In development. Currently a bit all over the place. **Do not use in production code, as this has not been vetted for memory bugs, or anything beyond general performance and features.**
 
 ### Quick Start
 
@@ -134,7 +134,7 @@ puts renderer.render({ "a" => 1 }, template)
 ###### Coming Soon!
 
 Or, alternatively, one can use the "drop in replacement" module, which wraps all this, which will register the exact same constructs as the normal liquid library.
-The advantage of this is that by simply replacing your include statements, you should be able to use your existing code; but it'll be close to an order of magnitude
+The advantage of this is that by simply replacing your require statements, you should be able to use your existing code; but it'll be close to an order of magnitude
 faster.
 
 ```ruby

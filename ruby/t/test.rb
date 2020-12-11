@@ -10,18 +10,22 @@ templateContent = "{% if a %}asdfghj {{ a }}{% else %}asdfjlsjkhgsjlkhglsdfjkgdf
 
 start = Time.now
 
+template1 = LiquidC::Template.new(context, templateContent)
+template2 = Liquid::Template.parse(templateContent)
+
+s = nil
 (1..10000).each { |x| 
-	template = LiquidC::Template.new(context, templateContent)
-	s = renderer.render({ "a" => 0 }, template)
+	s = renderer.render({ "a" => false }, template1)
 }
+puts s
 
 puts (Time.now - start)*1000
 
 start = Time.now
 
 (1..10000).each { |x| 
-	template = Liquid::Template.parse(templateContent)
-	s = template.render({ "a" => 0 })
+	s = template2.render({ "a" => false })
 }
+puts s
 
 puts (Time.now - start)*1000
