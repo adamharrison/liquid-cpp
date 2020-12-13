@@ -54,8 +54,6 @@ extern "C" {
     };
     typedef struct SLiquidParserError LiquidParserError;
 
-
-
     enum ELiquidRenderErrorType {
         LIQUID_RENDERER_ERROR_TYPE_NONE,
         LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_MEMORY,
@@ -168,6 +166,12 @@ extern "C" {
     void liquidFreeContext(LiquidContext context);
     void liquidImplementStrictStandardDialect(LiquidContext context);
     void liquidImplementPermissiveStandardDialect(LiquidContext context);
+    #ifdef LIQUID_INCLUDE_WEB_DIALECT
+        void liquidImplementWebDialect(LiquidContext context);
+    #endif
+    #ifdef LIQUID_INCLUDE_RAPIDJSON_VARIABLE
+        void liquidImplementJSONStringVariable();
+    #endif
 
     LiquidRenderer liquidCreateRenderer(LiquidContext context);
     void liquidRendererSetReturnValueNil(LiquidRenderer renderer);

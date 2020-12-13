@@ -11,8 +11,10 @@ namespace Liquid {
     // As such, you can either enable/disable features one at a time, or call `implementStrict`, or `implementPermissive` for the
     // defaults that are most/least/permissive.
 
+    struct Dialect {};
+
     // The only tags missing from the standard set of non-web tags is {% include %}.
-    struct StandardDialect {
+    struct StandardDialect :Dialect {
 
         static void implement(
             Context& context,
@@ -49,5 +51,10 @@ namespace Liquid {
         }
     };
 };
+
+#ifdef LIQUID_INCLUDE_WEB_DIALECT
+    #include "dialects/web.h"
+#endif
+
 
 #endif

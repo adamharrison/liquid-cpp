@@ -16,6 +16,9 @@ Context& getContext() {
     static Context context;
     if (!setup) {
         StandardDialect::implementPermissive(context);
+        #ifdef LIQUID_INCLUDE_WEB_DIALECT
+            WebDialect::implement(context);
+        #endif
         context.registerType<CPPVariableNode>();
         setup = true;
     }
@@ -482,6 +485,78 @@ TEST(sanity, error) {
     }, Parser::Exception);
 
 }
+
+//#ifdef LIQUID_INCLUDE_RAPIDJSON_VARIABLE
+
+#include "../src/rapidjsonvariable.h"
+
+TEST(sanity, rj) {
+    Context context;
+    StandardDialect::implementPermissive(context);
+
+    Parser parser(context);
+    Renderer renderer(context);
+    rapidjson::Document d;
+
+    d.Parse("{\"a\":\"b\"}");
+
+    Node ast = parser.parse("{{ a }}");
+
+    string str = renderer.render(ast, &d);
+
+    ASSERT_EQ(str, "b");
+}
+
+//#endif
+
+#ifdef LIQUID_INCLUDE_WEB_DIALECT
+
+TEST(sanity, web) {
+
+    CPPVariable hash = { };
+    hash["a"] = 1;
+    Node ast;
+    std::string str;
+
+    ast = getParser().parse("{{ 'a' | md5 }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "0cc175b9c0f1b6a831c399e269772661");
+
+    ast = getParser().parse("{{ 'a' | sha1 }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "86f7e437faa5a7fce15d1ddcb9eaeaea377667b8");
+
+    ast = getParser().parse("{{ 'a' | sha256 }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb");
+
+    ast = getParser().parse("{{ 'a' | hmac_sha1: 'b' }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "8abe0fd691e3da3035f7b7ac91be45d99e942b9e");
+
+    ast = getParser().parse("{{ 'a' | hmac_sha256: 'b' }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "cb448b440c42ac8ad084fc8a8795c98f5b7802359c305eabd57ecdb20e248896");
+
+    ast = getParser().parse("{{ '<html></html>' | escape }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "&lt;html&gt;&lt;/html&gt;");
+
+    ast = getParser().parse("{% scss %}.a { .b { margin-left: 2px; } }{% endscss %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, ".a .b {\n  margin-left: 2px; }\n");
+
+    ast = getParser().parse("{% minify_css %}.a .b { margin-left: 2px; }{% endminify_css %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, ".a .b{margin-left:2px}");
+
+    ast = getParser().parse("{% minify_js %}var a = 1 + 2 + 3 + 4; console.log(a);{% endminify_js %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "var a=1+2+3+4;console.log(a);");
+
+}
+
+#endif
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

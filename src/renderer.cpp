@@ -124,7 +124,7 @@ namespace Liquid {
                 if (size >= 0) {
                     s.resize(size);
                     if (resolver.getString(node.variant.v.pointer, const_cast<char*>(s.data())))
-                        return move(s);
+                        return s;
                 }
             } else {
                 return node.variant.getString();

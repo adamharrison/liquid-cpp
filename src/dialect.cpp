@@ -517,7 +517,6 @@ namespace Liquid {
             if (op1.type || op2.type)
                 return Node();
             switch (op1.variant.type) {
-                return Node();
                 case Variant::Type::INT:
                     switch (op2.variant.type) {
                         case Variant::Type::INT:
@@ -563,7 +562,6 @@ namespace Liquid {
             if (op1.type || op2.type)
                 return Node();
             switch (op1.variant.type) {
-                return Node();
                 case Variant::Type::INT:
                     switch (op2.variant.type) {
                         case Variant::Type::INT:
@@ -1799,3 +1797,7 @@ namespace Liquid {
         context.registerType<DefaultFilterNode>();
     }
 }
+
+#ifdef LIQUID_INCLUDE_WEB_DIALECT
+    #include "dialects/web.cpp"
+#endif

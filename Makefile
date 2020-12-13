@@ -4,9 +4,9 @@ BDIR=bin
 TDIR=t
 CXX=g++
 CC=gcc
-CFLAGS=-Wall -fexceptions -fPIC
+CFLAGS=-Wall -fexceptions -fPIC -DLIQUID_INCLUDE_WEB_DIALECT -DLIQUID_INCLUDE_RAPIDJSON_VARIABLE
 CXXFLAGS=$(CFLAGS) -std=c++17
-LDFLAGS=
+LDFLAGS=-lsass -lcrypto
 AR=ar
 RUBY_DIR=ruby
 PERL_DIR=perl
@@ -22,6 +22,7 @@ DEPENDS=$(wildcard $(ODIR)/*.d)
 $(BDIR)/01sanity: $(LIBRARY) $(ODIR)/01sanity.o
 	$(CXX) $(ODIR)/01sanity.o -L$(BDIR) -lliquid -lgtest -lpthread -o $(BDIR)/01sanity $(LDFLAGS)
 
+test: CFLAGS := $(CFLAGS) -g
 test: $(BDIR)/01sanity
 
 $(LIBRARY): $(LIBRARYOBJECTS)
