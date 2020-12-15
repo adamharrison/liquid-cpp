@@ -42,9 +42,6 @@ int(int argc, char* argv[]) {
     // can override one another; whichever dialect was applied last will apply its proper tags, operators, and filters.
     // Currently, there is no way to deregsiter a tag, operator, or filter once registered.
 
-    // Register the standard, out of the box variable implementation that lets us pass a type union'd variant that can hold either a long long, double, pointer, string, vector, or unordered_map<string, ...> .
-    context.registerType<Liquid::CPPVariableNode>();
-
     // Initialize a parser. These should be thread-local. One parser can parse many files.
     Liquid::Parser parser(context);
 
@@ -52,7 +49,8 @@ int(int argc, char* argv[]) {
     // Throws an exception if there's a parsing error.
     Liquid::Node ast = parser.parseFile(exampleFile, sizeof(exampleFile)-1);
     // Initialize a renderer. These should be thread-local. One renderer can render many templates.
-    Liquid::Renderer renderer(context);
+    // Register the standard, out of the box variable implementation that lets us pass a type union'd variant that can hold either a long long, double, pointer, string, vector, or unordered_map<string, ...> .
+    Liquid::Renderer renderer(context, CPPVariableResolver());
 
     Liquid::CPPVariable store;
     store["a"] = 10;
@@ -201,6 +199,7 @@ This is what I'm aiming for at any rate.
 * Significant speedup over ruby-based liquid. (Need to do benchmarks; but at first glance seems like a minimum of a 6-fold speedup over regular Liquid)
 * Fully compatible with both `Liquid`, Shopify's ruby gem, and `WWW::Shopify::Liquid`, the perl implementation. The only thing we're missing is optimizer, or AST walk capabilities.
 * Use a standard build system; like cmake, instead of a manual make.
+* Optional compatibilty with rapidjson to allow for JSON reading.
 
 ### Partial
 
@@ -213,7 +212,6 @@ This is what I'm aiming for at any rate.
 ### TODO
 
 * Ability to partially render content, then spit back out the remaining liquid that genreated it.
-* Optional compatibilty with rapidjson to allow for JSON reading.
 * Built-in optimizer that will do things like loop unrolling, conditional elimiation, etc...
 
 

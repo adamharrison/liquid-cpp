@@ -141,6 +141,7 @@ namespace Liquid {
 
 
         Node getOperand(Renderer& renderer, const Node& node, Variable store) const;
+        Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
     };
 
 
@@ -182,34 +183,16 @@ namespace Liquid {
         };
 
         // These are purely for parsing purpose, and should not make their way to the rednerer.
-        struct GroupNode : PassthruNode {
-            GroupNode() : PassthruNode(Type::GROUP) { }
-        };
+        struct GroupNode : PassthruNode { GroupNode() : PassthruNode(Type::GROUP) { } };
         // These are purely for parsing purpose, and should not make their way to the rednerer.
-        struct GroupDereferenceNode : PassthruNode {
-            GroupDereferenceNode() : PassthruNode(Type::GROUP_DEREFERENCE) { }
-        };
+        struct GroupDereferenceNode : PassthruNode { GroupDereferenceNode() : PassthruNode(Type::GROUP_DEREFERENCE) { } };
         // Used exclusively for tags. Should be never be rendered by itself.
-        struct ArgumentNode : NodeType {
-            ArgumentNode() : NodeType(Type::ARGUMENTS) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const { assert(false); }
-        };
-
-        struct UnknownFilterNode : FilterNodeType {
-            UnknownFilterNode() : FilterNodeType("", -1, -1) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
-        };
+        struct ArgumentNode : NodeType { ArgumentNode() : NodeType(Type::ARGUMENTS) { } };
+        struct UnknownFilterNode : FilterNodeType { UnknownFilterNode() : FilterNodeType("", -1, -1) { } };
 
         EFalsiness falsiness = FALSY_FALSE;
 
         struct VariableNode : NodeType {
-            /* Things like .size, etc.. */
-            struct UnaryVariableFilterNode : FilterNodeType {
-                UnaryVariableFilterNode(const std::string& symbol) : FilterNodeType(symbol, 0, 0) { }
-            };
-
-            unordered_map<std::string, unique_ptr<NodeType>> filters;
-
             VariableNode() : NodeType(Type::VARIABLE) { }
 
             Node render(Renderer& renderer, const Node& node, Variable store) const {
@@ -231,7 +214,6 @@ namespace Liquid {
         const NodeType* getGroupDereferenceNodeType() const { static GroupDereferenceNode groupDereferenceNodeType; return &groupDereferenceNodeType; }
         const NodeType* getArgumentsNodeType() const { static ArgumentNode argumentNodeType; return &argumentNodeType; }
         const NodeType* getUnknownFilterNodeType() const { static UnknownFilterNode filterNodeType; return &filterNodeType; }
-
 
         void registerType(unique_ptr<NodeType> type) {
             switch (type->type) {

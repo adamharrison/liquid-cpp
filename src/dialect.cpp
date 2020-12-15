@@ -323,7 +323,7 @@ namespace Liquid {
                 resolver.setDictionaryVariable(forLoopContext.renderer, forLoopVariable, "length", resolver.createInteger(forLoopContext.renderer, forLoopContext.length));
 
                 forLoopContext.result.append(forLoopContext.renderer.retrieveRenderedNode(*forLoopContext.node.children[1].get(), forLoopContext.store).getString());
-                ++forLoopContext.idx;;
+                ++forLoopContext.idx;
 
                 if (forLoopContext.renderer.control != Renderer::Control::NONE)  {
                     if (forLoopContext.renderer.control == Renderer::Control::BREAK) {
@@ -1579,6 +1579,45 @@ namespace Liquid {
         }
     };
 
+    struct FirstDotFilterNode : DotFilterNodeType {
+        FirstDotFilterNode() : DotFilterNodeType("first") { }
+
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            auto operand = getOperand(renderer, node, store);
+            if (operand.type)
+                return Node();
+
+            switch (operand.variant.type) {
+                case Variant::Type::ARRAY:
+                    return variantOperate(renderer, node, store, operand.variant);
+                case Variant::Type::VARIABLE:
+                    return variableOperate(renderer, node, store, operand.variant.v);
+                default:
+                    return Node();
+            }
+        }
+
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
+            Variable v;
+            LiquidVariableType type = renderer.variableResolver.getType(operand);
+            if (type == LiquidVariableType::LIQUID_VARIABLE_TYPE_DICTIONARY) {
+                if (!renderer.variableResolver.getDictionaryVariable(operand, "first", v))
+                    return Node();
+                return Node(v);
+            }
+            if (!renderer.variableResolver.getArrayVariable(operand, 0, v))
+                return Node();
+            return Node(v);
+        }
+
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) const {
+            if (operand.type != Variant::Type::ARRAY || operand.a.size() == 0)
+                return Node();
+            return operand.a[0];
+        }
+    };
+
+
     struct LastFilterNode : ArrayFilterNodeType {
         LastFilterNode() : ArrayFilterNodeType("last", 0, 0) { }
 
@@ -1596,6 +1635,46 @@ namespace Liquid {
             return operand.a[operand.a.size()-1];
         }
     };
+
+
+    struct LastDotFilterNode : DotFilterNodeType {
+        LastDotFilterNode() : DotFilterNodeType("last") { }
+
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            auto operand = getOperand(renderer, node, store);
+            if (operand.type)
+                return Node();
+
+            switch (operand.variant.type) {
+                case Variant::Type::ARRAY:
+                    return variantOperate(renderer, node, store, operand.variant);
+                case Variant::Type::VARIABLE:
+                    return variableOperate(renderer, node, store, operand.variant.v);
+                default:
+                    return Node();
+            }
+        }
+
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
+            Variable v;
+            LiquidVariableType type = renderer.variableResolver.getType(operand);
+            if (type == LiquidVariableType::LIQUID_VARIABLE_TYPE_DICTIONARY) {
+                if (!renderer.variableResolver.getDictionaryVariable(operand, "last", v))
+                    return Node();
+                return Node(v);
+            }
+            if (!renderer.variableResolver.getArrayVariable(operand, -1, v))
+                return Node();
+            return Node(v);
+        }
+
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) const {
+            if (operand.type != Variant::Type::ARRAY || operand.a.size() == 0)
+                return Node();
+            return operand.a[operand.a.size()-1];
+        }
+    };
+
 
     struct IndexFilterNode : ArrayFilterNodeType {
         IndexFilterNode() : ArrayFilterNodeType("index", 1, 1) { }
@@ -1621,6 +1700,8 @@ namespace Liquid {
             return operand.a[idx];
         }
     };
+
+
     struct SizeFilterNode : FilterNodeType {
         SizeFilterNode() : FilterNodeType("size", 0, 0) { }
 
@@ -1675,6 +1756,13 @@ namespace Liquid {
         }
 
         Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
+            LiquidVariableType type = renderer.variableResolver.getType(operand);
+            if (type == LiquidVariableType::LIQUID_VARIABLE_TYPE_DICTIONARY) {
+                Variable v;
+                if (!renderer.variableResolver.getDictionaryVariable(operand, "size", v))
+                    return Node();
+                return Node(v);
+            }
             long long size = renderer.variableResolver.getArraySize(operand);
             return size != -1 ? Node(size) : Node();
         }
@@ -1792,6 +1880,8 @@ namespace Liquid {
         context.registerType<ReverseFilterNode>();
         context.registerType<SizeFilterNode>();
         context.registerType<SizeDotFilterNode>();
+        context.registerType<FirstDotFilterNode>();
+        context.registerType<LastDotFilterNode>();
         context.registerType<SortFilterNode>();
         context.registerType<WhereFilterNode>();
         context.registerType<UniqFilterNode>();

@@ -200,44 +200,15 @@ VALUE liquidC_alloc(VALUE self) {
     return TypedData_Wrap_Struct(self, &liquidC_type, data);
 }
 
-VALUE liquidGlobalContext;
-
 VALUE liquidC_m_initialize(int argc, VALUE* argv, VALUE self) {
         LiquidContext* context;
         char* str;
-        LiquidVariableResolver resolver = {
-            liquidCgetType,
-            liquidCgetBool,
-            liquidCgetTruthy,
-            liquidCgetString,
-            liquidCgetStringLength,
-            liquidCgetInteger,
-            liquidCgetFloat,
-            liquidCgetDictionaryVariable,
-            liquidCgetArrayVariable,
-            liquidCiterate,
-            liquidCgetArraySize,
-            liquidCsetDictionaryVariable,
-            liquidCsetArrayVariable,
-            liquidCcreateHash,
-            liquidCcreateArray,
-            liquidCcreateFloat,
-            liquidCcreateBool,
-            liquidCcreateInteger,
-            liquidCcreateString,
-            liquidCcreatePointer,
-            liquidCcreateNil,
-            liquidCcreateClone,
-            liquidCfreeVariable,
-            liquidCcompare
-        };
         TypedData_Get_Struct(self, LiquidContext, &liquidC_type, context);
         *context = liquidCreateContext();
         if (liquidGetError()) {
             rb_raise(rb_eTypeError, "LiquidC init failure: %s.", liquidGetError());
             return self;
         }
-        liquidRegisterVariableResolver(*context, resolver);
 
         if (argc > 0) {
             str = StringValueCStr(argv[0]);
@@ -248,9 +219,6 @@ VALUE liquidC_m_initialize(int argc, VALUE* argv, VALUE self) {
         }
         else
             liquidImplementStrictStandardDialect(*context);
-
-        liquidGlobalContext = self;
-
         return self;
 }
 
@@ -268,11 +236,6 @@ VALUE liquidC_registerOperator(VALUE self, VALUE symbol, VALUE type, VALUE prior
 
 VALUE liquidC_registerDotFilter(VALUE self, VALUE symbol) {
     return Qnil;
-}
-
-
-VALUE liquidC_getSingleton(VALUE klass, VALUE name) {
-    return liquidGlobalContext;
 }
 
 
@@ -310,9 +273,36 @@ VALUE liquidCRenderer_alloc(VALUE self) {
 VALUE liquidCRenderer_m_initialize(VALUE self, VALUE contextValue) {
     LiquidRenderer* renderer;
     LiquidContext* context;
+    LiquidVariableResolver resolver = {
+        liquidCgetType,
+        liquidCgetBool,
+        liquidCgetTruthy,
+        liquidCgetString,
+        liquidCgetStringLength,
+        liquidCgetInteger,
+        liquidCgetFloat,
+        liquidCgetDictionaryVariable,
+        liquidCgetArrayVariable,
+        liquidCiterate,
+        liquidCgetArraySize,
+        liquidCsetDictionaryVariable,
+        liquidCsetArrayVariable,
+        liquidCcreateHash,
+        liquidCcreateArray,
+        liquidCcreateFloat,
+        liquidCcreateBool,
+        liquidCcreateInteger,
+        liquidCcreateString,
+        liquidCcreatePointer,
+        liquidCcreateNil,
+        liquidCcreateClone,
+        liquidCfreeVariable,
+        liquidCcompare
+    };
     TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, renderer);
     TypedData_Get_Struct(contextValue, LiquidContext, &liquidC_type, context);
     *renderer = liquidCreateRenderer(*context);
+    liquidRegisterVariableResolver(*renderer, resolver);
     return self;
 }
 

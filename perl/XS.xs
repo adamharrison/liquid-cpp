@@ -427,33 +427,6 @@ void*
 createContext()
     CODE:
         LiquidContext context = liquidCreateContext();
-        LiquidVariableResolver resolver = {
-            lpGetType,
-            lpGetBool,
-            lpGetTruthy,
-            lpGetString,
-            lpGetStringLength,
-            lpGetInteger,
-            lpGetFloat,
-            lpGetDictionaryVariable,
-            lpGetArrayVariable,
-            lpIterate,
-            lpGetArraySize,
-            lpSetDictionaryVariable,
-            lpSetArrayVariable,
-            lpCreateHash,
-            lpCreateArray,
-            lpCreateFloat,
-            lpCreateBool,
-            lpCreateInteger,
-            lpCreateString,
-            lpCreatePointer,
-            lpCreateNil,
-            lpCreateClone,
-            lpFreeVariable,
-            lpCompare
-        };
-        liquidRegisterVariableResolver(context, resolver);
         RETVAL = context.context;
     OUTPUT:
         RETVAL
@@ -480,7 +453,35 @@ void*
 createRenderer(context)
     void* context;
     CODE:
-        RETVAL = liquidCreateRenderer(*(LiquidContext*)&context).renderer;
+        LiquidVariableResolver resolver = {
+            lpGetType,
+            lpGetBool,
+            lpGetTruthy,
+            lpGetString,
+            lpGetStringLength,
+            lpGetInteger,
+            lpGetFloat,
+            lpGetDictionaryVariable,
+            lpGetArrayVariable,
+            lpIterate,
+            lpGetArraySize,
+            lpSetDictionaryVariable,
+            lpSetArrayVariable,
+            lpCreateHash,
+            lpCreateArray,
+            lpCreateFloat,
+            lpCreateBool,
+            lpCreateInteger,
+            lpCreateString,
+            lpCreatePointer,
+            lpCreateNil,
+            lpCreateClone,
+            lpFreeVariable,
+            lpCompare
+        };
+        LiquidRenderer renderer = liquidCreateRenderer(*(LiquidContext*)&context);
+        liquidRegisterVariableResolver(renderer, resolver);
+        RETVAL = renderer.renderer;
     OUTPUT:
         RETVAL
 
