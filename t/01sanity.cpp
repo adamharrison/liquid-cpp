@@ -19,14 +19,13 @@ Context& getContext() {
         #ifdef LIQUID_INCLUDE_WEB_DIALECT
             WebDialect::implement(context);
         #endif
-        context.registerType<CPPVariableNode>();
         setup = true;
     }
     return context;
 }
 
 Renderer& getRenderer() {
-    static Renderer renderer(getContext());
+    static Renderer renderer(getContext(), CPPVariableResolver());
     return renderer;
 }
 Parser& getParser() {
@@ -322,6 +321,21 @@ TEST(sanity, forloop) {
 }
 
 
+TEST(sanity, negation) {
+    CPPVariable hash, internal;
+
+    internal["b"] = 0;
+    internal["c"] = 1;
+    hash["a"] = move(internal);
+    Node ast;
+    std::string str;
+
+
+    ast = getParser().parse("{{ !a.b }} {{ !a.c }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "true false");
+}
+
 TEST(sanity, filters) {
     CPPVariable hash = { };
     hash["a"] = 1;
@@ -491,16 +505,14 @@ TEST(sanity, error) {
 #include "../src/rapidjsonvariable.h"
 
 TEST(sanity, rj) {
-    Context context;
-    StandardDialect::implementPermissive(context);
 
-    Parser parser(context);
-    Renderer renderer(context);
+    Node ast;
+
+    Renderer renderer(getContext(), RapidJSONVariableResolver());
+    ast = getParser().parse("{{ a }}");
     rapidjson::Document d;
 
     d.Parse("{\"a\":\"b\"}");
-
-    Node ast = parser.parse("{{ a }}");
 
     string str = renderer.render(ast, &d);
 

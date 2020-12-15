@@ -164,11 +164,9 @@ void liquidRendererSetReturnValueVariable(LiquidRenderer renderer, void* variabl
     static_cast<Renderer*>(renderer.renderer)->returnValue = Variant(Variable{variable});
 }
 
-void liquidRegisterVariableResolver(LiquidContext context, LiquidVariableResolver resolver) {
-    Context* ctx = static_cast<Context*>(context.context);
-    unique_ptr<NodeType> type = make_unique<Context::VariableNode>();
-    static_cast<Context::VariableNode*>(type.get())->variableResolver = resolver;
-    ctx->registerType(move(type));
+void liquidRegisterVariableResolver(LiquidRenderer renderer, LiquidVariableResolver resolver) {
+    Renderer* rdr = static_cast<Renderer*>(renderer.renderer);
+    rdr->variableResolver = resolver;
 }
 
 void liquidFreeTemplateRender(LiquidTemplateRender render) {

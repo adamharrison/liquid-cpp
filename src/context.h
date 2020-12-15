@@ -210,70 +210,10 @@ namespace Liquid {
 
             unordered_map<std::string, unique_ptr<NodeType>> filters;
 
-            LiquidVariableResolver variableResolver;
-
             VariableNode() : NodeType(Type::VARIABLE) { }
 
-            Variable getVariable(Renderer& renderer, const Node& node, Variable store) const {
-                Variable storePointer = store;
-                for (auto& link : node.children) {
-                    auto node = renderer.retrieveRenderedNode(*link.get(), store);
-                    switch (node.variant.type) {
-                        case Variant::Type::INT:
-                            if (!variableResolver.getArrayVariable(storePointer, node.variant.i, storePointer)) {
-                                storePointer = Variable({ nullptr });
-                            }
-                        break;
-                        case Variant::Type::STRING:
-                            if (!variableResolver.getDictionaryVariable(storePointer, node.variant.s.data(), storePointer))
-                                storePointer = Variable({ nullptr });
-                        break;
-                        default:
-                            storePointer = Variable({ nullptr });
-                        break;
-                    }
-                    if (!storePointer.pointer)
-                        return Variable({ nullptr });
-                }
-                return storePointer;
-            }
-
-            bool setVariable(Renderer& renderer, const Node& node, Variable store, Variable value) const {
-                Variable storePointer = store;
-                for (size_t i = 0; i < node.children.size(); ++i) {
-                    auto& link = node.children[i];
-                    auto part = renderer.retrieveRenderedNode(*link.get(), store);
-                    if (i == node.children.size() - 1) {
-                        switch (part.variant.type) {
-                            case Variant::Type::INT:
-                                return variableResolver.setArrayVariable(renderer, storePointer, part.variant.i, value);
-                            case Variant::Type::STRING:
-                                return variableResolver.setDictionaryVariable(renderer, storePointer, part.variant.s.data(), value);
-                            default:
-                                return false;
-                        }
-                    } else {
-                        switch (part.variant.type) {
-                            case Variant::Type::INT:
-                                if (!variableResolver.getArrayVariable(storePointer, part.variant.i, storePointer))
-                                    return false;
-                            break;
-                            case Variant::Type::STRING:
-                                if (!variableResolver.getDictionaryVariable(storePointer, part.variant.s.data(), storePointer))
-                                    return false;
-                            break;
-                            default:
-                                return false;
-                        }
-                    }
-                    if (!storePointer.pointer)
-                        return false;
-                }
-                return false;
-            }
-
             Node render(Renderer& renderer, const Node& node, Variable store) const {
-                Variable storePointer = getVariable(renderer, node, store);
+                Variable storePointer = renderer.getVariable(node, store);
                 return Node(renderer.parseVariant(storePointer));
             }
         };
@@ -283,11 +223,10 @@ namespace Liquid {
         unordered_map<string, unique_ptr<NodeType>> binaryOperatorTypes;
         unordered_map<string, unique_ptr<NodeType>> filterTypes;
         unordered_map<string, unique_ptr<NodeType>> dotFilterTypes;
-        unique_ptr<NodeType> variableNodeType;
 
         const NodeType* getConcatenationNodeType() const { static ConcatenationNode concatenationNodeType; return &concatenationNodeType; }
         const NodeType* getOutputNodeType() const { static OutputNode outputNodeType; return &outputNodeType; }
-        const VariableNode* getVariableNodeType() const { return static_cast<VariableNode*>(variableNodeType.get()); }
+        const VariableNode* getVariableNodeType() const { static VariableNode variableNodeType; return &variableNodeType; }
         const NodeType* getGroupNodeType() const { static GroupNode groupNodeType; return &groupNodeType; }
         const NodeType* getGroupDereferenceNodeType() const { static GroupDereferenceNode groupDereferenceNodeType; return &groupDereferenceNodeType; }
         const NodeType* getArgumentsNodeType() const { static ArgumentNode argumentNodeType; return &argumentNodeType; }
@@ -298,9 +237,6 @@ namespace Liquid {
             switch (type->type) {
                 case NodeType::Type::TAG:
                     tagTypes[type->symbol] = move(type);
-                break;
-                case NodeType::Type::VARIABLE:
-                    variableNodeType = move(type);
                 break;
                 case NodeType::Type::OPERATOR:
                     switch (static_cast<OperatorNodeType*>(type.get())->arity) {
@@ -364,18 +300,6 @@ namespace Liquid {
         }
 
         void optimize(Node& ast, Variable store);
-
-        const LiquidVariableResolver& getVariableResolver() const { return getVariableNodeType()->variableResolver; }
-        bool resolveVariableString(string& target, void* variable) const {
-            const LiquidVariableResolver& resolver = getVariableResolver();
-            long long length = resolver.getStringLength(variable);
-            if (length < 0)
-                return false;
-            target.resize(length);
-            if (!resolver.getString(variable, const_cast<char*>(target.data())))
-                return false;
-            return true;
-        }
 
     };
 }

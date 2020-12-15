@@ -78,12 +78,6 @@ int(int argc, char* argv[]) {
     LiquidContext context = liquidCreateContext();
     liquidImplementPermissiveStandardDialect(context);
 
-    // If no LiquidVariableResolver is specified; an internal default is used that won't read anything you pass in, but will funciton for {% assign %}, {% capture %} and other tags.
-    LiquidVariableResolver resolver = {
-        ...
-    };
-    liquidRegisterVariableResolver(resolver);
-
     const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
     LiquidTemplate tmpl = liquidCreateTemplate(context, exampleFile, sizeof(exampleFile)-1);
     if (liquidGetError()) {
@@ -92,6 +86,15 @@ int(int argc, char* argv[]) {
     }
     // This object should be thread-local.
     LiquidRenderer renderer = liquidCreateRenderer(context);
+
+
+    // If no LiquidVariableResolver is specified; an internal default is used that won't read anything you pass in, but will funciton for {% assign %}, {% capture %} and other tags.
+    /* LiquidVariableResolver resolver = {
+        ...
+    };
+
+    liquidRegisterVariableResolver(renderer, resolver); */
+
     // Use something that works with your language here; as resolved by the LiquidVariableResolver above.
     void* variableStore = NULL;
     LiquidTemplateRender result = liquidRenderTemplate(renderer, variableStore, tmpl);

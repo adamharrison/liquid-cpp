@@ -4,6 +4,13 @@
 namespace Liquid {
     struct Context;
 
+    Renderer::Renderer(const Context& context) : context(context) {
+        memset(&variableResolver, 0, sizeof(LiquidVariableResolver));
+    }
+
+    Renderer::Renderer(const Context& context, LiquidVariableResolver variableResolver) : context(context), variableResolver(variableResolver) {
+
+    }
 
     LiquidRenderErrorType Renderer::render(const Node& ast, Variable store, void (*callback)(const char* chunk, size_t size, void* data), void* data) {
         renderStartTime = std::chrono::system_clock::now();
@@ -37,37 +44,36 @@ namespace Liquid {
 
 
     void Renderer::inject(Variable& variable, const Variant& variant) {
-        const LiquidVariableResolver& resolver = context.getVariableResolver();
         switch (variant.type) {
             case Variant::Type::STRING:
-                variable = resolver.createString(*this, variant.s.data());
+                variable = variableResolver.createString(*this, variant.s.data());
             break;
             case Variant::Type::INT:
-                variable = resolver.createInteger(*this, variant.i);
+                variable = variableResolver.createInteger(*this, variant.i);
             break;
             case Variant::Type::FLOAT:
-                variable = resolver.createFloat(*this, variant.f);
+                variable = variableResolver.createFloat(*this, variant.f);
             break;
             case Variant::Type::NIL:
-                variable = resolver.createNil(*this);
+                variable = variableResolver.createNil(*this);
             break;
             case Variant::Type::BOOL:
-                variable = resolver.createBool(*this, variant.b);
+                variable = variableResolver.createBool(*this, variant.b);
             break;
             case Variant::Type::VARIABLE:
-                variable = resolver.createClone(*this, variant.v.pointer);
+                variable = variableResolver.createClone(*this, variant.v.pointer);
             break;
             case Variant::Type::ARRAY: {
-                variable = resolver.createArray(*this);
+                variable = variableResolver.createArray(*this);
                 for (size_t i = 0; i < variant.a.size(); ++i) {
                     Variable target;
                     inject(target, variant.a[i]);
-                    if (!resolver.setArrayVariable(*this, variable, i, target))
+                    if (!variableResolver.setArrayVariable(*this, variable, i, target))
                         break;
                 }
             } break;
             default:
-                variable = resolver.createPointer(*this, variant.p);
+                variable = variableResolver.createPointer(*this, variant.p);
             break;
         }
     }
@@ -75,8 +81,7 @@ namespace Liquid {
     Variant Renderer::parseVariant(Variable variable) {
         if (!variable.exists())
             return Variant();
-        const LiquidVariableResolver& resolver = context.getVariableResolver();
-        ELiquidVariableType type = resolver.getType(variable);
+        ELiquidVariableType type = variableResolver.getType(variable);
         switch (type) {
             case LIQUID_VARIABLE_TYPE_OTHER:
             case LIQUID_VARIABLE_TYPE_DICTIONARY:
@@ -85,25 +90,25 @@ namespace Liquid {
             break;
             case LIQUID_VARIABLE_TYPE_BOOL: {
                 bool b;
-                if (resolver.getBool(variable, &b))
+                if (variableResolver.getBool(variable, &b))
                     return Variant(b);
             } break;
             case LIQUID_VARIABLE_TYPE_INT: {
                 long long i;
-                if (resolver.getInteger(variable, &i))
+                if (variableResolver.getInteger(variable, &i))
                     return Variant(i);
             } break;
             case LIQUID_VARIABLE_TYPE_FLOAT: {
                 double f;
-                if (resolver.getFloat(variable, &f))
+                if (variableResolver.getFloat(variable, &f))
                     return Variant(f);
             } break;
             case LIQUID_VARIABLE_TYPE_STRING: {
                 string s;
-                long long size = resolver.getStringLength(variable);
+                long long size = variableResolver.getStringLength(variable);
                 if (size >= 0) {
                     s.resize(size);
-                    if (resolver.getString(variable, const_cast<char*>(s.data())))
+                    if (variableResolver.getString(variable, const_cast<char*>(s.data())))
                         return Variant(move(s));
                 }
             } break;
@@ -115,15 +120,13 @@ namespace Liquid {
 
 
     std::string Renderer::getString(const Node& node) {
-        const LiquidVariableResolver& resolver = context.getVariableResolver();
-
         if (!node.type) {
             if (node.variant.type == Variant::Type::VARIABLE) {
                 string s;
-                long long size = resolver.getStringLength(node.variant.v.pointer);
+                long long size = variableResolver.getStringLength(node.variant.v.pointer);
                 if (size >= 0) {
                     s.resize(size);
-                    if (resolver.getString(node.variant.v.pointer, const_cast<char*>(s.data())))
+                    if (variableResolver.getString(node.variant.v.pointer, const_cast<char*>(s.data())))
                         return s;
                 }
             } else {
@@ -131,5 +134,64 @@ namespace Liquid {
             }
         }
         return string();
+    }
+
+
+    Variable Renderer::getVariable(const Node& node, Variable store) {
+        Variable storePointer = store;
+        for (auto& link : node.children) {
+            auto node = retrieveRenderedNode(*link.get(), store);
+            switch (node.variant.type) {
+                case Variant::Type::INT:
+                    if (!variableResolver.getArrayVariable(storePointer, node.variant.i, storePointer)) {
+                        storePointer = Variable({ nullptr });
+                    }
+                break;
+                case Variant::Type::STRING:
+                    if (!variableResolver.getDictionaryVariable(storePointer, node.variant.s.data(), storePointer))
+                        storePointer = Variable({ nullptr });
+                break;
+                default:
+                    storePointer = Variable({ nullptr });
+                break;
+            }
+            if (!storePointer.pointer)
+                return Variable({ nullptr });
+        }
+        return storePointer;
+    }
+
+    bool Renderer::setVariable(const Node& node, Variable store, Variable value) {
+        Variable storePointer = store;
+        for (size_t i = 0; i < node.children.size(); ++i) {
+            auto& link = node.children[i];
+            auto part = retrieveRenderedNode(*link.get(), store);
+            if (i == node.children.size() - 1) {
+                switch (part.variant.type) {
+                    case Variant::Type::INT:
+                        return variableResolver.setArrayVariable(*this, storePointer, part.variant.i, value);
+                    case Variant::Type::STRING:
+                        return variableResolver.setDictionaryVariable(*this, storePointer, part.variant.s.data(), value);
+                    default:
+                        return false;
+                }
+            } else {
+                switch (part.variant.type) {
+                    case Variant::Type::INT:
+                        if (!variableResolver.getArrayVariable(storePointer, part.variant.i, storePointer))
+                            return false;
+                    break;
+                    case Variant::Type::STRING:
+                        if (!variableResolver.getDictionaryVariable(storePointer, part.variant.s.data(), storePointer))
+                            return false;
+                    break;
+                    default:
+                        return false;
+                }
+            }
+            if (!storePointer.pointer)
+                return false;
+        }
+        return false;
     }
 }

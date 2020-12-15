@@ -315,43 +315,44 @@ namespace Liquid {
         }
     };
 
-    struct CPPVariableNode : Context::VariableNode {
-        CPPVariableNode() {
-            variableResolver.getType = +[](void* variable) { return static_cast<CPPVariable*>(variable)->type; };
-            variableResolver.getBool = +[](void* variable, bool* target) { return static_cast<CPPVariable*>(variable)->getBool(*target); };
-            variableResolver.getTruthy = +[](void* variable) { return static_cast<CPPVariable*>(variable)->getTruthy(); };
-            variableResolver.getString = +[](void* variable, char* target) {
+
+    struct CPPVariableResolver : LiquidVariableResolver {
+        CPPVariableResolver() {
+            getType = +[](void* variable) { return static_cast<CPPVariable*>(variable)->type; };
+            getBool = +[](void* variable, bool* target) { return static_cast<CPPVariable*>(variable)->getBool(*target); };
+            getTruthy = +[](void* variable) { return static_cast<CPPVariable*>(variable)->getTruthy(); };
+            getString = +[](void* variable, char* target) {
                 if (static_cast<CPPVariable*>(variable)->type != LIQUID_VARIABLE_TYPE_STRING)
                     return false;
                 strcpy(target, static_cast<CPPVariable*>(variable)->s.data());
                 return true;
             };
-            variableResolver.getStringLength = +[](void* variable) {
+            getStringLength = +[](void* variable) {
                 if (static_cast<CPPVariable*>(variable)->type != LIQUID_VARIABLE_TYPE_STRING)
                     return -1LL;
                 return (long long)static_cast<CPPVariable*>(variable)->s.size();
             };
-            variableResolver.getInteger = +[](void* variable, long long* target) { return static_cast<CPPVariable*>(variable)->getInteger(*target); };
-            variableResolver.getFloat = +[](void* variable, double* target) { return static_cast<CPPVariable*>(variable)->getFloat(*target); };
-            variableResolver.getDictionaryVariable = +[](void* variable, const char* key, void** target) { return static_cast<CPPVariable*>(variable)->getDictionaryVariable((const CPPVariable**)target, key); };
-            variableResolver.getArrayVariable = +[](void* variable, size_t idx, void** target) { return static_cast<CPPVariable*>(variable)->getArrayVariable((const CPPVariable**)target, idx); };
-            variableResolver.setArrayVariable = +[](LiquidRenderer renderer, void* variable, size_t idx, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setArrayVariable(idx, static_cast<CPPVariable*>(target)); };
-            variableResolver.setDictionaryVariable = +[](LiquidRenderer renderer, void* variable, const char* key, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setDictionaryVariable(key, static_cast<CPPVariable*>(target)); };
-            variableResolver.iterate = +[](void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) { return static_cast<CPPVariable*>(variable)->iterate(callback, data, start, limit, reverse); };
-            variableResolver.getArraySize = +[](void* variable) { return static_cast<CPPVariable*>(variable)->getArraySize(); };
+            getInteger = +[](void* variable, long long* target) { return static_cast<CPPVariable*>(variable)->getInteger(*target); };
+            getFloat = +[](void* variable, double* target) { return static_cast<CPPVariable*>(variable)->getFloat(*target); };
+            getDictionaryVariable = +[](void* variable, const char* key, void** target) { return static_cast<CPPVariable*>(variable)->getDictionaryVariable((const CPPVariable**)target, key); };
+            getArrayVariable = +[](void* variable, size_t idx, void** target) { return static_cast<CPPVariable*>(variable)->getArrayVariable((const CPPVariable**)target, idx); };
+            setArrayVariable = +[](LiquidRenderer renderer, void* variable, size_t idx, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setArrayVariable(idx, static_cast<CPPVariable*>(target)); };
+            setDictionaryVariable = +[](LiquidRenderer renderer, void* variable, const char* key, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setDictionaryVariable(key, static_cast<CPPVariable*>(target)); };
+            iterate = +[](void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) { return static_cast<CPPVariable*>(variable)->iterate(callback, data, start, limit, reverse); };
+            getArraySize = +[](void* variable) { return static_cast<CPPVariable*>(variable)->getArraySize(); };
 
-            variableResolver.createHash = +[](LiquidRenderer renderer) { return (void*)new CPPVariable(unordered_map<string, unique_ptr<CPPVariable>>()); };
-            variableResolver.createArray = +[](LiquidRenderer renderer) { return (void*)new CPPVariable({ }); };
-            variableResolver.createFloat = +[](LiquidRenderer renderer, double value) { return (void*)new CPPVariable(value); };
-            variableResolver.createBool = +[](LiquidRenderer renderer, bool value) { return (void*)new CPPVariable(value); };
-            variableResolver.createInteger = +[](LiquidRenderer renderer, long long value) { return (void*)new CPPVariable(value); };
-            variableResolver.createString = +[](LiquidRenderer renderer,  const char* value) { return (void*)new CPPVariable(string(value)); };
-            variableResolver.createPointer = +[](LiquidRenderer renderer, void* value) { return (void*)new CPPVariable(value); };
-            variableResolver.createNil = +[](LiquidRenderer renderer) { return (void*)new CPPVariable(); };
-            variableResolver.createClone = +[](LiquidRenderer renderer, void* variable) { return (void*)new CPPVariable(*static_cast<CPPVariable*>(variable)); };
-            variableResolver.freeVariable = +[](LiquidRenderer renderer, void* variable) { delete (CPPVariable*)variable;  };
+            createHash = +[](LiquidRenderer renderer) { return (void*)new CPPVariable(unordered_map<string, unique_ptr<CPPVariable>>()); };
+            createArray = +[](LiquidRenderer renderer) { return (void*)new CPPVariable({ }); };
+            createFloat = +[](LiquidRenderer renderer, double value) { return (void*)new CPPVariable(value); };
+            createBool = +[](LiquidRenderer renderer, bool value) { return (void*)new CPPVariable(value); };
+            createInteger = +[](LiquidRenderer renderer, long long value) { return (void*)new CPPVariable(value); };
+            createString = +[](LiquidRenderer renderer,  const char* value) { return (void*)new CPPVariable(string(value)); };
+            createPointer = +[](LiquidRenderer renderer, void* value) { return (void*)new CPPVariable(value); };
+            createNil = +[](LiquidRenderer renderer) { return (void*)new CPPVariable(); };
+            createClone = +[](LiquidRenderer renderer, void* variable) { return (void*)new CPPVariable(*static_cast<CPPVariable*>(variable)); };
+            freeVariable = +[](LiquidRenderer renderer, void* variable) { delete (CPPVariable*)variable;  };
 
-            variableResolver.compare = +[](void* a, void* b) { return *static_cast<CPPVariable*>(a) < *static_cast<CPPVariable*>(b) ? -1 : 0; };
+            compare = +[](void* a, void* b) { return *static_cast<CPPVariable*>(a) < *static_cast<CPPVariable*>(b) ? -1 : 0; };
         }
     };
 

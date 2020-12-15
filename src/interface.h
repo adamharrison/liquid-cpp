@@ -201,13 +201,13 @@ extern "C" {
     int liquidGetArgumentCount(LiquidNode node);
     int liquidGetChildCount(LiquidNode node);
     typedef void (*LiquidRenderFunction)(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data);
+    void liquidRegisterVariableResolver(LiquidRenderer renderer, LiquidVariableResolver resolver);
 
     // Passing -1 to min/maxArguments means no min or max.
     void liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data);
     void liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data);
     void liquidRegisterDotFilter(LiquidContext context, const char* symbol, LiquidRenderFunction renderFunction, void* data);
     void liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity arity, enum ELiquidOperatorFixness fixness, int priority, LiquidRenderFunction renderFunction, void* data);
-    void liquidRegisterVariableResolver(LiquidContext context, LiquidVariableResolver resolver);
 
 #ifdef __cplusplus
 }

@@ -248,6 +248,8 @@ namespace Liquid {
                     return std::to_string(f);
                 case Type::INT:
                     return std::to_string(i);
+                case Type::BOOL:
+                    return b ? "true" : "false";
                 default:
                     return string();
             }

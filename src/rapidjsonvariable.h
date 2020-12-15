@@ -9,9 +9,9 @@
 
 namespace Liquid {
 
-    struct RapidJSONVariableNode : Context::VariableNode {
-        RapidJSONVariableNode() {
-            variableResolver.getType = +[](void* variable) {
+    struct RapidJSONVariableResolver : LiquidVariableResolver {
+        RapidJSONVariableResolver() {
+            getType = +[](void* variable) {
                 switch (static_cast<rapidjson::Value*>(variable)->GetType()) {
                     case 0:
                         return LIQUID_VARIABLE_TYPE_NIL;
@@ -30,14 +30,14 @@ namespace Liquid {
                         return LIQUID_VARIABLE_TYPE_OTHER;
                 }
             };
-            variableResolver.getBool = +[](void* variable, bool* target) {
+            getBool = +[](void* variable, bool* target) {
                 int type = static_cast<rapidjson::Value*>(variable)->GetType();
                 if (type != 2 && type != 3)
                     return false;
                 *target = type == 2;
                 return true;
             };
-            variableResolver.getTruthy = +[](void* variable) {
+            getTruthy = +[](void* variable) {
                 switch (static_cast<rapidjson::Value*>(variable)->GetType()) {
                     case 0:
                     case 1:
@@ -50,37 +50,37 @@ namespace Liquid {
                         return true;
                 }
             };
-            variableResolver.getString = +[](void* variable, char* target) {
+            getString = +[](void* variable, char* target) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsString())
                     return false;
                 strcpy(target, static_cast<rapidjson::Value*>(variable)->GetString());
                 return true;
             };
-            variableResolver.getStringLength = +[](void* variable) {
+            getStringLength = +[](void* variable) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsString())
                     return -1LL;
                 return (long long)static_cast<rapidjson::Value*>(variable)->GetStringLength();
             };
-            variableResolver.getInteger = +[](void* variable, long long* target) {
+            getInteger = +[](void* variable, long long* target) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsNumber())
                     return false;
                 *target = static_cast<rapidjson::Value*>(variable)->GetInt64();
                 return true;
             };
-            variableResolver.getFloat = +[](void* variable, double* target) {
+            getFloat = +[](void* variable, double* target) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsNumber())
                     return false;
                 *target = static_cast<rapidjson::Value*>(variable)->GetFloat();
                 return false;
             };
-            variableResolver.getDictionaryVariable = +[](void* variable, const char* key, void** target) {
+            getDictionaryVariable = +[](void* variable, const char* key, void** target) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsObject() || !static_cast<rapidjson::Value*>(variable)->HasMember(key))
                     return false;
                 auto& value = (*static_cast<rapidjson::Value*>(variable))[key];
                 *target = &value;
                 return true;
             };
-            variableResolver.getArrayVariable = +[](void* variable, size_t idx, void** target) {
+            getArrayVariable = +[](void* variable, size_t idx, void** target) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsArray() || idx < static_cast<rapidjson::Value*>(variable)->Size())
                     return false;
                 auto& value = (*static_cast<rapidjson::Value*>(variable))[idx];
@@ -88,13 +88,13 @@ namespace Liquid {
                 return true;
             };
 
-            variableResolver.getArraySize = +[](void* variable) {
+            getArraySize = +[](void* variable) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsArray())
                     return -1LL;
                 return (long long)static_cast<rapidjson::Value*>(variable)->Size();
             };
 
-            variableResolver.iterate = +[](void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) {
+            iterate = +[](void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) {
                 if (static_cast<rapidjson::Value*>(variable)->IsArray()) {
 
                 } else if (static_cast<rapidjson::Value*>(variable)->IsObject()) {
@@ -103,21 +103,21 @@ namespace Liquid {
                 return false;
             };
 
-            variableResolver.setArrayVariable = +[](LiquidRenderer renderer, void* variable, size_t idx, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setArrayVariable(idx, static_cast<CPPVariable*>(target)); };
-            variableResolver.setDictionaryVariable = +[](LiquidRenderer renderer, void* variable, const char* key, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setDictionaryVariable(key, static_cast<CPPVariable*>(target)); };
+            setArrayVariable = +[](LiquidRenderer renderer, void* variable, size_t idx, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setArrayVariable(idx, static_cast<CPPVariable*>(target)); };
+            setDictionaryVariable = +[](LiquidRenderer renderer, void* variable, const char* key, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setDictionaryVariable(key, static_cast<CPPVariable*>(target)); };
 
-            variableResolver.createHash = +[](LiquidRenderer renderer) { return (void*)new CPPVariable(unordered_map<string, unique_ptr<CPPVariable>>()); };
-            variableResolver.createArray = +[](LiquidRenderer renderer) { return (void*)new CPPVariable({ }); };
-            variableResolver.createFloat = +[](LiquidRenderer renderer, double value) { return (void*)new CPPVariable(value); };
-            variableResolver.createBool = +[](LiquidRenderer renderer, bool value) { return (void*)new CPPVariable(value); };
-            variableResolver.createInteger = +[](LiquidRenderer renderer, long long value) { return (void*)new CPPVariable(value); };
-            variableResolver.createString = +[](LiquidRenderer renderer,  const char* value) { return (void*)new CPPVariable(string(value)); };
-            variableResolver.createPointer = +[](LiquidRenderer renderer, void* value) { return (void*)new CPPVariable(value); };
-            variableResolver.createNil = +[](LiquidRenderer renderer) { return (void*)new CPPVariable(); };
-            variableResolver.createClone = +[](LiquidRenderer renderer, void* variable) { return (void*)new CPPVariable(*static_cast<CPPVariable*>(variable)); };
-            variableResolver.freeVariable = +[](LiquidRenderer renderer, void* variable) { delete (CPPVariable*)variable;  };
+            createHash = +[](LiquidRenderer renderer) { return (void*)new CPPVariable(unordered_map<string, unique_ptr<CPPVariable>>()); };
+            createArray = +[](LiquidRenderer renderer) { return (void*)new CPPVariable({ }); };
+            createFloat = +[](LiquidRenderer renderer, double value) { return (void*)new CPPVariable(value); };
+            createBool = +[](LiquidRenderer renderer, bool value) { return (void*)new CPPVariable(value); };
+            createInteger = +[](LiquidRenderer renderer, long long value) { return (void*)new CPPVariable(value); };
+            createString = +[](LiquidRenderer renderer,  const char* value) { return (void*)new CPPVariable(string(value)); };
+            createPointer = +[](LiquidRenderer renderer, void* value) { return (void*)new CPPVariable(value); };
+            createNil = +[](LiquidRenderer renderer) { return (void*)new CPPVariable(); };
+            createClone = +[](LiquidRenderer renderer, void* variable) { return (void*)new CPPVariable(*static_cast<CPPVariable*>(variable)); };
+            freeVariable = +[](LiquidRenderer renderer, void* variable) { delete (CPPVariable*)variable;  };
 
-            variableResolver.compare = +[](void* a, void* b) { return *static_cast<CPPVariable*>(a) < *static_cast<CPPVariable*>(b) ? -1 : 0; };
+            compare = +[](void* a, void* b) { return *static_cast<CPPVariable*>(a) < *static_cast<CPPVariable*>(b) ? -1 : 0; };
         }
     };
 
