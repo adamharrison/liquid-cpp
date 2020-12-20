@@ -1,11 +1,12 @@
 #include "web.h"
+#include "context.h"
 #include <sass/context.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
 
-#include "web/css_minifier_xs.cpp"
-#include "web/js_minifier_xs.cpp"
+#include "css_minifier_xs.cpp"
+#include "js_minifier_xs.cpp"
 
 namespace Liquid {
 

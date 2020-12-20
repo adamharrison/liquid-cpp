@@ -471,6 +471,22 @@ TEST(sanity, composite) {
     ast = getParser().parse("{% for trans in order.transactions %}{% if trans.status == 'success' and trans.kind == 'refund' %}{% unless forloop.first %}, {% endunless %}{{ trans.id }}{% endif %}{% endfor %}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "12445324");
+
+    hash.clear();
+    Liquid::CPPVariable search;
+    Liquid::CPPVariable results({ });
+    std::unique_ptr<Liquid::CPPVariable> cppResult = std::make_unique<Liquid::CPPVariable>();
+    (*cppResult.get())["url"] = string("https://test.com");
+    (*cppResult.get())["title"] = string("My Test Thing");
+    (*cppResult.get())["description"] = string("A description!");
+    results.a.push_back(move(cppResult));
+    search["results"] = move(results);
+    hash["search"] = move(search);
+
+    ast = getParser().parse("<ul class='search-results'>{% for result in search.results %}<li><a href='{{ result.url }}'><div class='title'>{{ result.title | escape }}</div><div class='description'>{{ result.description | escape }}</div></a></li>{% endfor %}</ul>");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "<ul class='search-results'><li><a href='https://test.com'><div class='title'>My Test Thing</div><div class='description'>A description!</div></a></li></ul>");
+
 }
 
 
@@ -500,7 +516,7 @@ TEST(sanity, error) {
 
 }
 
-//#ifdef LIQUID_INCLUDE_RAPIDJSON_VARIABLE
+#ifdef LIQUID_INCLUDE_RAPIDJSON_VARIABLE
 
 #include "../src/rapidjsonvariable.h"
 
@@ -519,7 +535,7 @@ TEST(sanity, rj) {
     ASSERT_EQ(str, "b");
 }
 
-//#endif
+#endif
 
 #ifdef LIQUID_INCLUDE_WEB_DIALECT
 
@@ -529,6 +545,10 @@ TEST(sanity, web) {
     hash["a"] = 1;
     Node ast;
     std::string str;
+
+    ast = getParser().parse("{{ '<html>' | escape }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "&lt;html&gt;");
 
     ast = getParser().parse("{{ 'a' | md5 }}");
     str = getRenderer().render(ast, hash);

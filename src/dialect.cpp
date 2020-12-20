@@ -1892,5 +1892,5 @@ namespace Liquid {
 }
 
 #ifdef LIQUID_INCLUDE_WEB_DIALECT
-    #include "dialects/web.cpp"
+    #include "web.cpp"
 #endif

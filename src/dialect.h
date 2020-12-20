@@ -53,7 +53,7 @@ namespace Liquid {
 };
 
 #ifdef LIQUID_INCLUDE_WEB_DIALECT
-    #include "dialects/web.h"
+    #include "web.h"
 #endif
 
 

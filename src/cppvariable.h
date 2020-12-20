@@ -1,5 +1,5 @@
 
-#ifndef CPPVARAIBLE_H
+#ifndef CPPVARIABLE_H
 #define CPPVARIABLE_H
 
 #include "common.h"
@@ -170,6 +170,20 @@ namespace Liquid {
             }
             return *a[idx].get();
         }
+        void pushBack(const CPPVariable& variable) {
+            if (type == LIQUID_VARIABLE_TYPE_NIL) {
+                new(&this->a) vector<unique_ptr<CPPVariable>>();
+                type = LIQUID_VARIABLE_TYPE_ARRAY;
+            }
+            a.push_back(make_unique<CPPVariable>(variable));
+        }
+        void pushBack(unique_ptr<CPPVariable> variable) {
+            if (type == LIQUID_VARIABLE_TYPE_NIL) {
+                new(&this->a) vector<unique_ptr<CPPVariable>>();
+                type = LIQUID_VARIABLE_TYPE_ARRAY;
+            }
+            a.push_back(std::move(variable));
+        }
 
         CPPVariable& operator = (const std::string& s) { assign(s); return *this; }
         CPPVariable& operator = (const char* s) { assign(std::string(s)); return *this; }
@@ -179,6 +193,7 @@ namespace Liquid {
         CPPVariable& operator = (int i) { assign(i); return *this; }
         CPPVariable& operator = (CPPVariable&& v) { move(std::move(v)); return *this; }
         CPPVariable& operator = (const CPPVariable& v) { assign(v); return *this; }
+        CPPVariable& operator = (const vector<unique_ptr<CPPVariable>>& a) { assign(a); return *this; }
 
 
         ELiquidVariableType getType() const  {

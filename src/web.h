@@ -1,6 +1,6 @@
 #ifndef DIALECTSWEB_H
 #define DIALECTSWEB_H
-#include "../dialect.h"
+#include "dialect.h"
 
 namespace Liquid {
     struct Context;
