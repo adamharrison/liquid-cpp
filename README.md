@@ -5,7 +5,7 @@ Is a soon-to-be fully featured C++17 renderer for Liquid; Shopify's templating l
 
 ## Status
 
-In development. Currently a bit all over the place. **Do not use in production code, as this has not been vetted for memory bugs, or anything beyond general performance and features.**
+In development. Currently a bit all over the place. **Do not use in production code, as this has not been vetted for memory bugs, or anything beyond general performance and features.** 
 
 ### Quick Start
 
