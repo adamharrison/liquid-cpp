@@ -261,6 +261,8 @@ namespace Liquid {
                     return i;
                 case Type::FLOAT:
                     return (long long)f;
+                case Type::STRING:
+                    return atoll(s.c_str());
                 default:
                     return 0;
             }
@@ -272,6 +274,8 @@ namespace Liquid {
                     return (double)i;
                 case Type::FLOAT:
                     return f;
+                case Type::STRING:
+                    return atof(s.c_str());
                 default:
                     return 0.0;
             }

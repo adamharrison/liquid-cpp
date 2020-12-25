@@ -574,18 +574,13 @@ TEST(sanity, web) {
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "&lt;html&gt;&lt;/html&gt;");
 
-    ast = getParser().parse("{% scss %}.a { .b { margin-left: 2px; } }{% endscss %}");
+    ast = getParser().parse("{{ 1608524371 | date: \"%B %d, %Y\" }}");
     str = getRenderer().render(ast, hash);
-    ASSERT_EQ(str, ".a .b {\n  margin-left: 2px; }\n");
+    ASSERT_EQ(str, "December 20, 2020");
 
-    ast = getParser().parse("{% minify_css %}.a .b { margin-left: 2px; }{% endminify_css %}");
+    ast = getParser().parse("{{ \"tefasdfsdf\" | link_to: \"//test.com\", \"titletest\" }}");
     str = getRenderer().render(ast, hash);
-    ASSERT_EQ(str, ".a .b{margin-left:2px}");
-
-    ast = getParser().parse("{% minify_js %}var a = 1 + 2 + 3 + 4; console.log(a);{% endminify_js %}");
-    str = getRenderer().render(ast, hash);
-    ASSERT_EQ(str, "var a=1+2+3+4;console.log(a);");
-
+    ASSERT_EQ(str, "<a title=\"titletest\" href=\"//test.com\">tefasdfsdf</a>");
 }
 
 #endif

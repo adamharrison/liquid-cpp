@@ -1890,7 +1890,3 @@ namespace Liquid {
         context.registerType<DefaultFilterNode>();
     }
 }
-
-#ifdef LIQUID_INCLUDE_WEB_DIALECT
-    #include "web.cpp"
-#endif

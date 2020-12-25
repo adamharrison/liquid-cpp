@@ -78,35 +78,27 @@
 		<Unit filename="ruby/lib/liquidc.rb" />
 		<Unit filename="ruby/t/test.rb" />
 		<Unit filename="src/common.h" />
-		<Unit filename="src/context.cpp">
-			<Option target="library" />
-		</Unit>
-		<Unit filename="src/context.h">
-			<Option target="library" />
-		</Unit>
+		<Unit filename="src/context.cpp" />
+		<Unit filename="src/context.h" />
 		<Unit filename="src/cppvariable.h" />
+		<Unit filename="src/css_minifier_xs.cpp" />
 		<Unit filename="src/dialect.cpp" />
 		<Unit filename="src/dialect.h" />
-		<Unit filename="src/dialects/web.cpp" />
 		<Unit filename="src/dialects/web.h">
 			<Option virtualFolder="src/" />
 		</Unit>
-		<Unit filename="src/dialects/web/css_minifier_xs.cpp" />
-		<Unit filename="src/dialects/web/js_minifier_xs.cpp" />
 		<Unit filename="src/interface.cpp" />
 		<Unit filename="src/interface.h" />
-		<Unit filename="src/lexer.h">
-			<Option target="library" />
-		</Unit>
+		<Unit filename="src/js_minifier_xs.cpp" />
+		<Unit filename="src/lexer.h" />
 		<Unit filename="src/liquid.h" />
 		<Unit filename="src/parser.cpp" />
-		<Unit filename="src/parser.h">
-			<Option target="library" />
-		</Unit>
+		<Unit filename="src/parser.h" />
+		<Unit filename="src/rapidjsonvariable.h" />
 		<Unit filename="src/renderer.cpp" />
-		<Unit filename="src/renderer.h">
-			<Option target="library" />
-		</Unit>
+		<Unit filename="src/renderer.h" />
+		<Unit filename="src/web.cpp" />
+		<Unit filename="src/web.h" />
 		<Unit filename="t/01sanity.cpp" />
 		<Extensions />
 	</Project>
