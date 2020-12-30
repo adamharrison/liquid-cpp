@@ -81,7 +81,6 @@
 		<Unit filename="src/context.cpp" />
 		<Unit filename="src/context.h" />
 		<Unit filename="src/cppvariable.h" />
-		<Unit filename="src/css_minifier_xs.cpp" />
 		<Unit filename="src/dialect.cpp" />
 		<Unit filename="src/dialect.h" />
 		<Unit filename="src/dialects/web.h">
@@ -89,7 +88,6 @@
 		</Unit>
 		<Unit filename="src/interface.cpp" />
 		<Unit filename="src/interface.h" />
-		<Unit filename="src/js_minifier_xs.cpp" />
 		<Unit filename="src/lexer.h" />
 		<Unit filename="src/liquid.h" />
 		<Unit filename="src/parser.cpp" />

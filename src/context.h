@@ -34,7 +34,8 @@ namespace Liquid {
         ~NodeType() { }
 
         virtual Node render(Renderer& renderer, const Node& node, Variable store) const {
-            assert(userRenderFunction);
+            if (!userRenderFunction)
+                return Node();
             userRenderFunction(LiquidRenderer{&renderer}, LiquidNode{const_cast<Node*>(&node)}, store, userData);
             return renderer.returnValue;
         }
@@ -139,9 +140,7 @@ namespace Liquid {
 
         FilterNodeType(string symbol, int minArguments = -1, int maxArguments = -1) : NodeType(NodeType::Type::FILTER, symbol, -1), minArguments(minArguments), maxArguments(maxArguments) { }
 
-
         Node getOperand(Renderer& renderer, const Node& node, Variable store) const;
-        Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
     };
 
 
@@ -215,7 +214,7 @@ namespace Liquid {
         const NodeType* getArgumentsNodeType() const { static ArgumentNode argumentNodeType; return &argumentNodeType; }
         const NodeType* getUnknownFilterNodeType() const { static UnknownFilterNode filterNodeType; return &filterNodeType; }
 
-        void registerType(unique_ptr<NodeType> type) {
+        NodeType* registerType(unique_ptr<NodeType> type) {
             switch (type->type) {
                 case NodeType::Type::TAG:
                     tagTypes[type->symbol] = move(type);
@@ -245,8 +244,9 @@ namespace Liquid {
                     assert(false);
                 break;
             }
+            return type.get();
         }
-        template <class T> void registerType() { registerType(make_unique<T>()); }
+        template <class T> NodeType* registerType() { return registerType(make_unique<T>()); }
 
         const TagNodeType* getTagType(string symbol) const {
             auto it = tagTypes.find(symbol);

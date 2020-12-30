@@ -68,27 +68,33 @@ LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variabl
     return LiquidTemplateRender({ str });
 }
 
-void liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data) {
+void liquidWalkTemplate(LiquidTemplate tmpl, LiquidWalkTemplateFunction callback, void* data) {
+    static_cast<Node*>(tmpl.ast)->walk([tmpl, callback, data](const Node& node) {
+        callback(tmpl, LiquidNode { const_cast<Node*>(&node) }, data);
+    });
+}
+
+void* liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data) {
     Context* ctx = static_cast<Context*>(context.context);
     unique_ptr<NodeType> registeredType = make_unique<TagNodeType>((TagNodeType::Composition)type, symbol, minArguments, maxArguments);
     registeredType->userRenderFunction = renderFunction;
     registeredType->userData = data;
-    ctx->registerType(move(registeredType));
+    return ctx->registerType(move(registeredType));
 }
-void liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data) {
+void* liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data) {
     Context* ctx = static_cast<Context*>(context.context);
     unique_ptr<NodeType> registeredType = make_unique<FilterNodeType>(symbol, minArguments, maxArguments);
     registeredType->userRenderFunction = renderFunction;
     registeredType->userData = data;
-    ctx->registerType(move(registeredType));
+    return ctx->registerType(move(registeredType));
 }
 
-void liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity arity, enum ELiquidOperatorFixness fixness, int priority, LiquidRenderFunction renderFunction, void* data) {
+void* liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity arity, enum ELiquidOperatorFixness fixness, int priority, LiquidRenderFunction renderFunction, void* data) {
     Context* ctx = static_cast<Context*>(context.context);
     unique_ptr<NodeType> registeredType = make_unique<OperatorNodeType>(symbol, (OperatorNodeType::Arity)arity, priority, (OperatorNodeType::Fixness)fixness);
     registeredType->userRenderFunction = renderFunction;
     registeredType->userData = data;
-    ctx->registerType(move(registeredType));
+    return ctx->registerType(move(registeredType));
 }
 
 

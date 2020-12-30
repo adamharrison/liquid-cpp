@@ -186,6 +186,8 @@ extern "C" {
     void liquidFreeTemplate(LiquidTemplate tmpl);
 
     LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRenderError* error);
+    typedef void (*LiquidWalkTemplateFunction)(LiquidTemplate tmpl, const LiquidNode node, void* data);
+    void liquidWalkTemplate(LiquidTemplate tmpl, LiquidWalkTemplateFunction callback, void* data);
     void liquidFreeTemplateRender(LiquidTemplateRender render);
 
     const char* liquidTemplateRenderGetBuffer(LiquidTemplateRender render);
@@ -204,10 +206,10 @@ extern "C" {
     void liquidRegisterVariableResolver(LiquidRenderer renderer, LiquidVariableResolver resolver);
 
     // Passing -1 to min/maxArguments means no min or max.
-    void liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data);
-    void liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data);
-    void liquidRegisterDotFilter(LiquidContext context, const char* symbol, LiquidRenderFunction renderFunction, void* data);
-    void liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity arity, enum ELiquidOperatorFixness fixness, int priority, LiquidRenderFunction renderFunction, void* data);
+    void* liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data);
+    void* liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data);
+    void* liquidRegisterDotFilter(LiquidContext context, const char* symbol, LiquidRenderFunction renderFunction, void* data);
+    void* liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity arity, enum ELiquidOperatorFixness fixness, int priority, LiquidRenderFunction renderFunction, void* data);
 
 #ifdef __cplusplus
 }

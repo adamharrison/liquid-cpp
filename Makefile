@@ -6,7 +6,7 @@ CXX=g++
 CC=gcc
 CFLAGS=-Wall -fexceptions -fPIC -DLIQUID_INCLUDE_WEB_DIALECT -DLIQUID_INCLUDE_RAPIDJSON_VARIABLE
 CXXFLAGS=$(CFLAGS) -std=c++17
-LDFLAGS=-lsass -lcrypto
+LDFLAGS=-lcrypto
 AR=ar
 RUBY_DIR=ruby
 PERL_DIR=perl

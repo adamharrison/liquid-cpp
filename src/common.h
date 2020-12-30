@@ -394,6 +394,15 @@ namespace Liquid {
             type = n.type;
             return *this;
         }
+
+        template <class T>
+        void walk(T callback) const {
+            callback(*this);
+            if (type) {
+                for (auto it = children.begin(); it != children.end(); ++it)
+                    (*it)->walk(callback);
+            }
+        }
     };
 }
 
