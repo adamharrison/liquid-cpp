@@ -421,7 +421,37 @@ static void lpRenderBinaryInfixOperator(LiquidRenderer renderer, LiquidNode node
     LEAVE;
 }
 
+static void lpWalkTemplateCallback(LiquidTemplate tmpl, const LiquidNode node, void* data) {
+    dTHX;
+    SV* callback = (SV*)data;
+
+    dSP;
+
+    ENTER;
+    SAVETMPS;
+    PUSHMARK(SP);
+
+    EXTEND(SP, 1);
+    PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
+    PUTBACK;
+
+    call_sv(callback, G_VOID);
+
+    SPAGAIN;
+
+    FREETMPS;
+    LEAVE;
+}
+
 MODULE = WWW::Shopify::Liquid::XS		PACKAGE = WWW::Shopify::Liquid::XS
+
+void
+walkTemplate(template, callback)
+    void* template;
+    SV* callback;
+    CODE:
+        liquidWalkTemplate(*((LiquidTemplate*)&template), lpWalkTemplateCallback, callback);
+
 
 void*
 createContext()
@@ -448,6 +478,12 @@ implementStrictStandardDialect(context)
     void* context;
     CODE:
         liquidImplementStrictStandardDialect(*(LiquidContext*)&context);
+
+void
+implementWebDialect(context)
+    void* context;
+    CODE:
+        liquidImplementWebDialect(*(LiquidContext*)&context);
 
 void*
 createRenderer(context)

@@ -18,4 +18,3 @@ sahfkjsad{% endescape_js %}";';
 my $ast = $liquid->parse_text($block);
 
 my $text = $liquid->render_ast({ }, $ast);
-print STDERR "TEXT: $text\n";

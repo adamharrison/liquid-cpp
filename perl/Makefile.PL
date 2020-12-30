@@ -11,8 +11,8 @@ WriteMakefile(
     LICENSE           => 'mit',
     #Value must be from legacy list of licenses here
     #http://search.cpan.org/perldoc?Module%3A%3ABuild%3A%3AAPI
-    LIBS              => ['-L../bin -lliquid -lstdc++'], # e.g., '-lm'
-    DEFINE            => '', # e.g., '-DHAVE_SOMETHING'
+    LIBS              => ['-L../bin -lliquid -lcrypto -lstdc++'], # e.g., '-lm'
+    DEFINE            => '-DLIQUID_INCLUDE_WEB_DIALECT', # e.g., '-DHAVE_SOMETHING'
     INC               => '-I.', # e.g., '-I. -I/usr/include/other'
 	# Un-comment this if you add C files to link with later:
     # OBJECT            => '$(O_FILES)', # link all the C files too

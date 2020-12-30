@@ -60,7 +60,7 @@ sub render {
     my ($self, $hash, $template) = @_;
     my $error = [];
     my $result = WWW::Shopify::Liquid::XS::renderTemplate($self->{renderer}, $hash, $template->{template}, $error);
-    die WWW::Shopify::Liquid::XS::Exception->new($error[0]) if !$self->{silence_exceptions} && int(@$error) > 0;
+    die WWW::Shopify::Liquid::XS::Exception->new($error->[0]) if !$self->{silence_exceptions} && int(@$error) > 0;
     return $result;
 }
 
@@ -68,9 +68,11 @@ sub silence_exceptions { $_[0]->{silence_exceptions} = $_[1] if @_ > 1; return $
 sub print_exceptions { $_[0]->{print_exceptions} = $_[1] if @_ > 1; return $_[0]->{print_exceptions}; }
 sub inclusion_context { $_[0]->{inclusion_context} = $_[1] if @_ > 1; return $_[0]->{inclusion_context}; }
 sub max_inclusion_depth { $_[0]->{max_inclusion_depth} = $_[1] if @_ > 1; return $_[0]->{max_inclusion_depth}; }
+sub make_method_calls { $_[0]->{make_method_calls} = $_[1] if @_ > 1; return $_[0]->{make_method_calls}; }
+sub clone_hash { $_[0]->{clone_hash} = $_[1] if @_ > 1; return $_[0]->{clone_hash}; }
 
 package WWW::Shopify::Liquid::XS::Optimizer;
-use parent 'WWW::Shopify::Liquid::XS::Renderer';
+use base 'WWW::Shopify::Liquid::XS::Renderer';
 
 sub optimize {
     my ($self, $hash, $template) = @_;
@@ -87,6 +89,16 @@ sub new {
     return bless { template => $template }, $package;
 }
 
+# For the walk retrieve all tokens in an array,
+sub tokens {
+    my ($self) = @_;
+    my @nodes;
+    WWW::Shopify::Liquid::XS::walkTemplate(sub {
+        my ($node) = @_;
+        push(@nodes, $node);
+    });
+}
+
 sub DESTROY {
     my ($self) = @_;
     WWW::Shopify::Liquid::XS::freeTemplate($self->{template});
@@ -97,22 +109,17 @@ package WWW::Shopify::Liquid::XS::Tag::Include;
 sub is_enclosing { 0; }
 sub max_arguments { return 1; }
 sub min_arguments { return 1; }
-
-sub operate {
-    my ($self, $hash, @arguments) = @_;
-    my ($path, $template) = $self->{renderer}->retrieve_include($self, $hash, $arguments[0]);
-    return $self->{renderer}->render($hash, $node);
-}
+sub name { "include"; }
 
 sub retrieve_include {
 	my ($self, $hash, $string) = @_;
 	if ($self->{renderer}->inclusion_context) {
 		# Inclusion contexts are evaluated from left to right, in order of priority.
-		my @inclusion_contexts = $pipeline->inclusion_context && ref($pipeline->inclusion_context) && ref($pipeline->inclusion_context) eq "ARRAY" ? @{$pipeline->inclusion_context} : $pipeline->inclusion_context;
-		die new WWW::Shopify::Liquid::Exception:XS([], "Backtracking not allowed in inclusions.") if $string =~ m/\.\./;
+		my @inclusion_contexts = $self->{renderer}->inclusion_context && ref($self->{renderer}->inclusion_context) && ref($self->{renderer}->inclusion_context) eq "ARRAY" ? @{$self->{renderer}->inclusion_context} : $self->{renderer}->inclusion_context;
+		die new WWW::Shopify::Liquid::Exception::XS("Backtracking not allowed in inclusions.") if $string =~ m/\.\./;
 		for (@inclusion_contexts) {
 			if (ref($_) eq "CODE") {
-				return $_->($self, $hash, $action, $pipeline, $string);
+				return $_->($self, $hash, "render", $self->{renderer}, $string);
 			} else {
 				my $path = $_ . "/" . $string . ".liquid";
 				return ($path, scalar(read_file($path))) if -e $path;
@@ -125,27 +132,137 @@ sub retrieve_include {
 sub process_include {
 	my ($self, $hash, $string, $path, $text, $argument) = @_;
 	# If text is already an AST, then we do not parse the text.
-	my $ast = ref($text) ? $text : $pipeline->parent->parse_text($text);
+	my $ast = ref($text) ? $text : $self->{renderer}->parent->parse_text($text);
 	$hash->{$string} = $argument if defined $argument;
-    $self->{renderer}->render($hash, $ast);
-    return $result;
+    return $self->{renderer}->render($hash, $ast);
 }
 
 sub operate {
 	my ($self, $hash, @arguments) = @_;
-	die new WWW::Shopify::Liquid::Exception([], "Recursive inclusion probable, greater than depth " . $pipeline->max_inclusion_depth . ". Aborting.")
+	die new WWW::Shopify::Liquid::Exception::XS("Recursive inclusion probable, greater than depth " . $self->{renderer}->max_inclusion_depth . ". Aborting.")
 		if $self->{renderer}->inclusion_depth > $self->{renderer}->max_inclusion_depth;
 	return '' unless int(@arguments) > 0;
 	my ($path, $text) = $self->retrieve_include($hash, $arguments[0]);
 	my $include_depth = $self->{renderer}->inclusion_depth;
 	$self->{renderer}->inclusion_depth($include_depth+1);
-	$result = $self->process_include($hash, $arguments[0], $path, $text, $arguments[1]);
+	my $result = $self->process_include($hash, $arguments[0], $path, $text, $arguments[1]);
 	$self->{renderer}->inclusion_depth($include_depth);
 	return $result;
 
 }
 
 
+# Analyzes liquid in a non-trivial manner to perform useful calculations.
+# Generaly for dependncy analysis.
+package WWW::Shopify::Liquid::XS::Analyzer::Entity;
+sub new {
+	my ($package, $hash) = @_;
+	$hash = {} unless $hash;
+	return bless {
+		id => undef,
+		# Things we include.
+		dependencies => [],
+		# Things that include us.
+		references => [],
+		# Flattened lists of dependencies and references.
+		full_dependencies => [],
+		full_references => [],
+		file => undef,
+		ast => undef,
+		%$hash
+	}, $package;
+}
+sub ast { return $_[0]->{ast}; }
+sub id { return $_[0]->{id}; }
+sub file { return $_[0]->{file}; }
+
+package WWW::Shopify::Liquid::XS::Analyzer;
+sub new {
+	my ($package) = shift;
+	my $self = bless {
+		@_
+	}, $package;
+	$self->{liquid} = WWW::Shopify::Liquid::XS->new unless $self->liquid;
+	return $self;
+}
+sub liquid { return $_[0]->{liquid}; }
+
+sub retrieve_includes_ast {
+	my ($self, $ast) = @_;
+	return () unless $ast;
+	return grep { defined $_ && $_->isa('WWW::Shopify::Liquid::XS::Tag::Include') } $ast->tokens;
+}
+
+sub expand_entity {
+	my ($self, $entity, $type, $used_list) = @_;
+	$used_list = { $entity->id => 1 } unless $used_list;
+	return map { $used_list->{$_->id} ? () : ($_, $self->expand_entity($_, $type, $used_list)) } @{$entity->{$type}};
+}
+
+sub generate_include_entity {
+	my ($self, $include) = @_;
+	my ($path) = $include->retrieve_include({}, "render", $self->liquid->renderer, $include->include_literal);
+	my $entity = $self->generate_entity_file($path);
+	return $entity;
+
+}
+
+use List::MoreUtils qw(uniq);
+sub populate_dependencies {
+	my ($self, @entities) = @_;
+	my %entity_list = map { $_->id => $_ } @entities;
+	# Go through, and flatten out those lists.
+	for my $entity (grep { $_->ast } @entities) {
+		my @included_literals = $self->retrieve_includes_ast($entity->ast);
+		$entity_list{$_->include_literal} = $self->generate_include_entity($_) for (grep { !$entity_list{$_->include_literal} } @included_literals);
+		my @included_entities = map { $entity_list{$_->include_literal} } @included_literals;
+		push(@{$entity->{dependencies}}, @included_entities);
+		push(@{$_->{references}}, $entity) for (@included_entities);
+	}
+	for (@entities) {
+		$_->{full_dependencies} = [$self->expand_entity($_, 'dependencies')];
+		$_->{full_references} = [$self->expand_entity($_, 'references')];
+	}
+
+	return @entities;
+}
+
+# If an entity is changed/added, then this should be called on the entity.
+sub add_refresh_entity {
+	my ($self, $entity, @entities) = @_;
+	my %entity_list = map { $_->id => $_ } @entities;
+	if (!$entity_list{$entity->id}) {
+		my @included_literals = $self->retrieve_includes_ast($entity->ast);
+		$entity_list{$_->include_literal} = $self->generate_include_entity($_) for (grep { !$entity_list{$_->include_literal} } @included_literals);
+		my @included_entities = map { $entity_list{$_->include_literal} } @included_literals;
+		push(@{$entity->{dependencies}}, @included_entities);
+		push(@{$_->{references}}, $entity) for (@included_entities);
+		$entity->{full_dependencies} = [$self->expand_entity($entity, 'dependencies')];
+		$entity->{full_references} = [$self->expand_entity($entity, 'references')];
+	}
+	return $entity;
+}
+
+sub add_refresh_path {
+	my ($self, $path, @entities) = @_;
+	return $self->add_refresh_entity($self->generate_entity_file($path), @entities);
+}
+
+sub generate_entity_file {
+	my ($self, $path) = @_;
+	return WWW::Shopify::Liquid::XS::Analyzer::Entity->new({
+		id => do { my $handle = $path; $handle =~ s/^.*\/([^\/]+?)(\.liquid)?$/$1/; $handle },
+		ast => $self->liquid->parse_file($path),
+		file => $path
+	})
+}
+
+sub generate_entities_files {
+	my ($self, @paths) = @_;
+	return map {
+		$self->generate_entity_file($_);
+	} @paths;
+}
 
 package WWW::Shopify::Liquid::XS;
 
@@ -201,19 +318,22 @@ sub new {
     %settings }, $package;
     WWW::Shopify::Liquid::XS::implementPermissiveStandardDialect($self->{context});
     $self->register_tag('WWW::Shopify::Liquid::XS::Tag::Include');
+    $self->{renderer} = WWW::Shopify::Liquid::XS::Renderer->new($self);
+    $self->{optimizer} = WWW::Shopify::Liquid::XS::Optimizer->new($self);
     $_->apply($self) for (@{$self->{dialects}});
     WWW::Shopify::Liquid::XS::implementWebDialect($self->{context}) if $settings{'implement_web_dialect'};
-    $self->{renderer} = WWW::Shopify::Liquid::XS::Renderer->new($self->{context});
-    $self->{optimizer} = WWW::Shopify::Liquid::XS::Optimizer->new($self->{context});
     return $self;
 }
+
+sub renderer { return $_[0]->{renderer}; }
+sub optimizer { return $_[0]->{optimizer}; }
+sub analyzer { return $_[0]->{analyzer} ||= WWW::Shopify::Liquid::XS::Analyzer->new(liquid => $_[0]); }
 
 sub DESTROY {
     my ($self) = @_;
     freeContext($self->{context});
 }
 
-sub renderer { return $_[0]->{renderer}; }
 
 sub parse_file {
     my ($self, $file) = @_;
@@ -253,15 +373,16 @@ sub optimize_ast {
 sub register_tag {
     my ($self, $tag) = @_;
     die WWW::Shopify::Liquid::XS::Exception->new("Requies tag to have an operate sub; currently custom processing is not supported.") unless $tag->can('operate');
+    my $opsub = \&{$tag . "::operate"};
     die WWW::Shopify::Liquid::XS::Exception->new("Can't register tag '" . $tag->name . "'.") unless WWW::Shopify::Liquid::XS::registerTag($self->{context}, $tag->name, ($tag->is_enclosing ? "enclosing" : "free"), $tag->min_arguments, (defined $tag->max_arguments ? $tag->max_arguments : -1), $tag->is_enclosing ? sub {
         my ($renderer, $node, $hash, $contents, @arguments) = @_;
-        return $tag::operate({
+        return $opsub->({
             node => $node,
             renderer => $renderer
         }, $hash, $contents, @arguments);
     } : sub {
         my ($renderer, $node, $hash, @arguments) = @_;
-        return $tag::operate({
+        return $opsub->operate({
             node => $node,
             renderer => $renderer
         }, $hash, @arguments);
@@ -271,9 +392,10 @@ sub register_tag {
 sub register_filter {
     my ($self, $filter) = @_;
     die WWW::Shopify::Liquid::XS::Exception->new("Requires filter to have an operate sub; currently custom processing is not supported.") unless $filter->can('operate');
+    my $opsub = \&{$filter . "::operate"};
     die WWW::Shopify::Liquid::XS::Exception->new("Can't register filter '" . $filter->name . "'.") unless WWW::Shopify::Liquid::XS::registerFilter($self->{context}, $filter->name, $filter->min_arguments, (defined $filter->max_arguments ? $filter->max_arguments : -1), sub {
         my ($renderer, $node, $hash, $operand, @arguments) = @_;
-        my $result = $filter::operate({
+        my $result = $opsub->({
             node => $node,
             renderer => $renderer
         }, $hash, $operand, @arguments);
@@ -285,9 +407,10 @@ sub register_filter {
 sub register_operator {
     my ($self, $operator) = @_;
     die WWW::Shopify::Liquid::XS::Exception->new("Requires operator to have an operate sub; currently custom processing is not supported.") unless $operator->can('operate');
+    my $opsub = \&{$operator . "::operate"};
     die WWW::Shopify::Liquid::XS::Exception->new("Can't register operator '" . $operator->symbol. "'.") unless WWW::Shopify::Liquid::XS::registerOperator($self->{context}, $operator->symbol, $operator->arity, $operator->fixness, $operator->priority, sub {
         my ($renderer, $node, $hash, @operands) = @_;
-        my $result = $operator::operate({
+        my $result = $opsub->({
             node => $node,
             renderer => $renderer
         }, $hash, @operands);
