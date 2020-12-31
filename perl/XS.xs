@@ -4,7 +4,7 @@
 #include "XSUB.h"
 
 #include "ppport.h"
-#include "../src/liquid.h"
+#include <liquid/liquid.h>
 
 LiquidVariableType lpGetType(void* variable) {
     if (SvROK((SV*)variable)) {
@@ -89,7 +89,7 @@ bool lpGetDictionaryVariable(void* variable, const char* key, void** target) {
     SV** retrieved = hv_fetch(hv, key, strlen(key), 0);
     if (!retrieved)
         return false;
-    *target = *retrieved;
+    *target = SvREFCNT_inc(*retrieved);
     return true;
 }
 
@@ -153,7 +153,7 @@ void* lpSetDictionaryVariable(LiquidRenderer renderer, void* variable, const cha
         SvREFCNT_dec(target);
         return NULL;
     }
-    return *retrieved;
+    return SvREFCNT_inc(*retrieved);
 }
 
 void* lpSetArrayVariable(LiquidRenderer renderer, void* variable, long long idx, void* target) {
@@ -166,7 +166,7 @@ void* lpSetArrayVariable(LiquidRenderer renderer, void* variable, long long idx,
         SvREFCNT_dec(target);
         return NULL;
     }
-    return *retrieved;
+    return SvREFCNT_inc(*retrieved);
 }
 
 void* lpCreateHash(LiquidRenderer renderer) {
@@ -259,23 +259,31 @@ static void lpRenderEnclosingTag(LiquidRenderer renderer, LiquidNode node, void*
     dTHX;
     SV* callback = (SV*)data;
 
+
+    int argMax = liquidGetArgumentCount(node);
+    SV** arguments = malloc(sizeof(SV)*argMax);
+    for (int i = 0; i < argMax; ++i)
+        liquidGetArgument((void**)&arguments[i], renderer, node, variableStore, i);
+
+    SV* child = NULL;
+    liquidGetChild((void**)&child, renderer, node, variableStore, 1);
+
     dSP;
 
     ENTER;
     SAVETMPS;
     PUSHMARK(SP);
 
-    EXTEND(SP, 4);
+    EXTEND(SP, 4+argMax);
     // Wrapped closure should look like:
     // ($package, $renderer, $hash)
     // the only thing we supply is the render, node, and hash.
     PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
     PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
     PUSHs((SV*)variableStore);
-
-    SV* child = NULL;
-    liquidGetChild((void**)&child, renderer, node, variableStore, 1);
     PUSHs(child);
+    for (int i = 0; i < argMax; ++i)
+        PUSHs(arguments[i]);
 
 
     PUTBACK;
@@ -285,12 +293,13 @@ static void lpRenderEnclosingTag(LiquidRenderer renderer, LiquidNode node, void*
     SPAGAIN;
 
     if (count > 0) {
-        SV *sv = POPs;
-        lpSetReturnValue(my_perl, renderer, sv);
+        lpSetReturnValue(my_perl, renderer, POPs);
     } else {
         liquidRendererSetReturnValueNil(renderer);
     }
+    free(arguments);
 
+    PUTBACK;
     FREETMPS;
     LEAVE;
 }
@@ -300,25 +309,24 @@ static void lpRenderFreeTag(LiquidRenderer renderer, LiquidNode node, void* vari
     dTHX;
     SV* callback = (SV*)data;
 
+    int argMax = liquidGetArgumentCount(node);
+    SV** arguments = malloc(sizeof(SV)*argMax);
+    for (int i = 0; i < argMax; ++i)
+        liquidGetArgument((void**)&arguments[i], renderer, node, variableStore, i);
+
     dSP;
 
     ENTER;
     SAVETMPS;
     PUSHMARK(SP);
 
-
-    int argMax = liquidGetArgumentCount(node);
-
     EXTEND(SP, 3+argMax);
     PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
     PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
     PUSHs((SV*)variableStore);
 
-    for (int i = 0; i < argMax; ++i) {
-        SV* arg = NULL;
-        liquidGetArgument((void**)&arg, renderer, node, variableStore, i);
-        PUSHs(arg);
-    }
+    for (int i = 0; i < argMax; ++i)
+        PUSHs(arguments[i]);
 
     PUTBACK;
 
@@ -327,12 +335,13 @@ static void lpRenderFreeTag(LiquidRenderer renderer, LiquidNode node, void* vari
     SPAGAIN;
 
     if (count > 0) {
-        SV *sv = POPs;
-        lpSetReturnValue(my_perl, renderer, sv);
+        lpSetReturnValue(my_perl, renderer, POPs);
     } else {
         liquidRendererSetReturnValueNil(renderer);
     }
+    free(arguments);
 
+    PUTBACK;
     FREETMPS;
     LEAVE;
 }
@@ -342,34 +351,30 @@ static void lpRenderFreeTag(LiquidRenderer renderer, LiquidNode node, void* vari
 static void lpRenderFilter(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
     dTHX;
     SV* callback = (SV*)data;
-
-
     dSP;
+
+    // This *must* be outside the setup calls for the call-frame, becuase these potentially could also make calls; I learned this the hard way.
+    SV* operand = NULL;
+    liquidFilterGetOperand((void**)&operand, renderer, node, variableStore);
+    int argMax = liquidGetArgumentCount(node);
+    SV** arguments = malloc(sizeof(SV)*argMax);
+    for (int i = 0; i < argMax; ++i)
+        liquidGetArgument((void**)&arguments[i], renderer, node, variableStore, i);
+
 
     ENTER;
     SAVETMPS;
     PUSHMARK(SP);
 
-
-    int argMax = liquidGetArgumentCount(node);
-
     EXTEND(SP, 4+argMax);
-    // Wrapped closure should look like:
-    // ($package, $renderer, $hash)
-    // the only thing we supply is the render, node, and hash.
+
     PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
     PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
-    PUSHs((SV*)variableStore);
+    PUSHs(SvREFCNT_inc(variableStore));
+    PUSHs(SvREFCNT_inc(operand));
 
-    SV* operand = NULL;
-    liquidFilterGetOperand((void**)&operand, renderer, node, variableStore);
-    PUSHs(operand);
-
-    for (int i = 0; i < argMax; ++i) {
-        SV* arg = NULL;
-        liquidGetArgument((void**)&arg, renderer, node, variableStore, i);
-        PUSHs(arg);
-    }
+    for (int i = 0; i < argMax; ++i)
+        PUSHs(arguments[i]);
 
     PUTBACK;
 
@@ -377,13 +382,18 @@ static void lpRenderFilter(LiquidRenderer renderer, LiquidNode node, void* varia
 
     SPAGAIN;
 
+    SvREFCNT_dec(variableStore);
+    SvREFCNT_dec(operand);
+
     if (count > 0) {
-        SV *sv = POPs;
-        lpSetReturnValue(my_perl, renderer, sv);
+        lpSetReturnValue(my_perl, renderer, POPs);
     } else {
         liquidRendererSetReturnValueNil(renderer);
     }
 
+    free(arguments);
+
+    PUTBACK;
     FREETMPS;
     LEAVE;
 }
@@ -421,12 +431,12 @@ static void lpRenderBinaryInfixOperator(LiquidRenderer renderer, LiquidNode node
     SPAGAIN;
 
     if (count > 0) {
-        SV *sv = POPs;
-        lpSetReturnValue(my_perl, renderer, sv);
+        lpSetReturnValue(my_perl, renderer, POPs);
     } else {
         liquidRendererSetReturnValueNil(renderer);
     }
 
+    PUTBACK;
     FREETMPS;
     LEAVE;
 }
