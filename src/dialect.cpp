@@ -132,8 +132,8 @@ namespace Liquid {
         }
 
 
-        Parser::Error validate(const Context& context, const Node& node) const {
-            auto elseNode = intermediates.find("else")->second.get();
+        LiquidParserError validate(const Context& context, const Node& node) const {
+            /*auto elseNode = intermediates.find("else")->second.get();
             auto elsifNode = intermediates.find("elsif")->second.get();
             for (size_t i = 1; i < node.children.size(); ++i) {
                 if (((i - 1) % 2) == 0) {
@@ -141,7 +141,8 @@ namespace Liquid {
                         return Parser::Error(Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL);
                 }
             }
-            return Parser::Error();
+            return Parser::Error();*/
+            return LiquidParserError { };
         }
 
 
@@ -1001,19 +1002,20 @@ namespace Liquid {
         ReplaceFilterNode() : FilterNodeType("replace", 2, 2) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type || argument.type)
+            auto argumentPattern = getArgument(renderer, node, store, 0);
+            auto argumentReplacement = getArgument(renderer, node, store, 1);
+            if (operand.type || argumentPattern.type || argumentReplacement.type)
                 return Node();
             string accumulator;
             string str = operand.getString();
-            string rm = argument.getString();
-            string replacement = argument.getString();
+            string pattern = argumentPattern.getString();
+            string replacement = argumentReplacement.getString();
             size_t start = 0, idx;
-            while ((idx = str.find(rm, start)) != string::npos) {
+            while ((idx = str.find(pattern, start)) != string::npos) {
                 if (idx > start)
                     accumulator.append(str, start, idx - start);
                 accumulator.append(replacement);
-                start = idx + rm.size();
+                start = idx + pattern.size();
             }
             accumulator.append(str, start, str.size() - start);
             return Variant(accumulator);
@@ -1023,19 +1025,20 @@ namespace Liquid {
         ReplaceFirstFilterNode() : FilterNodeType("replacefirst", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type || argument.type)
+            auto argumentPattern = getArgument(renderer, node, store, 0);
+            auto argumentReplacement = getArgument(renderer, node, store, 1);
+            if (operand.type || argumentPattern.type || argumentReplacement.type)
                 return Node();
             string accumulator;
             string str = operand.getString();
-            string rm = argument.getString();
-            string replacement = argument.getString();
+            string pattern = argumentPattern.getString();
+            string replacement = argumentReplacement.getString();
             size_t start = 0, idx;
-            while ((idx = str.find(rm, start)) != string::npos) {
+            while ((idx = str.find(pattern, start)) != string::npos) {
                 if (idx > start)
                     accumulator.append(str, start, idx - start);
                 accumulator.append(replacement);
-                start = idx + rm.size();
+                start = idx + pattern.size();
                 break;
             }
             accumulator.append(str, start, str.size() - start);
@@ -1789,9 +1792,11 @@ namespace Liquid {
 
 
 
-    void StandardDialect::implement(Context& context, bool globalAssignsOnly, bool disallowParentheses, bool assignOperatorsOnly, EFalsiness falsiness) {
+    void StandardDialect::implement(Context& context, bool globalAssignsOnly, bool disallowParentheses, bool assignOperatorsOnly, bool disableArrayLiterals, EFalsiness falsiness) {
 
         context.falsiness = falsiness;
+        context.allowArrayLiterals = !disableArrayLiterals;
+
         // Control flow tags.
         context.registerType<IfNode>();
         context.registerType<UnlessNode>();

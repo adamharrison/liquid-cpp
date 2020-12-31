@@ -33,7 +33,7 @@ namespace Liquid {
                         result += "&amp;";
                     break;
                     default:
-                        result += incoming[i];
+                        result += c;
                 }
             }
             return result;
@@ -45,8 +45,32 @@ namespace Liquid {
         }
     };
 
+    static const char hexDigits[] = "0123456789abcdef";
+
+    struct URLEncodeFilterNode : FilterNodeType {
+        static string paramEncode(const string& incoming) {
+            string result;
+            result.reserve(int(incoming.size()*1.10));
+            for (size_t i = 0; i < incoming.size(); ++i) {
+                char c = incoming[i];
+                if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z'))
+                    result += c;
+                else {
+                    result += hexDigits[c >> 4];
+                    result += hexDigits[c & 0xF];
+                }
+            }
+            return result;
+        }
+
+        URLEncodeFilterNode() : FilterNodeType("url_encode", 0, 0) { }
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            return Variant(paramEncode(renderer.retrieveRenderedNode(*node.children.front().get(), store).getString()));
+        }
+    };
+
+
     void toHex(char* dst, const unsigned char* src, int size) {
-        static const char hexDigits[] = "0123456789abcdef";
         for (int i = 0; i < size; ++i) {
             *(dst++) = hexDigits[src[i] >> 4];
             *(dst++) = hexDigits[src[i] & 0xF];
@@ -507,6 +531,7 @@ namespace Liquid {
 
     void WebDialect::implement(Context& context) {
         context.registerType<EscapeFilterNode>();
+        context.registerType<URLEncodeFilterNode>();
         context.registerType<MD5FilterNode>();
         context.registerType<SHA1FilterNode>();
         context.registerType<SHA256FilterNode>();

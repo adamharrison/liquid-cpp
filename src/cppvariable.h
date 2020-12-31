@@ -218,9 +218,22 @@ namespace Liquid {
         }
 
         bool getString(std::string& s) const  {
-            if (type != LIQUID_VARIABLE_TYPE_STRING)
-                return false;
-            s = this->s;
+            switch (type) {
+                case LIQUID_VARIABLE_TYPE_STRING:
+                    s = this->s;
+                    return true;
+                case LIQUID_VARIABLE_TYPE_FLOAT:
+                    s = std::to_string(f);
+                    return true;
+                case LIQUID_VARIABLE_TYPE_INT:
+                    s = std::to_string(i);
+                    return true;
+                case LIQUID_VARIABLE_TYPE_BOOL:
+                    s = b ? "true" : "false";
+                    return true;
+                default:
+                    return false;
+            }
             return true;
         }
         bool getInteger(long long& i) const  {
@@ -262,19 +275,25 @@ namespace Liquid {
             return it->second.get();
         }
 
-        bool getArrayVariable(const CPPVariable** variable, size_t idx) const {
+        bool getArrayVariable(const CPPVariable** variable, long long idx) const {
             if (type != LIQUID_VARIABLE_TYPE_ARRAY)
                 return false;
-            if (idx >= a.size())
+            if (idx < 0)
+                idx += a.size();
+            if (idx < 0)
+                return false;
+            if (idx >= (long long)a.size())
                 return false;
             *variable = &((*const_cast<CPPVariable*>(this))[idx]);
             return true;
         }
 
-        CPPVariable* setArrayVariable(size_t idx, CPPVariable* target)  {
+        CPPVariable* setArrayVariable(long long idx, CPPVariable* target)  {
             if (type != LIQUID_VARIABLE_TYPE_ARRAY)
                 return nullptr;
-            if (idx >= a.size())
+            if (idx < 0)
+                idx += a.size();
+            if (idx < 0 || idx >= (long long)a.size())
                 a.resize(idx+1);
             a[idx] = make_unique<CPPVariable>(*target);
             return a[idx].get();
@@ -337,21 +356,23 @@ namespace Liquid {
             getBool = +[](void* variable, bool* target) { return static_cast<CPPVariable*>(variable)->getBool(*target); };
             getTruthy = +[](void* variable) { return static_cast<CPPVariable*>(variable)->getTruthy(); };
             getString = +[](void* variable, char* target) {
-                if (static_cast<CPPVariable*>(variable)->type != LIQUID_VARIABLE_TYPE_STRING)
+                string s;
+                if (!static_cast<CPPVariable*>(variable)->getString(s))
                     return false;
-                strcpy(target, static_cast<CPPVariable*>(variable)->s.data());
+                strcpy(target, s.data());
                 return true;
             };
             getStringLength = +[](void* variable) {
-                if (static_cast<CPPVariable*>(variable)->type != LIQUID_VARIABLE_TYPE_STRING)
+                string s;
+                if (!static_cast<CPPVariable*>(variable)->getString(s))
                     return -1LL;
-                return (long long)static_cast<CPPVariable*>(variable)->s.size();
+                return (long long)s.size();
             };
             getInteger = +[](void* variable, long long* target) { return static_cast<CPPVariable*>(variable)->getInteger(*target); };
             getFloat = +[](void* variable, double* target) { return static_cast<CPPVariable*>(variable)->getFloat(*target); };
             getDictionaryVariable = +[](void* variable, const char* key, void** target) { return static_cast<CPPVariable*>(variable)->getDictionaryVariable((const CPPVariable**)target, key); };
-            getArrayVariable = +[](void* variable, size_t idx, void** target) { return static_cast<CPPVariable*>(variable)->getArrayVariable((const CPPVariable**)target, idx); };
-            setArrayVariable = +[](LiquidRenderer renderer, void* variable, size_t idx, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setArrayVariable(idx, static_cast<CPPVariable*>(target)); };
+            getArrayVariable = +[](void* variable, long long idx, void** target) { return static_cast<CPPVariable*>(variable)->getArrayVariable((const CPPVariable**)target, idx); };
+            setArrayVariable = +[](LiquidRenderer renderer, void* variable, long long idx, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setArrayVariable(idx, static_cast<CPPVariable*>(target)); };
             setDictionaryVariable = +[](LiquidRenderer renderer, void* variable, const char* key, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setDictionaryVariable(key, static_cast<CPPVariable*>(target)); };
             iterate = +[](void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) { return static_cast<CPPVariable*>(variable)->iterate(callback, data, start, limit, reverse); };
             getArraySize = +[](void* variable) { return static_cast<CPPVariable*>(variable)->getArraySize(); };

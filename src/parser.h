@@ -189,7 +189,7 @@ namespace Liquid {
         // Pops the last node in the stack, and then applies it as the last child of the node prior to it.
         bool popNode();
         // Pops nodes until it reaches a node of the given type.
-        bool popNodeUntil(int type);
+        bool popNodeUntil(NodeType::Type type);
 
         Node parse(const char* buffer, size_t len);
         Node parse(const string& str) {

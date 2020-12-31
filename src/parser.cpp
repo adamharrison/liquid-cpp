@@ -4,8 +4,8 @@
 namespace Liquid {
 
     Parser::Error Parser::validate(const Node& node) const {
-        if (node.type)
-            return node.type->validate(context, node);
+        /*if (node.type)
+            return node.type->validate(context, node);*/
         return Error();
     }
 
@@ -37,6 +37,12 @@ namespace Liquid {
                 return false;
             break;
             case Parser::State::ARGUMENT:
+                if (parser.nodes.size() > 2 && parser.nodes[parser.nodes.size()-2]->type && parser.nodes[parser.nodes.size()-2]->type->type == NodeType::Type::ARRAY_LITERAL) {
+                    if (!parser.popNode())
+                        return false;
+                    parser.nodes.back()->children.push_back(nullptr);
+                    return true;
+                }
                 if (!parser.popNodeUntil(NodeType::Type::ARGUMENTS)) {
                     parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL, ","));
                     return false;
@@ -75,8 +81,12 @@ namespace Liquid {
             break;
             case Parser::State::ARGUMENT:
                 if (!parser.nodes.back()->type || parser.nodes.back()->type->type != NodeType::Type::VARIABLE) {
-                    parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL, "["));
-                    return false;
+                    // In this case, we're looking an array literal. Check to see if those are enabled.
+                    if (!parser.context.allowArrayLiterals) {
+                        parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL, "["));
+                        return false;
+                    }
+                    return parser.pushNode(make_unique<Node>(context.getArrayLiteralNodeType()), true);
                 }
                 parser.nodes.back()->children.push_back(nullptr);
                 return parser.pushNode(make_unique<Node>(context.getGroupDereferenceNodeType()), true);
@@ -91,13 +101,30 @@ namespace Liquid {
                 parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL, "]"));
                 return false;
             break;
-            case Parser::State::ARGUMENT:
+            case Parser::State::ARGUMENT: {
+                int i;
+                for (i = parser.nodes.size()-1; i > 0; --i) {
+                    if (parser.nodes[i]->type) {
+                        if (parser.nodes[i]->type->type == NodeType::Type::GROUP_DEREFERENCE || parser.nodes[i]->type->type == NodeType::Type::ARRAY_LITERAL)
+                            break;
+                    }
+                }
+                // Array literal ending. If we're a 0 length array, remove the expeaction of an element.
+                if (i >= 0 && parser.nodes[i]->type->type == NodeType::Type::ARRAY_LITERAL) {
+                    if (i == (int)parser.nodes.size() - 1 && parser.nodes[i]->children.size() == 1 && parser.nodes[i]->children[0].get() == nullptr)
+                        parser.nodes[i]->children.resize(0);
+                    if (!parser.popNodeUntil(NodeType::Type::ARRAY_LITERAL)) {
+                        parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNBALANCED_GROUP));
+                        return false;
+                    }
+                    return true;
+                }
                 if (!parser.popNodeUntil(NodeType::Type::GROUP_DEREFERENCE)) {
                     parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNBALANCED_GROUP));
                     return false;
                 }
                 parser.popNode();
-            break;
+            } break;
         }
         return true;
     }
@@ -225,7 +252,11 @@ namespace Liquid {
                         // Check for operators.
                         std::string opName = std::string(str, len);
                         if (opName == "|") {
-                            if (parser.filterState != Parser::EFilterState::UNSET && parser.filterState != Parser::EFilterState::ARGUMENTS) {
+                            // In the case where we're chaining filters, and there are no arguments; the precense of another | is enough to terminate this an popUntil the filter.
+                            if (
+                                (parser.filterState == Parser::EFilterState::COLON && !parser.popNodeUntil(NodeType::Type::FILTER)) ||
+                                (parser.filterState != Parser::EFilterState::UNSET && parser.filterState != Parser::EFilterState::ARGUMENTS && parser.filterState != Parser::EFilterState::COLON)
+                            ) {
                                 parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL, opName));
                                 return false;
                             }
@@ -353,7 +384,7 @@ namespace Liquid {
         return true;
     }
 
-    bool Parser::popNodeUntil(int type) {
+    bool Parser::popNodeUntil(NodeType::Type type) {
         while (true) {
             auto& node = nodes.back();
             if (node->type && node->type->type == type)
@@ -421,8 +452,10 @@ namespace Liquid {
             throw Exception(errors[0]);
         if (error.type != Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_NONE)
             throw Exception(error);
-        assert(nodes.size() > 0);
-        Node node = move(*nodes[nodes.size()-1]);
+        if (nodes.size() > 1)
+            throw Exception(Liquid::Parser::Error(lexer, LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END));
+        assert(nodes.size() == 1);
+        Node node = move(*nodes.back().get());
         nodes.clear();
         return node;
     }

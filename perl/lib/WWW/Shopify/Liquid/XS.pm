@@ -29,8 +29,11 @@ sub english {
         "Unknown operator",
         "Unknown operator or qualifier",
         "Unknown filter",
+        "Unexpected operand",
+        "Invalid arguments",
         "Invalid symbol",
-        "Unbalanced end to group"
+        "Unbalanced end to group",
+        "Parse depth exceeded"
     );
 
     if (defined $self->{error} && $self->{error} < int(@codes)) {
@@ -44,21 +47,32 @@ sub english {
 
 package WWW::Shopify::Liquid::XS::Renderer;
 
+# Little hack to allow recovery of the renderer from the internal one.
+use Scalar::Util qw(weaken);
+our %renderer_dereference = ();
+
 sub new {
     my ($package, $liquid) = @_;
-    return bless { liquid => $liquid, renderer => WWW::Shopify::Liquid::XS::createRenderer($liquid->{context}) }, $package;
+    my $self = bless { liquid => $liquid, renderer => WWW::Shopify::Liquid::XS::createRenderer($liquid->{context}), max_inclusion_depth => 10 }, $package;
+    my $reference = $self;
+    weaken($reference);
+    $renderer_dereference{$self->{renderer}} = $reference;
+    return $self;
 }
 
 sub parent { return $_[0]->{liquid}; }
 
+
 sub DESTROY {
     my ($self) = @_;
+    delete $renderer_dereference{$self->{renderer}};
     WWW::Shopify::Liquid::XS::freeRenderer($self->{renderer});
 }
 
 sub render {
     my ($self, $hash, $template) = @_;
     my $error = [];
+    $self->inclusion_depth(0);
     my $result = WWW::Shopify::Liquid::XS::renderTemplate($self->{renderer}, $hash, $template->{template}, $error);
     die WWW::Shopify::Liquid::XS::Exception->new($error->[0]) if !$self->{silence_exceptions} && int(@$error) > 0;
     return $result;
@@ -67,6 +81,7 @@ sub render {
 sub silence_exceptions { $_[0]->{silence_exceptions} = $_[1] if @_ > 1; return $_[0]->{silence_exceptions}; }
 sub print_exceptions { $_[0]->{print_exceptions} = $_[1] if @_ > 1; return $_[0]->{print_exceptions}; }
 sub inclusion_context { $_[0]->{inclusion_context} = $_[1] if @_ > 1; return $_[0]->{inclusion_context}; }
+sub inclusion_depth { $_[0]->{inclusion_depth} = $_[1] if @_ > 1; return $_[0]->{inclusion_depth}; }
 sub max_inclusion_depth { $_[0]->{max_inclusion_depth} = $_[1] if @_ > 1; return $_[0]->{max_inclusion_depth}; }
 sub make_method_calls { $_[0]->{make_method_calls} = $_[1] if @_ > 1; return $_[0]->{make_method_calls}; }
 sub clone_hash { $_[0]->{clone_hash} = $_[1] if @_ > 1; return $_[0]->{clone_hash}; }
@@ -82,10 +97,14 @@ sub optimize {
 package WWW::Shopify::Liquid::XS::Template;
 
 sub new {
-    my ($package, $context, $text) = @_;
+    my ($package, $context, $text, $file) = @_;
     my $error = [];
     my $template = WWW::Shopify::Liquid::XS::createTemplate($context, $text, $error);
-    die WWW::Shopify::Liquid::XS::Exception->new($error) if !$template;
+    if (!$template) {
+        $error = WWW::Shopify::Liquid::XS::Exception->new($error);
+        $error->{line}->[3] = $file;
+        die $error;
+    }
     return bless { template => $template }, $package;
 }
 
@@ -93,7 +112,7 @@ sub new {
 sub tokens {
     my ($self) = @_;
     my @nodes;
-    WWW::Shopify::Liquid::XS::walkTemplate(sub {
+    WWW::Shopify::Liquid::XS::walkTemplate($self->{template}, sub {
         my ($node) = @_;
         push(@nodes, $node);
     });
@@ -339,12 +358,12 @@ sub parse_file {
     my ($self, $file) = @_;
     open(my $fh, "<", $file);
     my $text = do { local $/; <$fh> };
-    return $self->parse_text($text);
+    return $self->parse_text($text, $file);
 }
 
 sub parse_text {
-    my ($self, $text) = @_;
-    my $template = WWW::Shopify::Liquid::XS::Template->new($self->{context}, $text);
+    my ($self, $text, $file) = @_;
+    my $template = WWW::Shopify::Liquid::XS::Template->new($self->{context}, $text, $file);
     return $template;
 }
 
@@ -372,33 +391,33 @@ sub optimize_ast {
 
 sub register_tag {
     my ($self, $tag) = @_;
-    die WWW::Shopify::Liquid::XS::Exception->new("Requies tag to have an operate sub; currently custom processing is not supported.") unless $tag->can('operate');
-    my $opsub = \&{$tag . "::operate"};
+    my $opsub = $tag->can('operate');
+    die WWW::Shopify::Liquid::XS::Exception->new("Requies tag to have an operate sub; currently custom processing is not supported.") unless $opsub;
     die WWW::Shopify::Liquid::XS::Exception->new("Can't register tag '" . $tag->name . "'.") unless WWW::Shopify::Liquid::XS::registerTag($self->{context}, $tag->name, ($tag->is_enclosing ? "enclosing" : "free"), $tag->min_arguments, (defined $tag->max_arguments ? $tag->max_arguments : -1), $tag->is_enclosing ? sub {
         my ($renderer, $node, $hash, $contents, @arguments) = @_;
-        return $opsub->({
+        return $opsub->((bless {
             node => $node,
-            renderer => $renderer
-        }, $hash, $contents, @arguments);
+            renderer => $WWW::Shopify::Liquid::XS::Renderer::renderer_dereference{$renderer}
+        }, $tag), $hash, $contents, @arguments);
     } : sub {
         my ($renderer, $node, $hash, @arguments) = @_;
-        return $opsub->operate({
+        return $opsub->((bless {
             node => $node,
-            renderer => $renderer
-        }, $hash, @arguments);
+            renderer => $WWW::Shopify::Liquid::XS::Renderer::renderer_dereference{$renderer}
+        }, $tag), $hash, @arguments);
     }) == 0;
 }
 
 sub register_filter {
     my ($self, $filter) = @_;
-    die WWW::Shopify::Liquid::XS::Exception->new("Requires filter to have an operate sub; currently custom processing is not supported.") unless $filter->can('operate');
-    my $opsub = \&{$filter . "::operate"};
+    my $opsub = $filter->can('operate');
+    die WWW::Shopify::Liquid::XS::Exception->new("Requires filter to have an operate sub; currently custom processing is not supported.") unless $opsub;
     die WWW::Shopify::Liquid::XS::Exception->new("Can't register filter '" . $filter->name . "'.") unless WWW::Shopify::Liquid::XS::registerFilter($self->{context}, $filter->name, $filter->min_arguments, (defined $filter->max_arguments ? $filter->max_arguments : -1), sub {
         my ($renderer, $node, $hash, $operand, @arguments) = @_;
-        my $result = $opsub->({
+        my $result = $opsub->((bless {
             node => $node,
-            renderer => $renderer
-        }, $hash, $operand, @arguments);
+            renderer => $WWW::Shopify::Liquid::XS::Renderer::renderer_dereference{$renderer}
+        }, $filter), $hash, $operand, @arguments);
         return $result;
     }) == 0;
 }
@@ -406,14 +425,14 @@ sub register_filter {
 
 sub register_operator {
     my ($self, $operator) = @_;
-    die WWW::Shopify::Liquid::XS::Exception->new("Requires operator to have an operate sub; currently custom processing is not supported.") unless $operator->can('operate');
-    my $opsub = \&{$operator . "::operate"};
+    my $opsub = $operator->can('operate');
+    die WWW::Shopify::Liquid::XS::Exception->new("Requires operator to have an operate sub; currently custom processing is not supported.") unless $opsub;;
     die WWW::Shopify::Liquid::XS::Exception->new("Can't register operator '" . $operator->symbol. "'.") unless WWW::Shopify::Liquid::XS::registerOperator($self->{context}, $operator->symbol, $operator->arity, $operator->fixness, $operator->priority, sub {
         my ($renderer, $node, $hash, @operands) = @_;
-        my $result = $opsub->({
+        my $result = $opsub->((bless {
             node => $node,
-            renderer => $renderer
-        }, $hash, @operands);
+            renderer => $WWW::Shopify::Liquid::XS::Renderer::renderer_dereference{$renderer}
+        }, $operator), $hash, @operands);
         return $result;
     }) == 0;
 }

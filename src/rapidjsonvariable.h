@@ -80,8 +80,12 @@ namespace Liquid {
                 *target = &value;
                 return true;
             };
-            getArrayVariable = +[](void* variable, size_t idx, void** target) {
-                if (!static_cast<rapidjson::Value*>(variable)->IsArray() || idx < static_cast<rapidjson::Value*>(variable)->Size())
+            getArrayVariable = +[](void* variable, long long idx, void** target) {
+                if (!static_cast<rapidjson::Value*>(variable)->IsArray())
+                    return false;
+                if (idx < 0)
+                    idx += static_cast<rapidjson::Value*>(variable)->Size();
+                if (idx < 0 || idx >= static_cast<rapidjson::Value*>(variable)->Size())
                     return false;
                 auto& value = (*static_cast<rapidjson::Value*>(variable))[idx];
                 *target = &value;
@@ -103,7 +107,7 @@ namespace Liquid {
                 return false;
             };
 
-            setArrayVariable = +[](LiquidRenderer renderer, void* variable, size_t idx, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setArrayVariable(idx, static_cast<CPPVariable*>(target)); };
+            setArrayVariable = +[](LiquidRenderer renderer, void* variable, long long idx, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setArrayVariable(idx, static_cast<CPPVariable*>(target)); };
             setDictionaryVariable = +[](LiquidRenderer renderer, void* variable, const char* key, void* target) { return (void*)static_cast<CPPVariable*>(variable)->setDictionaryVariable(key, static_cast<CPPVariable*>(target)); };
 
             createHash = +[](LiquidRenderer renderer) { return (void*)new CPPVariable(unordered_map<string, unique_ptr<CPPVariable>>()); };

@@ -9,44 +9,6 @@ namespace Liquid {
 
     struct Renderer;
 
-    struct NodeType {
-        enum Type {
-            VARIABLE,
-            TAG,
-            GROUP,
-            GROUP_DEREFERENCE,
-            OUTPUT,
-            ARGUMENTS,
-            QUALIFIER,
-            OPERATOR,
-            FILTER,
-            DOT_FILTER
-        };
-        Type type;
-        string symbol;
-        int maxChildren;
-        void* userData = nullptr;
-        LiquidRenderFunction userRenderFunction = nullptr;
-
-        NodeType(Type type, string symbol = "", int maxChildren = -1) : type(type), symbol(symbol), maxChildren(maxChildren) { }
-        NodeType(const NodeType&) = default;
-        NodeType(NodeType&&) = default;
-        ~NodeType() { }
-
-        virtual Node render(Renderer& renderer, const Node& node, Variable store) const {
-            if (!userRenderFunction)
-                return Node();
-            userRenderFunction(LiquidRenderer{&renderer}, LiquidNode{const_cast<Node*>(&node)}, store, userData);
-            return renderer.returnValue;
-        }
-        virtual Parser::Error validate(const Context& context, const Node& node) const { return Parser::Error(); }
-        virtual void optimize(const Context& context, Node& node, Variable store) const { }
-
-        Node getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const;
-        int getArgumentCount(const Node& node) const;
-        Node getChild(Renderer& renderer, const Node& node, Variable store, int idx) const;
-        int getChildCount(const Node& node) const;
-    };
 
     struct TagNodeType : NodeType {
         enum class Composition {
@@ -187,9 +149,21 @@ namespace Liquid {
         struct GroupDereferenceNode : PassthruNode { GroupDereferenceNode() : PassthruNode(Type::GROUP_DEREFERENCE) { } };
         // Used exclusively for tags. Should be never be rendered by itself.
         struct ArgumentNode : NodeType { ArgumentNode() : NodeType(Type::ARGUMENTS) { } };
+        struct ArrayLiteralNode : NodeType {
+            ArrayLiteralNode() : NodeType(Type::ARRAY_LITERAL) { }
+            Node render(Renderer& renderer, const Node& node, Variable store) const {
+                Variant var({ });
+                var.a.reserve(node.children.size());
+                for (size_t i = 0; i < node.children.size(); ++i)
+                    var.a.push_back(move(renderer.retrieveRenderedNode(*node.children[i].get(), store).variant));
+                return Node(move(var));
+            }
+        };
+
         struct UnknownFilterNode : FilterNodeType { UnknownFilterNode() : FilterNodeType("", -1, -1) { } };
 
         EFalsiness falsiness = FALSY_FALSE;
+        bool allowArrayLiterals = true;
 
         struct VariableNode : NodeType {
             VariableNode() : NodeType(Type::VARIABLE) { }
@@ -213,6 +187,7 @@ namespace Liquid {
         const NodeType* getGroupDereferenceNodeType() const { static GroupDereferenceNode groupDereferenceNodeType; return &groupDereferenceNodeType; }
         const NodeType* getArgumentsNodeType() const { static ArgumentNode argumentNodeType; return &argumentNodeType; }
         const NodeType* getUnknownFilterNodeType() const { static UnknownFilterNode filterNodeType; return &filterNodeType; }
+        const NodeType* getArrayLiteralNodeType() const { static ArrayLiteralNode arrayLiteralNode; return &arrayLiteralNode; }
 
         NodeType* registerType(unique_ptr<NodeType> type) {
             switch (type->type) {

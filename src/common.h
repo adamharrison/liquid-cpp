@@ -404,6 +404,45 @@ namespace Liquid {
             }
         }
     };
+
+    struct Renderer;
+    struct Parser;
+    struct Context;
+
+    struct NodeType {
+        enum Type {
+            VARIABLE,
+            TAG,
+            GROUP,
+            GROUP_DEREFERENCE,
+            ARRAY_LITERAL,
+            OUTPUT,
+            ARGUMENTS,
+            QUALIFIER,
+            OPERATOR,
+            FILTER,
+            DOT_FILTER
+        };
+        Type type;
+        string symbol;
+        int maxChildren;
+        void* userData = nullptr;
+        LiquidRenderFunction userRenderFunction = nullptr;
+
+        NodeType(Type type, string symbol = "", int maxChildren = -1) : type(type), symbol(symbol), maxChildren(maxChildren) { }
+        NodeType(const NodeType&) = default;
+        NodeType(NodeType&&) = default;
+        ~NodeType() { }
+
+        virtual Node render(Renderer& renderer, const Node& node, Variable store) const;
+        virtual LiquidParserError validate(const Context& context, const Node& node) const { return LiquidParserError { LIQUID_PARSER_ERROR_TYPE_NONE }; }
+        virtual void optimize(const Context& context, Node& node, Variable store) const { }
+
+        Node getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const;
+        int getArgumentCount(const Node& node) const;
+        Node getChild(Renderer& renderer, const Node& node, Variable store, int idx) const;
+        int getChildCount(const Node& node) const;
+    };
 }
 
 #endif

@@ -93,7 +93,7 @@ bool lpGetDictionaryVariable(void* variable, const char* key, void** target) {
     return true;
 }
 
-bool lpGetArrayVariable(void* variable, size_t idx, void** target) {
+bool lpGetArrayVariable(void* variable, long long idx, void** target) {
     dTHX;
     if (!SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
         return false;
@@ -101,7 +101,7 @@ bool lpGetArrayVariable(void* variable, size_t idx, void** target) {
     SV** sv = av_fetch(av, idx, 0);
     if (!sv)
         return false;
-    *target = *sv;
+    *target = SvREFCNT_inc(*sv);
     return true;
 }
 
@@ -109,6 +109,7 @@ bool lpIterate(void* variable, bool (*callback)(void* variable, void* data), voi
     dTHX;
     if (!SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
         return false;
+
     AV* av = (AV*)SvRV((SV*)variable);
     int length = av_top_index(av)+1;
     if (length > limit)
@@ -147,20 +148,24 @@ void* lpSetDictionaryVariable(LiquidRenderer renderer, void* variable, const cha
     if (!SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVHV)
         return NULL;
     HV* hv = (HV*)SvRV((SV*)variable);
-    SV** retrieved = hv_store(hv, key, strlen(key), target, 0);
-    if (!retrieved)
+    SV** retrieved = hv_store(hv, key, strlen(key), SvREFCNT_inc(target), 0);
+    if (!retrieved) {
+        SvREFCNT_dec(target);
         return NULL;
+    }
     return *retrieved;
 }
 
-void* lpSetArrayVariable(LiquidRenderer renderer, void* variable, size_t idx, void* target) {
+void* lpSetArrayVariable(LiquidRenderer renderer, void* variable, long long idx, void* target) {
     dTHX;
     if (!SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
         return NULL;
     AV* av = (AV*)SvRV((SV*)variable);
-    SV** retrieved = av_store(av, idx, target);
-    if (!retrieved)
+    SV** retrieved = av_store(av, idx, SvREFCNT_inc(target));
+    if (!retrieved) {
+        SvREFCNT_dec(target);
         return NULL;
+    }
     return *retrieved;
 }
 
@@ -211,7 +216,7 @@ void* lpCreateClone(LiquidRenderer renderer, void* value) {
 
 void lpFreeVariable(LiquidRenderer renderer, void* value) {
     dTHX;
-    SvREFCNT_inc((SV*)value);
+    SvREFCNT_dec((SV*)value);
 }
 
 int lpCompare(void* a, void* b) {
@@ -301,13 +306,19 @@ static void lpRenderFreeTag(LiquidRenderer renderer, LiquidNode node, void* vari
     SAVETMPS;
     PUSHMARK(SP);
 
-    EXTEND(SP, 3);
-    // Wrapped closure should look like:
-    // ($package, $renderer, $hash)
-    // the only thing we supply is the render, node, and hash.
+
+    int argMax = liquidGetArgumentCount(node);
+
+    EXTEND(SP, 3+argMax);
     PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
     PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
     PUSHs((SV*)variableStore);
+
+    for (int i = 0; i < argMax; ++i) {
+        SV* arg = NULL;
+        liquidGetArgument((void**)&arg, renderer, node, variableStore, i);
+        PUSHs(arg);
+    }
 
     PUTBACK;
 
@@ -353,7 +364,6 @@ static void lpRenderFilter(LiquidRenderer renderer, LiquidNode node, void* varia
     SV* operand = NULL;
     liquidFilterGetOperand((void**)&operand, renderer, node, variableStore);
     PUSHs(operand);
-
 
     for (int i = 0; i < argMax; ++i) {
         SV* arg = NULL;

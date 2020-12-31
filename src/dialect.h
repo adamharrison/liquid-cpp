@@ -24,6 +24,8 @@ namespace Liquid {
             bool disallowParentheses,
             // If true, disables all operators outside of the {% assign %} tag, or the {% if %} and {% unless %} tags as in Shopify.
             bool assignOperatorsOnly,
+            // If true, removed the ability to specify arrays with [] notation.
+            bool disableArrayLiterals,
             // Determines whether something is truthy/falsy.
             // In strict; this is set to FALSY_NIL, which emuilates ruby; meaning only NIL, and the false boolean are false.
             // In permissive; this is set to FALSY_EMPTY_STRING | FALSY_NIL | FALSY_0, which emulates perl, where all those are treated as false (the sane option, really).
@@ -36,6 +38,7 @@ namespace Liquid {
                 true,
                 true,
                 true,
+                true,
                 FALSY_NIL
             );
         }
@@ -43,6 +46,7 @@ namespace Liquid {
         static void implementPermissive(Context& context) {
             implement(
                 context,
+                false,
                 false,
                 false,
                 false,

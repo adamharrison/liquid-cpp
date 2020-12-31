@@ -3,9 +3,12 @@ use warnings;
 
 package WWW::Shopify::Liquid::XS::Filter::Test;
 use parent 'WWW::Shopify::Liquid::Filter';
+use Test::More;
+
 
 sub operate {
 	my ($self, $hash, $operand) = @_;
+	is(ref($self->{renderer}), 'WWW::Shopify::Liquid::XS::Renderer');
 	return reverse($operand);
 }
 

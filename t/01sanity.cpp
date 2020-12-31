@@ -336,6 +336,17 @@ TEST(sanity, negation) {
     ASSERT_EQ(str, "true false");
 }
 
+
+TEST(sanity, arrayLiterals) {
+    CPPVariable hash, internal;
+    Node ast;
+    std::string str;
+
+    ast = getParser().parse("{% assign a = [1,2] %}A{{ a.last }}B");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "A2B");
+}
+
 TEST(sanity, filters) {
     CPPVariable hash = { };
     hash["a"] = 1;
@@ -350,6 +361,10 @@ TEST(sanity, filters) {
     ast = getParser().parse("{% assign a = a | plus: 1 | plus: 6 %}{{ a }}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "8");
+
+    ast = getParser().parse("{{ a | plus: 5 | plus: 3 }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "16");
 
 
     hash["a"] = 1;
@@ -370,9 +385,16 @@ TEST(sanity, filters) {
 }
 
 TEST(sanity, composite) {
-    CPPVariable hash, order, transaction;
+    CPPVariable hash, order, transaction, event;
     Node ast;
     std::string str;
+
+    event["category"] = "tv";
+    hash["event"] = move(event);
+    ast = getParser().parse("{{ event.category | capitalize | replace: \"Tv\", \"TV\" }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "TV");
+
 
     ast = getParser().parse("{% if a %}asdfghj {{ a }}{% else %}asdfjlsjkhgsjlkhglsdfjkgdfhs{% for i in (1..10) %}{{ i }}fasdfsdf{% endfor %}{% endif %}");
     str = getRenderer().render(ast, hash);

@@ -142,11 +142,11 @@ extern "C" {
         bool (*getInteger)(void* variable, long long* target);
         bool (*getFloat)(void* variable, double* target);
         bool (*getDictionaryVariable)(void* variable, const char* key, void** target);
-        bool (*getArrayVariable)(void* variable, size_t idx, void** target);
+        bool (*getArrayVariable)(void* variable, long long idx, void** target);
         bool (*iterate)(void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse);
         long long (*getArraySize)(void* variable);
         void* (*setDictionaryVariable)(LiquidRenderer renderer, void* variable, const char* key, void* target);
-        void* (*setArrayVariable)(LiquidRenderer renderer, void* variable, size_t idx, void* target);
+        void* (*setArrayVariable)(LiquidRenderer renderer, void* variable, long long idx, void* target);
         void* (*createHash)(LiquidRenderer renderer);
         void* (*createArray)(LiquidRenderer renderer);
         void* (*createFloat)(LiquidRenderer renderer, double value);

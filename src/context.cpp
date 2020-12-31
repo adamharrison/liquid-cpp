@@ -2,6 +2,13 @@
 
 namespace Liquid {
 
+    Node NodeType::render(Renderer& renderer, const Node& node, Variable store) const {
+        if (!userRenderFunction)
+            return Node();
+        userRenderFunction(LiquidRenderer{&renderer}, LiquidNode{const_cast<Node*>(&node)}, store, userData);
+        return renderer.returnValue;
+    }
+
     Node FilterNodeType::getOperand(Renderer& renderer, const Node& node, Variable store) const {
         return renderer.retrieveRenderedNode(*node.children[0].get(), store);
     }
@@ -11,14 +18,16 @@ namespace Liquid {
 
 
     Node NodeType::getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const {
-        if (idx >= (int)node.children[1]->children.size())
+        int offset = node.type->type == NodeType::Type::TAG ? 0 : 1;
+        if (idx >= (int)node.children[offset]->children.size())
             return Node();
-        assert(node.children[1]->type->type == NodeType::Type::ARGUMENTS);
-        return renderer.retrieveRenderedNode(*node.children[1]->children[idx].get(), store);
+        assert(node.children[offset]->type->type == NodeType::Type::ARGUMENTS);
+        return renderer.retrieveRenderedNode(*node.children[offset]->children[idx].get(), store);
     }
     int NodeType::getArgumentCount(const Node& node) const {
-        assert(node.children[1]->type->type == NodeType::Type::ARGUMENTS);
-        return node.children[1]->children.size();
+        int offset = node.type->type == NodeType::Type::TAG ? 0 : 1;
+        assert(node.children[offset]->type->type == NodeType::Type::ARGUMENTS);
+        return node.children[offset]->children.size();
     }
 
     Node NodeType::getChild(Renderer& renderer, const Node& node, Variable store, int idx) const {
