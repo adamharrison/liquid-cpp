@@ -258,12 +258,16 @@ void lpSetReturnValue(PerlInterpreter* my_perl, LiquidRenderer renderer, SV* sv)
 static void lpRenderEnclosingTag(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
     dTHX;
     SV* callback = (SV*)data;
+    SV** arguments = NULL;
 
 
     int argMax = liquidGetArgumentCount(node);
-    SV** arguments = malloc(sizeof(SV)*argMax);
-    for (int i = 0; i < argMax; ++i)
-        liquidGetArgument((void**)&arguments[i], renderer, node, variableStore, i);
+    fprintf(stderr, "ARGS: %d\n", argMax);
+    if (argMax > 0) {
+        arguments = malloc(sizeof(SV)*argMax);
+        for (int i = 0; i < argMax; ++i)
+            liquidGetArgument((void**)&arguments[i], renderer, node, variableStore, i);
+    }
 
     SV* child = NULL;
     liquidGetChild((void**)&child, renderer, node, variableStore, 1);

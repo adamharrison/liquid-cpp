@@ -318,6 +318,8 @@ TEST(sanity, forloop) {
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "fdsfdf");
 
+
+
 }
 
 
@@ -388,6 +390,11 @@ TEST(sanity, composite) {
     CPPVariable hash, order, transaction, event;
     Node ast;
     std::string str;
+
+
+    ast = getParser().parse("{% comment %}Test Comment{% endcomment %}DoesntRender");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "DoesntRender");
 
     event["category"] = "tv";
     hash["event"] = move(event);

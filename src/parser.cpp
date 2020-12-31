@@ -418,6 +418,13 @@ namespace Liquid {
             parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END));
             return false;
         }
+        if (parser.blockType != Parser::EBlockType::END) {
+            if (!parser.popNodeUntil(NodeType::Type::ARGUMENTS))
+                return false;
+            // Prune unescessary null for no-arg blocks.
+            if (parser.nodes.back()->children.size() == 1 && parser.nodes.back()->children[0].get() == nullptr)
+                parser.nodes.back()->children.clear();
+        }
         if (!parser.popNodeUntil(NodeType::Type::TAG))
             return false;
         auto& controlBlock = parser.nodes.back();
@@ -431,7 +438,7 @@ namespace Liquid {
             }
             assert(parser.nodes.back()->type && parser.nodes.back()->type == context.getConcatenationNodeType());
         } else {
-            parser.nodes.back()->children.push_back(nullptr);
+            controlBlock->children.push_back(nullptr);
             parser.nodes.push_back(make_unique<Node>(context.getConcatenationNodeType()));
         }
         parser.state = Parser::State::NODE;
