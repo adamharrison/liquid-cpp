@@ -134,17 +134,17 @@ extern "C" {
     // For languages where the variables are garbage collected, like perl and ruby; freeVariable will be a no-op.
     // Whenever getArrayVariable or getDictionaryVariable are called, a pointer is given, but no allocaitons are made.
     struct SLiquidVariableResolver {
-        LiquidVariableType (*getType)(void* variable);
-        bool (*getBool)(void* variable, bool* target);
-        bool (*getTruthy)(void* variable);
-        bool (*getString)(void* variable, char* target);
-        long long (*getStringLength)(void* variable);
-        bool (*getInteger)(void* variable, long long* target);
-        bool (*getFloat)(void* variable, double* target);
-        bool (*getDictionaryVariable)(void* variable, const char* key, void** target);
-        bool (*getArrayVariable)(void* variable, long long idx, void** target);
-        bool (*iterate)(void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse);
-        long long (*getArraySize)(void* variable);
+        LiquidVariableType (*getType)(LiquidRenderer renderer, void* variable);
+        bool (*getBool)(LiquidRenderer renderer, void* variable, bool* target);
+        bool (*getTruthy)(LiquidRenderer renderer, void* variable);
+        bool (*getString)(LiquidRenderer renderer, void* variable, char* target);
+        long long (*getStringLength)(LiquidRenderer renderer, void* variable);
+        bool (*getInteger)(LiquidRenderer renderer, void* variable, long long* target);
+        bool (*getFloat)(LiquidRenderer renderer, void* variable, double* target);
+        bool (*getDictionaryVariable)(LiquidRenderer renderer, void* variable, const char* key, void** target);
+        bool (*getArrayVariable)(LiquidRenderer renderer, void* variable, long long idx, void** target);
+        bool (*iterate)(LiquidRenderer renderer, void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse);
+        long long (*getArraySize)(LiquidRenderer renderer, void* variable);
         void* (*setDictionaryVariable)(LiquidRenderer renderer, void* variable, const char* key, void* target);
         void* (*setArrayVariable)(LiquidRenderer renderer, void* variable, long long idx, void* target);
         void* (*createHash)(LiquidRenderer renderer);
@@ -174,6 +174,8 @@ extern "C" {
     #endif
 
     LiquidRenderer liquidCreateRenderer(LiquidContext context);
+    void liquidRendererSetCustomData(LiquidRenderer renderer, void* data);
+    void* liquidRendererGetCustomData(LiquidRenderer renderer);
     void liquidRendererSetReturnValueNil(LiquidRenderer renderer);
     void liquidRendererSetReturnValueBool(LiquidRenderer renderer, bool b);
     void liquidRendererSetReturnValueString(LiquidRenderer renderer, const char* s, int length);

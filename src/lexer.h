@@ -199,9 +199,12 @@ namespace Liquid {
                                     processComplete = true;
                                 break;
                                 case '-':
+                                    // Special case: when this is NOT followed by a space, and it's part of a word, this is treated as part of a literal.
                                     if (offset != startOfWord) {
-                                        ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
-                                        isNumber = false;
+                                        if (!isWord || offset+1 >= size || isblank(str[offset+1])) {
+                                            ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                            isNumber = false;
+                                        }
                                     } else {
                                         isWord = false;
                                     }

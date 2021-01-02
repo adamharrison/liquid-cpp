@@ -338,6 +338,15 @@ TEST(sanity, negation) {
     ASSERT_EQ(str, "true false");
 }
 
+TEST(sanity, specialLiterals) {
+    CPPVariable hash, internal;
+    Node ast;
+    std::string str;
+
+    ast = getParser().parse("{% assign a = true %}{{ a }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "true");
+}
 
 TEST(sanity, arrayLiterals) {
     CPPVariable hash, internal;
@@ -392,6 +401,24 @@ TEST(sanity, composite) {
     std::string str;
 
 
+    ast = getParser().parse("{{ params.state.order-by.test }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "");
+
+    hash["image"] = "ASD";
+    ast = getParser().parse("{{ image | default: '/static/img/empty.png' | img_tag }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "<img src='ASD'/>");
+
+    hash.clear();
+
+    ast = getParser().parse("{{ image | default: '/static/img/empty.png' | img_tag }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "<img src='/static/img/empty.png'/>");
+
+    ast = getParser().parse("{{ (series.lowest_review.content | newline_to_br) + \"<br> -- \" + series.lowest_review.user }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "<br> -- ");
     ast = getParser().parse("{% comment %}Test Comment{% endcomment %}DoesntRender");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "DoesntRender");
@@ -434,6 +461,7 @@ TEST(sanity, composite) {
     line_item2["properties"] = { lip3, lip4 };
     order["line_items"] = { line_item1, line_item2 };
     hash["order"] = order;
+    hash["email"] = "test1@gmail.com";
 
     ast = getParser().parse("{% for line_item in order.line_items %}{% for property in line_item.properties %}{% if property.name == \"Gift Email\" and property.value == email %}{% assign li = line_item %}{% endif %}{% endfor %}{% endfor %}{{ li.id }}");
     str = getRenderer().render(ast, hash);

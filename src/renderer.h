@@ -90,6 +90,7 @@ namespace Liquid {
 
         // Used for the C interface.
         Node returnValue;
+        void* customData;
         LiquidVariableResolver variableResolver;
 
         Renderer(const Context& context);
@@ -112,12 +113,12 @@ namespace Liquid {
         bool setVariable(const Node& node, Variable store, Variable value);
 
         const LiquidVariableResolver& getVariableResolver() const { return variableResolver; }
-        bool resolveVariableString(string& target, void* variable) const {
-            long long length = variableResolver.getStringLength(variable);
+        bool resolveVariableString(string& target, void* variable) {
+            long long length = variableResolver.getStringLength(LiquidRenderer { this }, variable);
             if (length < 0)
                 return false;
             target.resize(length);
-            if (!variableResolver.getString(variable, const_cast<char*>(target.data())))
+            if (!variableResolver.getString(LiquidRenderer { this }, variable, const_cast<char*>(target.data())))
                 return false;
             return true;
         }

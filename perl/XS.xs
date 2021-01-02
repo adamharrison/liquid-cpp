@@ -6,7 +6,12 @@
 #include "ppport.h"
 #include <liquid/liquid.h>
 
-LiquidVariableType lpGetType(void* variable) {
+struct RendererCustomData {
+    SV* parent;
+    bool makeMethodCalls;
+};
+
+LiquidVariableType lpGetType(LiquidRenderer renderer, void* variable) {
     if (SvROK((SV*)variable)) {
         if (SvTYPE(SvRV((SV*)variable)) == SVt_PVAV)
             return LIQUID_VARIABLE_TYPE_ARRAY;
@@ -24,18 +29,18 @@ LiquidVariableType lpGetType(void* variable) {
     return LIQUID_VARIABLE_TYPE_NIL;
 }
 
-bool lpGetBool(void* variable, bool* target) {
+bool lpGetBool(LiquidRenderer renderer, void* variable, bool* target) {
     dTHX;
     *target = SvTRUE((SV*)variable);
     return true;
 }
 
-bool lpGetTruthy(void* variable) {
+bool lpGetTruthy(LiquidRenderer renderer, void* variable) {
     dTHX;
     return SvTRUE((SV*)variable);
 }
 
-bool lpGetString(void* variable, char* target) {
+bool lpGetString(LiquidRenderer renderer, void* variable, char* target) {
     dTHX;
     STRLEN len;
     char* ptr;
@@ -53,7 +58,7 @@ bool lpGetString(void* variable, char* target) {
     return true;
 }
 
-long long lpGetStringLength(void* variable) {
+long long lpGetStringLength(LiquidRenderer renderer, void* variable) {
     dTHX;
     STRLEN len;
     char* ptr;
@@ -69,20 +74,86 @@ long long lpGetStringLength(void* variable) {
     return len;
 }
 
-bool lpGetInteger(void* variable, long long* target) {
+bool lpGetInteger(LiquidRenderer renderer, void* variable, long long* target) {
     dTHX;
     *target = (long long)SvNV((SV*)variable);
     return true;
 }
 
-bool lpGetFloat(void* variable, double* target) {
+bool lpGetFloat(LiquidRenderer renderer, void* variable, double* target) {
     dTHX;
     *target = SvNV((SV*)variable);
-    return false;
+    return true;
 }
 
-bool lpGetDictionaryVariable(void* variable, const char* key, void** target) {
+SV* lpGetMethod(SV* obj, const char* method) {
     dTHX;
+    SV* element = NULL;
+    dSP;
+
+    ENTER;
+    SAVETMPS;
+
+    PUSHMARK(SP);
+    EXTEND(SP, 2);
+    PUSHs(obj);
+    PUSHs(sv_2mortal(newSVpv(method, 0)));
+    PUTBACK;
+
+    int count = call_method("can", G_SCALAR);
+
+    SPAGAIN;
+
+    if (count > 0)
+        element = SvREFCNT_inc(POPs);
+
+    PUTBACK;
+    FREETMPS;
+    LEAVE;
+    return element;
+}
+
+bool lpGetDictionaryVariable(LiquidRenderer renderer, void* variable, const char* key, void** target) {
+    dTHX;
+    // If we're blessed, check to see if we can call a method called the thing first, if we have that sort of thing enabled.
+    if (sv_isobject((SV*)variable)) {
+        struct RendererCustomData* customData = liquidRendererGetCustomData(renderer);
+        if (customData->makeMethodCalls) {
+            SV* method = lpGetMethod((SV*)variable, key);
+            if (method && SvOK(method)) {
+                SV* element = NULL;
+
+                dSP;
+
+                ENTER;
+                SAVETMPS;
+
+                PUSHMARK(SP);
+                EXTEND(SP, 1);
+                PUSHs(variable);
+                PUTBACK;
+
+                int count = call_sv(method, G_SCALAR);
+                SvREFCNT_dec(method);
+
+                SPAGAIN;
+
+                if (count > 0)
+                    element = SvREFCNT_inc(POPs);
+
+                PUTBACK;
+                FREETMPS;
+                LEAVE;
+
+
+                if (element != NULL && SvOK(element)) {
+                    *target = element;
+                    return true;
+                }
+                return false;
+            }
+        }
+    }
     if (!SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVHV)
         return false;
     HV* hv = (HV*)SvRV((SV*)variable);
@@ -93,7 +164,7 @@ bool lpGetDictionaryVariable(void* variable, const char* key, void** target) {
     return true;
 }
 
-bool lpGetArrayVariable(void* variable, long long idx, void** target) {
+bool lpGetArrayVariable(LiquidRenderer renderer, void* variable, long long idx, void** target) {
     dTHX;
     if (!SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
         return false;
@@ -105,8 +176,50 @@ bool lpGetArrayVariable(void* variable, long long idx, void** target) {
     return true;
 }
 
-bool lpIterate(void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) {
+bool lpIterate(LiquidRenderer renderer, void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) {
     dTHX;
+
+    // Check to see if thing is a blessed object that can call `next`. If so, we should iterate on that. Otherwise, treat as normal.
+    // Should probably call `can` here, instead, first, and then just call_sv that, in order to allow for exception propogation.
+    if (sv_isobject((SV*)variable)) {
+        for (int i = 0;; ++i) {
+            SV* element = NULL;
+            dSP;
+
+            ENTER;
+            SAVETMPS;
+
+            PUSHMARK(SP);
+            EXTEND(SP, 2);
+            PUSHs(variable);
+            PUSHs(sv_2mortal(newSViv(i)));
+            PUTBACK;
+
+            int count = call_method("next", G_SCALAR | G_EVAL);
+
+            SPAGAIN;
+
+            SV* err_tmp = ERRSV;
+            if (SvTRUE(err_tmp)) {
+                POPs;
+                element = NULL;
+            } else if (count > 0)
+                element = SvREFCNT_inc(POPs);
+
+            PUTBACK;
+            FREETMPS;
+            LEAVE;
+
+            if (!element || !SvOK(element))
+                break;
+
+            callback(element, data);
+            SvREFCNT_dec(element);
+        }
+
+        return true;
+    }
+
     if (!SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
         return false;
 
@@ -135,7 +248,7 @@ bool lpIterate(void* variable, bool (*callback)(void* variable, void* data), voi
     return false;
 }
 
-long long lpGetArraySize(void* variable) {
+long long lpGetArraySize(LiquidRenderer renderer, void* variable) {
     dTHX;
     if (!SvROK((SV*)variable) || SvTYPE(SvRV((SV*)variable)) != SVt_PVAV)
         return -1;
@@ -225,7 +338,7 @@ int lpCompare(void* a, void* b) {
 }
 
 void lpSetReturnValue(PerlInterpreter* my_perl, LiquidRenderer renderer, SV* sv) {
-    switch (lpGetType((void*)sv)) {
+    switch (lpGetType(renderer, (void*)sv)) {
         case LIQUID_VARIABLE_TYPE_STRING: {
             STRLEN len;
             const char *s = SvPV(sv, len);
@@ -233,7 +346,7 @@ void lpSetReturnValue(PerlInterpreter* my_perl, LiquidRenderer renderer, SV* sv)
         } break;
         case LIQUID_VARIABLE_TYPE_BOOL: {
             bool b;
-            lpGetBool(sv, &b);
+            lpGetBool(renderer, sv, &b);
             liquidRendererSetReturnValueBool(renderer, b);
         } break;
         case LIQUID_VARIABLE_TYPE_NIL: {
@@ -241,12 +354,12 @@ void lpSetReturnValue(PerlInterpreter* my_perl, LiquidRenderer renderer, SV* sv)
         } break;
         case LIQUID_VARIABLE_TYPE_FLOAT: {
             double f;
-            lpGetFloat(sv, &f);
+            lpGetFloat(renderer, sv, &f);
             liquidRendererSetReturnValueBool(renderer, f);
         } break;
         case LIQUID_VARIABLE_TYPE_INT: {
             long long i;
-            lpGetInteger(sv, &i);
+            lpGetInteger(renderer, sv, &i);
             liquidRendererSetReturnValueInteger(renderer, i);
         } break;
         default:{
@@ -260,9 +373,8 @@ static void lpRenderEnclosingTag(LiquidRenderer renderer, LiquidNode node, void*
     SV* callback = (SV*)data;
     SV** arguments = NULL;
 
-
+    struct RendererCustomData* customData = liquidRendererGetCustomData(renderer);
     int argMax = liquidGetArgumentCount(node);
-    fprintf(stderr, "ARGS: %d\n", argMax);
     if (argMax > 0) {
         arguments = malloc(sizeof(SV)*argMax);
         for (int i = 0; i < argMax; ++i)
@@ -282,7 +394,7 @@ static void lpRenderEnclosingTag(LiquidRenderer renderer, LiquidNode node, void*
     // Wrapped closure should look like:
     // ($package, $renderer, $hash)
     // the only thing we supply is the render, node, and hash.
-    PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
+    PUSHs(SvREFCNT_inc(customData->parent));
     PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
     PUSHs((SV*)variableStore);
     PUSHs(child);
@@ -293,6 +405,8 @@ static void lpRenderEnclosingTag(LiquidRenderer renderer, LiquidNode node, void*
     PUTBACK;
 
     int count = call_sv(SvRV(callback), G_SCALAR);
+
+    SvREFCNT_dec(customData->parent);
 
     SPAGAIN;
 
@@ -313,6 +427,7 @@ static void lpRenderFreeTag(LiquidRenderer renderer, LiquidNode node, void* vari
     dTHX;
     SV* callback = (SV*)data;
 
+    struct RendererCustomData* customData = liquidRendererGetCustomData(renderer);
     int argMax = liquidGetArgumentCount(node);
     SV** arguments = malloc(sizeof(SV)*argMax);
     for (int i = 0; i < argMax; ++i)
@@ -325,7 +440,7 @@ static void lpRenderFreeTag(LiquidRenderer renderer, LiquidNode node, void* vari
     PUSHMARK(SP);
 
     EXTEND(SP, 3+argMax);
-    PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
+    PUSHs(SvREFCNT_inc(customData->parent));
     PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
     PUSHs((SV*)variableStore);
 
@@ -335,6 +450,8 @@ static void lpRenderFreeTag(LiquidRenderer renderer, LiquidNode node, void* vari
     PUTBACK;
 
     int count = call_sv(SvRV(callback), G_SCALAR);
+
+    SvREFCNT_dec(customData->parent);
 
     SPAGAIN;
 
@@ -357,6 +474,7 @@ static void lpRenderFilter(LiquidRenderer renderer, LiquidNode node, void* varia
     SV* callback = (SV*)data;
     dSP;
 
+    struct RendererCustomData* customData = liquidRendererGetCustomData(renderer);
     // This *must* be outside the setup calls for the call-frame, becuase these potentially could also make calls; I learned this the hard way.
     SV* operand = NULL;
     liquidFilterGetOperand((void**)&operand, renderer, node, variableStore);
@@ -372,7 +490,8 @@ static void lpRenderFilter(LiquidRenderer renderer, LiquidNode node, void* varia
 
     EXTEND(SP, 4+argMax);
 
-    PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
+
+    PUSHs(SvREFCNT_inc(customData->parent));
     PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
     PUSHs(SvREFCNT_inc(variableStore));
     PUSHs(SvREFCNT_inc(operand));
@@ -386,6 +505,7 @@ static void lpRenderFilter(LiquidRenderer renderer, LiquidNode node, void* varia
 
     SPAGAIN;
 
+    SvREFCNT_dec(customData->parent);
     SvREFCNT_dec(variableStore);
     SvREFCNT_dec(operand);
 
@@ -405,6 +525,8 @@ static void lpRenderFilter(LiquidRenderer renderer, LiquidNode node, void* varia
 
 static void lpRenderBinaryInfixOperator(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
     dTHX;
+
+    struct RendererCustomData* customData = liquidRendererGetCustomData(renderer);
     SV* callback = (SV*)data;
     SV* op1 = NULL;
     SV* op2 = NULL;
@@ -423,7 +545,7 @@ static void lpRenderBinaryInfixOperator(LiquidRenderer renderer, LiquidNode node
     // Wrapped closure should look like:
     // ($package, $renderer, $hash)
     // the only thing we supply is the render, node, and hash.
-    PUSHs(sv_2mortal(newSViv(PTR2IV(renderer.renderer))));
+    PUSHs(SvREFCNT_inc(customData->parent));
     PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
     PUSHs((SV*)variableStore);
     PUSHs(sv_2mortal((SV*)op1));
@@ -431,6 +553,8 @@ static void lpRenderBinaryInfixOperator(LiquidRenderer renderer, LiquidNode node
     PUTBACK;
 
     int count = call_sv(callback, G_ARRAY);
+
+    SvREFCNT_dec(customData->parent);
 
     SPAGAIN;
 
@@ -509,9 +633,11 @@ implementWebDialect(context)
     CODE:
         liquidImplementWebDialect(*(LiquidContext*)&context);
 
+
 void*
-createRenderer(context)
+createRenderer(context, parent)
     void* context;
+    SV* parent;
     CODE:
         LiquidVariableResolver resolver = {
             lpGetType,
@@ -541,6 +667,11 @@ createRenderer(context)
         };
         LiquidRenderer renderer = liquidCreateRenderer(*(LiquidContext*)&context);
         liquidRegisterVariableResolver(renderer, resolver);
+        struct RendererCustomData* customData = malloc(sizeof(struct RendererCustomData));
+        // TODO: Fix this. We shouldn't be incrementing the reference here, but for some reason the reference goes out of scope if I don't do this.
+        customData->parent = SvREFCNT_inc(parent);
+        customData->makeMethodCalls = false;
+        liquidRendererSetCustomData(renderer, customData);
         RETVAL = renderer.renderer;
     OUTPUT:
         RETVAL
@@ -549,7 +680,18 @@ void
 freeRenderer(renderer)
     void* renderer;
     CODE:
+        free(liquidRendererGetCustomData(*(LiquidRenderer*)&renderer));
         liquidFreeRenderer(*(LiquidRenderer*)&renderer);
+
+
+void
+rendererSetMakeMethodCalls(renderer, value)
+    void* renderer;
+    int value;
+    CODE:
+        struct RendererCustomData* customData = liquidRendererGetCustomData(*(LiquidRenderer*)&renderer);
+        customData->makeMethodCalls = value ? 1 : 0;
+
 
 void*
 createTemplate(context, str, error)

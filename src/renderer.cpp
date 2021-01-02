@@ -81,7 +81,7 @@ namespace Liquid {
     Variant Renderer::parseVariant(Variable variable) {
         if (!variable.exists())
             return Variant();
-        ELiquidVariableType type = variableResolver.getType(variable);
+        ELiquidVariableType type = variableResolver.getType(*this, variable);
         switch (type) {
             case LIQUID_VARIABLE_TYPE_OTHER:
             case LIQUID_VARIABLE_TYPE_DICTIONARY:
@@ -90,25 +90,25 @@ namespace Liquid {
             break;
             case LIQUID_VARIABLE_TYPE_BOOL: {
                 bool b;
-                if (variableResolver.getBool(variable, &b))
+                if (variableResolver.getBool(LiquidRenderer { this }, variable, &b))
                     return Variant(b);
             } break;
             case LIQUID_VARIABLE_TYPE_INT: {
                 long long i;
-                if (variableResolver.getInteger(variable, &i))
+                if (variableResolver.getInteger(*this, variable, &i))
                     return Variant(i);
             } break;
             case LIQUID_VARIABLE_TYPE_FLOAT: {
                 double f;
-                if (variableResolver.getFloat(variable, &f))
+                if (variableResolver.getFloat(*this, variable, &f))
                     return Variant(f);
             } break;
             case LIQUID_VARIABLE_TYPE_STRING: {
                 string s;
-                long long size = variableResolver.getStringLength(variable);
+                long long size = variableResolver.getStringLength(*this, variable);
                 if (size >= 0) {
                     s.resize(size);
-                    if (variableResolver.getString(variable, const_cast<char*>(s.data())))
+                    if (variableResolver.getString(*this, variable, const_cast<char*>(s.data())))
                         return Variant(move(s));
                 }
             } break;
@@ -123,10 +123,10 @@ namespace Liquid {
         if (!node.type) {
             if (node.variant.type == Variant::Type::VARIABLE) {
                 string s;
-                long long size = variableResolver.getStringLength(node.variant.v.pointer);
+                long long size = variableResolver.getStringLength(*this, node.variant.v.pointer);
                 if (size >= 0) {
                     s.resize(size);
-                    if (variableResolver.getString(node.variant.v.pointer, const_cast<char*>(s.data())))
+                    if (variableResolver.getString(*this, node.variant.v.pointer, const_cast<char*>(s.data())))
                         return s;
                 }
             } else {
@@ -143,12 +143,12 @@ namespace Liquid {
             auto node = retrieveRenderedNode(*link.get(), store);
             switch (node.variant.type) {
                 case Variant::Type::INT:
-                    if (!variableResolver.getArrayVariable(storePointer, node.variant.i, storePointer)) {
+                    if (!variableResolver.getArrayVariable(*this, storePointer, node.variant.i, storePointer)) {
                         storePointer = Variable({ nullptr });
                     }
                 break;
                 case Variant::Type::STRING:
-                    if (!variableResolver.getDictionaryVariable(storePointer, node.variant.s.data(), storePointer))
+                    if (!variableResolver.getDictionaryVariable(*this, storePointer, node.variant.s.data(), storePointer))
                         storePointer = Variable({ nullptr });
                 break;
                 default:
@@ -178,11 +178,11 @@ namespace Liquid {
             } else {
                 switch (part.variant.type) {
                     case Variant::Type::INT:
-                        if (!variableResolver.getArrayVariable(storePointer, part.variant.i, storePointer))
+                        if (!variableResolver.getArrayVariable(*this, storePointer, part.variant.i, storePointer))
                             return false;
                     break;
                     case Variant::Type::STRING:
-                        if (!variableResolver.getDictionaryVariable(storePointer, part.variant.s.data(), storePointer))
+                        if (!variableResolver.getDictionaryVariable(*this, storePointer, part.variant.s.data(), storePointer))
                             return false;
                     break;
                     default:

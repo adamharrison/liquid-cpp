@@ -2,6 +2,7 @@
 #include "dialect.h"
 #include "parser.h"
 #include <cmath>
+#include <ctime>
 #include <algorithm>
 #include <unordered_set>
 
@@ -56,7 +57,7 @@ namespace Liquid {
                 Variable targetVariable = renderer.getVariable(*variableNode.get(), store);
                 if (targetVariable.exists()) {
                     long long i = -1;
-                    if (renderer.variableResolver.getInteger(targetVariable,&i))
+                    if (renderer.variableResolver.getInteger(renderer, targetVariable,&i))
                         renderer.setVariable(*variableNode.get(), targetVariable, renderer.variableResolver.createInteger(renderer, i+1));
                 }
             }
@@ -74,7 +75,7 @@ namespace Liquid {
                 Variable targetVariable = renderer.getVariable(*variableNode.get(), store);
                 if (targetVariable.exists()) {
                     long long i = -1;
-                    if (renderer.variableResolver.getInteger(targetVariable,&i))
+                    if (renderer.variableResolver.getInteger(renderer, targetVariable,&i))
                         renderer.setVariable(*variableNode.get(), targetVariable, renderer.variableResolver.createInteger(renderer, i-1));
                 }
             }
@@ -312,7 +313,7 @@ namespace Liquid {
                 Variable forLoopVariable;
                 auto& resolver = forLoopContext.renderer.variableResolver;
 
-                if (!resolver.getDictionaryVariable(forLoopContext.store, "forloop", forLoopVariable))
+                if (!resolver.getDictionaryVariable(forLoopContext.renderer, forLoopContext.store, "forloop", forLoopVariable))
                     forLoopVariable = resolver.setDictionaryVariable(forLoopContext.renderer, forLoopContext.store, "forloop", resolver.createHash(forLoopContext.renderer));
 
                 resolver.setDictionaryVariable(forLoopContext.renderer, forLoopVariable, "index0", resolver.createInteger(forLoopContext.renderer, forLoopContext.idx));
@@ -340,7 +341,7 @@ namespace Liquid {
             ForLoopContext forLoopContext = { renderer, node, store, *variableNode.get(), iterator };
 
 
-            forLoopContext.length = result.variant.type == Variant::Type::ARRAY ? result.variant.a.size() : resolver.getArraySize(result.variant.p);
+            forLoopContext.length = result.variant.type == Variant::Type::ARRAY ? result.variant.a.size() : resolver.getArraySize(renderer, result.variant.p);
 
             if (!hasLimit)
                 limit = forLoopContext.length;
@@ -369,7 +370,7 @@ namespace Liquid {
                     }
                 }
             } else {
-                resolver.iterate(result.variant.v, +[](void* variable, void* data) {
+                resolver.iterate(renderer, result.variant.v, +[](void* variable, void* data) {
                     ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
                     forLoopContext.renderer.setVariable(forLoopContext.variableNode, forLoopContext.store, forLoopContext.renderer.variableResolver.createClone(forLoopContext.renderer, variable));
                     return forLoopContext.iterator(forLoopContext);
@@ -390,11 +391,11 @@ namespace Liquid {
             assert(node.children.size() == 1 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
             Variable forloopVariable;
-            if (renderer.variableResolver.getDictionaryVariable(store, "forloop", forloopVariable)) {
+            if (renderer.variableResolver.getDictionaryVariable(renderer, store, "forloop", forloopVariable)) {
                 Variable index0;
-                if (renderer.variableResolver.getDictionaryVariable(forloopVariable, "index0", index0)) {
+                if (renderer.variableResolver.getDictionaryVariable(renderer, forloopVariable, "index0", index0)) {
                     long long i;
-                    if (renderer.variableResolver.getInteger(index0, &i))
+                    if (renderer.variableResolver.getInteger(renderer, index0, &i))
                         return renderer.retrieveRenderedNode(*arguments->children[i % arguments->children.size()].get(), store);
                 }
             }
@@ -567,15 +568,23 @@ namespace Liquid {
 
             if (op1.type || op2.type)
                 return Node();
+            if (op2.variant.type == Variant::Type::NIL)
+                return Node(operate(op1.variant.type, Variant::Type::NIL));
             switch (op1.variant.type) {
+                case Variant::Type::NIL:
+                    return Node(Variant(operate(op1.variant.p, op2.variant.p)));
+                case Variant::Type::POINTER:
+                    return Node(Variant(operate(op1.variant.p, op2.variant.p)));
+                case Variant::Type::BOOL:
+                    return Node(Variant(operate(op1.variant.b, op2.variant.isTruthy(renderer.context.falsiness))));
                 case Variant::Type::INT:
                     switch (op2.variant.type) {
                         case Variant::Type::INT:
                             return Node(Variant(operate(op1.variant.i, op2.variant.i)));
-                        break;
                         case Variant::Type::FLOAT:
                             return Node(Variant(operate(op1.variant.i, op2.variant.f)));
-                        break;
+                        case Variant::Type::STRING:
+                            return Node(Variant(operate(op1.variant.i, op2.variant.getInt())));
                         default:
                         break;
                     }
@@ -584,19 +593,18 @@ namespace Liquid {
                     switch (op2.variant.type) {
                         case Variant::Type::INT:
                             return Node(Variant(operate(op1.variant.f, op2.variant.i)));
-                        break;
                         case Variant::Type::FLOAT:
                             return Node(Variant(operate(op1.variant.f, op2.variant.f)));
-                        break;
+                        case Variant::Type::STRING:
+                            return Node(Variant(operate(op1.variant.i, op2.variant.getFloat())));
                         default:
                         break;
                     }
                 break;
                 case Variant::Type::STRING:
                     if (op2.variant.type != Variant::Type::STRING)
-                        return Node(Variant(true));
+                        return Node(Variant(operate(op1.variant.s, op2.variant.getString())));
                     return Node(Variant(operate(op1.variant.s, op2.variant.s)));
-                break;
                 default:
                 break;
             }
@@ -1223,7 +1231,7 @@ namespace Liquid {
                 joinStruct.joiner = argument.getString();
 
 
-            renderer.variableResolver.iterate(operand, +[](void* variable, void* data) {
+            renderer.variableResolver.iterate(renderer, operand, +[](void* variable, void* data) {
                 JoinStruct& joinStruct = *(JoinStruct*)data;
                 string part;
                 if (joinStruct.idx++ > 0)
@@ -1267,7 +1275,7 @@ namespace Liquid {
         ConcatFilterNode() : ArrayFilterNodeType("concat", 1, 1) { }
 
         void accumulate(Renderer& renderer, Variant& accumulator, Variable v) const {
-            renderer.variableResolver.iterate(v, +[](void* variable, void* data) {
+            renderer.variableResolver.iterate(renderer, v, +[](void* variable, void* data) {
                     static_cast<Variant*>(data)->a.push_back(Variant(static_cast<Variable*>(variable)));
                 return true;
             }, &accumulator, 0, -1, false);
@@ -1320,10 +1328,10 @@ namespace Liquid {
         };
 
         void accumulate(Renderer& renderer, MapStruct& mapStruct, Variable v) const {
-            renderer.variableResolver.iterate(v, +[](void* variable, void* data) {
+            renderer.variableResolver.iterate(renderer, v, +[](void* variable, void* data) {
                 MapStruct& mapStruct = *static_cast<MapStruct*>(data);
                 Variable target;
-                if (mapStruct.renderer.variableResolver.getDictionaryVariable(variable, mapStruct.property.data(), target))
+                if (mapStruct.renderer.variableResolver.getDictionaryVariable(mapStruct.renderer, variable, mapStruct.property.data(), target))
                     mapStruct.accumulator.a.push_back(target);
                 else
                     mapStruct.accumulator.a.push_back(Variant());
@@ -1335,7 +1343,7 @@ namespace Liquid {
             for (auto it = v.a.begin(); it != v.a.end(); ++it) {
                 if (it->type == Variant::Type::VARIABLE) {
                     Variable target;
-                    if (mapStruct.renderer.variableResolver.getDictionaryVariable(const_cast<Variable&>(it->v), mapStruct.property.data(), target))
+                    if (mapStruct.renderer.variableResolver.getDictionaryVariable(mapStruct.renderer, const_cast<Variable&>(it->v), mapStruct.property.data(), target))
                         mapStruct.accumulator.a.push_back(target);
                     else
                         mapStruct.accumulator.a.push_back(Variant());
@@ -1376,7 +1384,7 @@ namespace Liquid {
             auto& v = operand.variant;
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
-                    renderer.variableResolver.iterate(v.v, +[](void* variable, void* data) {
+                    renderer.variableResolver.iterate(renderer, v.v, +[](void* variable, void* data) {
                         static_cast<Variant*>(data)->a.push_back(Variable({variable}));
                         return true;
                     }, &accumulator, 0, -1, true);
@@ -1405,7 +1413,7 @@ namespace Liquid {
                 return Node();
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE: {
-                    renderer.variableResolver.iterate(operand.variant.v, +[](void* variable, void* data) {
+                    renderer.variableResolver.iterate(renderer, operand.variant.v, +[](void* variable, void* data) {
                         static_cast<Variant*>(data)->a.push_back(Variable({variable}));
                         return true;
                     }, &accumulator, 0, -1, false);
@@ -1425,9 +1433,9 @@ namespace Liquid {
                     if (a.type != Variant::Type::VARIABLE || b.type != Variant::Type::VARIABLE)
                         return false;
                     Variable targetA, targetB;
-                    if (!renderer.variableResolver.getDictionaryVariable(a.v, property.data(), targetA))
+                    if (!renderer.variableResolver.getDictionaryVariable(renderer, a.v, property.data(), targetA))
                         return false;
-                    if (!renderer.variableResolver.getDictionaryVariable(b.v, property.data(), targetB))
+                    if (!renderer.variableResolver.getDictionaryVariable(renderer, b.v, property.data(), targetB))
                         return false;
                     return renderer.variableResolver.compare(targetA, targetB) < 0;
                 });
@@ -1450,12 +1458,12 @@ namespace Liquid {
         };
 
         void accumulate(WhereStruct& whereStruct, Variable v) const {
-            whereStruct.renderer.variableResolver.iterate(v, +[](void* variable, void* data) {
+            whereStruct.renderer.variableResolver.iterate(whereStruct.renderer, v, +[](void* variable, void* data) {
                 WhereStruct& whereStruct = *static_cast<WhereStruct*>(data);
                 Variable target;
-                if (whereStruct.renderer.variableResolver.getDictionaryVariable(variable, whereStruct.property.data(), target)) {
+                if (whereStruct.renderer.variableResolver.getDictionaryVariable(whereStruct.renderer, variable, whereStruct.property.data(), target)) {
                     if (whereStruct.property.empty()) {
-                        if (whereStruct.renderer.variableResolver.getTruthy(target))
+                        if (whereStruct.renderer.variableResolver.getTruthy(whereStruct.renderer, target))
                             whereStruct.accumulator.a.push_back(variable);
                     } else {
                         // std::string str;
@@ -1474,9 +1482,9 @@ namespace Liquid {
             for (auto it = v.a.begin(); it != v.a.end(); ++it) {
                 if (it->type == Variant::Type::VARIABLE) {
                     Variable target;
-                    if (whereStruct.renderer.variableResolver.getDictionaryVariable(const_cast<Variable&>(it->v), whereStruct.property.data(), target)) {
+                    if (whereStruct.renderer.variableResolver.getDictionaryVariable(whereStruct.renderer, const_cast<Variable&>(it->v), whereStruct.property.data(), target)) {
                         if (whereStruct.property.empty()) {
-                            if (whereStruct.renderer.variableResolver.getTruthy(target))
+                            if (whereStruct.renderer.variableResolver.getTruthy(whereStruct.renderer, target))
                                 whereStruct.accumulator.a.push_back(*it);
                         } else {
                             //std::string str;
@@ -1524,7 +1532,7 @@ namespace Liquid {
         };
 
         void accumulate(UniqStruct& uniqStruct, Variable v) const {
-            uniqStruct.renderer.variableResolver.iterate(v, +[](void* variable, void* data) {
+            uniqStruct.renderer.variableResolver.iterate(uniqStruct.renderer, v, +[](void* variable, void* data) {
                 UniqStruct& uniqStruct = *static_cast<UniqStruct*>(data);
                 Variant v = uniqStruct.renderer.parseVariant(Variable({variable}));
                 if (!uniqStruct.hashes.emplace(v.hash()).second)
@@ -1570,7 +1578,7 @@ namespace Liquid {
 
         Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             Variable v;
-            if (!renderer.variableResolver.getArrayVariable(operand, 0, v))
+            if (!renderer.variableResolver.getArrayVariable(renderer, operand, 0, v))
                 return Node();
             return Node(v);
         }
@@ -1602,13 +1610,13 @@ namespace Liquid {
 
         Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             Variable v;
-            LiquidVariableType type = renderer.variableResolver.getType(operand);
+            LiquidVariableType type = renderer.variableResolver.getType(renderer, operand);
             if (type == LiquidVariableType::LIQUID_VARIABLE_TYPE_DICTIONARY) {
-                if (!renderer.variableResolver.getDictionaryVariable(operand, "first", v))
+                if (!renderer.variableResolver.getDictionaryVariable(renderer, operand, "first", v))
                     return Node();
                 return Node(v);
             }
-            if (!renderer.variableResolver.getArrayVariable(operand, 0, v))
+            if (!renderer.variableResolver.getArrayVariable(renderer, operand, 0, v))
                 return Node();
             return Node(v);
         }
@@ -1626,8 +1634,8 @@ namespace Liquid {
 
         Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             Variable v;
-            long long size = renderer.variableResolver.getArraySize(operand);
-            if (size == -1 || !renderer.variableResolver.getArrayVariable(operand, size - 1, v))
+            long long size = renderer.variableResolver.getArraySize(renderer, operand);
+            if (size == -1 || !renderer.variableResolver.getArrayVariable(renderer, operand, size - 1, v))
                 return Node();
             return Node(v);
         }
@@ -1660,13 +1668,13 @@ namespace Liquid {
 
         Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             Variable v;
-            LiquidVariableType type = renderer.variableResolver.getType(operand);
+            LiquidVariableType type = renderer.variableResolver.getType(renderer, operand);
             if (type == LiquidVariableType::LIQUID_VARIABLE_TYPE_DICTIONARY) {
-                if (!renderer.variableResolver.getDictionaryVariable(operand, "last", v))
+                if (!renderer.variableResolver.getDictionaryVariable(renderer, operand, "last", v))
                     return Node();
                 return Node(v);
             }
-            if (!renderer.variableResolver.getArrayVariable(operand, -1, v))
+            if (!renderer.variableResolver.getArrayVariable(renderer, operand, -1, v))
                 return Node();
             return Node(v);
         }
@@ -1688,7 +1696,7 @@ namespace Liquid {
             if (!argument.type)
                 return Node();
             int idx = argument.variant.i;
-            if (!renderer.variableResolver.getArrayVariable(operand, idx, v))
+            if (!renderer.variableResolver.getArrayVariable(renderer, operand, idx, v))
                 return Node();
             return Node(v);
         }
@@ -1726,7 +1734,7 @@ namespace Liquid {
         }
 
         Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
-            long long size = renderer.variableResolver.getArraySize(operand);
+            long long size = renderer.variableResolver.getArraySize(renderer, operand);
             return size != -1 ? Node(size) : Node();
         }
 
@@ -1759,14 +1767,14 @@ namespace Liquid {
         }
 
         Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
-            LiquidVariableType type = renderer.variableResolver.getType(operand);
+            LiquidVariableType type = renderer.variableResolver.getType(renderer, operand);
             if (type == LiquidVariableType::LIQUID_VARIABLE_TYPE_DICTIONARY) {
                 Variable v;
-                if (!renderer.variableResolver.getDictionaryVariable(operand, "size", v))
+                if (!renderer.variableResolver.getDictionaryVariable(renderer, operand, "size", v))
                     return Node();
                 return Node(v);
             }
-            long long size = renderer.variableResolver.getArraySize(operand);
+            long long size = renderer.variableResolver.getArraySize(renderer, operand);
             return size != -1 ? Node(size) : Node();
         }
 
@@ -1790,6 +1798,19 @@ namespace Liquid {
         }
     };
 
+    struct DateFilterNode : FilterNodeType {
+        DateFilterNode() : FilterNodeType("date", 1, 1) { }
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            time_t operand = (time_t)getOperand(renderer, node, store).variant.getInt();
+            string argument = getArgument(renderer, node, store, 0).getString();
+            struct tm * timeinfo = localtime(&operand);
+            static constexpr int MAX_BUFFER_SIZE = 256;
+            string buffer;
+            buffer.resize(MAX_BUFFER_SIZE);
+            buffer.resize(strftime(&buffer[0], MAX_BUFFER_SIZE, argument.c_str(), timeinfo));
+            return Variant(move(buffer));
+        }
+    };
 
 
     void StandardDialect::implement(Context& context, bool globalAssignsOnly, bool disallowParentheses, bool assignOperatorsOnly, bool disableArrayLiterals, EFalsiness falsiness) {
@@ -1893,5 +1914,6 @@ namespace Liquid {
 
         // Other filters.
         context.registerType<DefaultFilterNode>();
+        context.registerType<DateFilterNode>();
     }
 }

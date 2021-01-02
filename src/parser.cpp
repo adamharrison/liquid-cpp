@@ -222,6 +222,12 @@ namespace Liquid {
                 }
             } break;
             case Parser::State::ARGUMENT: {
+                if (strncmp(str, "true", len) == 0)
+                    return parser.pushNode(move(make_unique<Node>(Variant(true))));
+                else if (strncmp(str, "false", len) == 0)
+                    return parser.pushNode(move(make_unique<Node>(Variant(false))));
+                else if (strncmp(str, "null", len) == 0)
+                    return parser.pushNode(move(make_unique<Node>(Variant(nullptr))));
                 auto& lastNode = parser.nodes.back();
                 if (lastNode->type && lastNode->type->type == NodeType::Type::VARIABLE && !lastNode->children.back().get()) {
                     // Check for dot filters.
@@ -254,7 +260,7 @@ namespace Liquid {
                         if (opName == "|") {
                             // In the case where we're chaining filters, and there are no arguments; the precense of another | is enough to terminate this an popUntil the filter.
                             if (
-                                (parser.filterState == Parser::EFilterState::COLON && !parser.popNodeUntil(NodeType::Type::FILTER)) ||
+                                ((parser.filterState == Parser::EFilterState::COLON || parser.filterState == Parser::EFilterState::ARGUMENTS) && !parser.popNodeUntil(NodeType::Type::FILTER)) ||
                                 (parser.filterState != Parser::EFilterState::UNSET && parser.filterState != Parser::EFilterState::ARGUMENTS && parser.filterState != Parser::EFilterState::COLON)
                             ) {
                                 parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL, opName));
@@ -349,7 +355,6 @@ namespace Liquid {
             parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNBALANCED_GROUP));
             return false;
         }
-        parser.popNode();
         return true;
     }
 

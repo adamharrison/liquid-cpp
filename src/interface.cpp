@@ -145,6 +145,14 @@ int liquidGetChildCount(LiquidNode parent) {
     return static_cast<const NodeType*>(node.type)->getChildCount(node);
 }
 
+void liquidRendererSetCustomData(LiquidRenderer renderer, void* data) {
+    static_cast<Renderer*>(renderer.renderer)->customData = data;
+}
+
+void* liquidRendererGetCustomData(LiquidRenderer renderer) {
+    return static_cast<Renderer*>(renderer.renderer)->customData;
+}
+
 
 void liquidRendererSetReturnValueString(LiquidRenderer renderer, const char* s, int length) {
     static_cast<Renderer*>(renderer.renderer)->returnValue = move(Variant(string(s, length)));

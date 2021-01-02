@@ -131,6 +131,7 @@ namespace Liquid {
         Variant(const char* s) : s(s), type(Type::STRING) { }
         Variant(Variable v) : v(v), type(Type::VARIABLE) { }
         Variant(void* p) : p(p), type(p ? Type::POINTER : Type::NIL) { }
+        Variant(std::nullptr_t) : p(nullptr), type(Type::NIL) { }
         Variant(const vector<Variant>& a) : a(a), type(Type::ARRAY) { }
         Variant(vector<Variant>&& a) : a(std::move(a)), type(Type::ARRAY) { }
         Variant(std::initializer_list<Variant> list) : a(list), type(Type::ARRAY) { }
@@ -244,8 +245,12 @@ namespace Liquid {
             switch (type) {
                 case Type::STRING:
                     return s;
-                case Type::FLOAT:
-                    return std::to_string(f);
+                case Type::FLOAT: {
+                    // We can't use to_string because that'll add an annoying amount of unecesarry 0s after the decimal point.
+                    char buffer[512];
+                    int length = snprintf(buffer, sizeof(buffer), "%.0f", f);
+                    return string(buffer, length);
+                }
                 case Type::INT:
                     return std::to_string(i);
                 case Type::BOOL:

@@ -1,6 +1,18 @@
 use strict;
 use warnings;
 
+package WWW::Shopify::Liquid::Filter::XS::Date;
+sub name { "date" }
+sub min_arguments { return 1; }
+sub max_arguments { return 1; }
+sub operate {
+	my ($self, $hash, $operand, @arguments) = @_;
+	return '' unless $operand;
+	$operand = DateTime->now if !ref($operand) && $operand eq "now";
+	return DateTime->from_epoch( epoch => $operand )->strftime(@arguments) if $operand && !ref($operand);
+	return $operand->strftime(@arguments);
+}
+
 package WWW::Shopify::Liquid::XS::Exception;
 use overload
 	fallback => 1,
@@ -47,16 +59,13 @@ sub english {
 
 package WWW::Shopify::Liquid::XS::Renderer;
 
-# Little hack to allow recovery of the renderer from the internal one.
 use Scalar::Util qw(weaken);
-our %renderer_dereference = ();
 
 sub new {
     my ($package, $liquid) = @_;
-    my $self = bless { liquid => $liquid, renderer => WWW::Shopify::Liquid::XS::createRenderer($liquid->{context}), max_inclusion_depth => 10 }, $package;
-    my $reference = $self;
-    weaken($reference);
-    $renderer_dereference{$self->{renderer}} = $reference;
+    my $self = bless { liquid => $liquid, max_inclusion_depth => 10 }, $package;
+    weaken($self->{liquid});
+    $self->{renderer} = WWW::Shopify::Liquid::XS::createRenderer($liquid->{context}, $self);
     return $self;
 }
 
@@ -65,9 +74,10 @@ sub parent { return $_[0]->{liquid}; }
 
 sub DESTROY {
     my ($self) = @_;
-    delete $renderer_dereference{$self->{renderer}};
     WWW::Shopify::Liquid::XS::freeRenderer($self->{renderer});
 }
+
+use Encode;
 
 sub render {
     my ($self, $hash, $template) = @_;
@@ -75,7 +85,7 @@ sub render {
     $self->inclusion_depth(0);
     my $result = WWW::Shopify::Liquid::XS::renderTemplate($self->{renderer}, $hash, $template->{template}, $error);
     die WWW::Shopify::Liquid::XS::Exception->new($error->[0]) if !$self->{silence_exceptions} && int(@$error) > 0;
-    return $result;
+    return decode("UTF-8", $result);
 }
 
 sub silence_exceptions { $_[0]->{silence_exceptions} = $_[1] if @_ > 1; return $_[0]->{silence_exceptions}; }
@@ -83,7 +93,13 @@ sub print_exceptions { $_[0]->{print_exceptions} = $_[1] if @_ > 1; return $_[0]
 sub inclusion_context { $_[0]->{inclusion_context} = $_[1] if @_ > 1; return $_[0]->{inclusion_context}; }
 sub inclusion_depth { $_[0]->{inclusion_depth} = $_[1] if @_ > 1; return $_[0]->{inclusion_depth}; }
 sub max_inclusion_depth { $_[0]->{max_inclusion_depth} = $_[1] if @_ > 1; return $_[0]->{max_inclusion_depth}; }
-sub make_method_calls { $_[0]->{make_method_calls} = $_[1] if @_ > 1; return $_[0]->{make_method_calls}; }
+sub make_method_calls {
+    if (@_ > 1) {
+        $_[0]->{make_method_calls} = $_[1];
+        WWW::Shopify::Liquid::XS::rendererSetMakeMethodCalls($_[0]->{renderer}, $_[1]);
+    }
+    return $_[0]->{make_method_calls};
+}
 sub clone_hash { $_[0]->{clone_hash} = $_[1] if @_ > 1; return $_[0]->{clone_hash}; }
 
 package WWW::Shopify::Liquid::XS::Optimizer;
@@ -95,11 +111,12 @@ sub optimize {
 }
 
 package WWW::Shopify::Liquid::XS::Template;
+use Encode;
 
 sub new {
     my ($package, $context, $text, $file) = @_;
     my $error = [];
-    my $template = WWW::Shopify::Liquid::XS::createTemplate($context, $text, $error);
+    my $template = WWW::Shopify::Liquid::XS::createTemplate($context, encode("UTF-8", $text), $error);
     if (!$template) {
         $error = WWW::Shopify::Liquid::XS::Exception->new($error);
         $error->{line}->[3] = $file;
@@ -341,6 +358,7 @@ sub new {
     $self->{optimizer} = WWW::Shopify::Liquid::XS::Optimizer->new($self);
     $_->apply($self) for (@{$self->{dialects}});
     WWW::Shopify::Liquid::XS::implementWebDialect($self->{context}) if $settings{'implement_web_dialect'};
+    $self->register_filter('WWW::Shopify::Liquid::Filter::XS::Date');
     return $self;
 }
 
@@ -353,11 +371,12 @@ sub DESTROY {
     freeContext($self->{context});
 }
 
+use Encode;
 
 sub parse_file {
     my ($self, $file) = @_;
     open(my $fh, "<", $file);
-    my $text = do { local $/; <$fh> };
+    my $text = decode("UTF-8", do { local $/; <$fh> });
     return $self->parse_text($text, $file);
 }
 
@@ -397,13 +416,13 @@ sub register_tag {
         my ($renderer, $node, $hash, $contents, @arguments) = @_;
         return $opsub->((bless {
             node => $node,
-            renderer => $WWW::Shopify::Liquid::XS::Renderer::renderer_dereference{$renderer}
+            renderer => $renderer
         }, $tag), $hash, $contents, @arguments);
     } : sub {
         my ($renderer, $node, $hash, @arguments) = @_;
         return $opsub->((bless {
             node => $node,
-            renderer => $WWW::Shopify::Liquid::XS::Renderer::renderer_dereference{$renderer}
+            renderer => $renderer
         }, $tag), $hash, @arguments);
     }) == 0;
 }
@@ -416,7 +435,7 @@ sub register_filter {
         my ($renderer, $node, $hash, $operand, @arguments) = @_;
         my $result = $opsub->((bless {
             node => $node,
-            renderer => $WWW::Shopify::Liquid::XS::Renderer::renderer_dereference{$renderer}
+            renderer => $renderer
         }, $filter), $hash, $operand, @arguments);
         return $result;
     }) == 0;
@@ -431,7 +450,7 @@ sub register_operator {
         my ($renderer, $node, $hash, @operands) = @_;
         my $result = $opsub->((bless {
             node => $node,
-            renderer => $WWW::Shopify::Liquid::XS::Renderer::renderer_dereference{$renderer}
+            renderer => $renderer,
         }, $operator), $hash, @operands);
         return $result;
     }) == 0;

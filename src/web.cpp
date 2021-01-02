@@ -163,19 +163,6 @@ namespace Liquid {
             return Variant(move(result));
         }
     };
-    struct DateFilterNode : FilterNodeType {
-        DateFilterNode() : FilterNodeType("date", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
-            time_t operand = (time_t)getOperand(renderer, node, store).variant.getInt();
-            string argument = getArgument(renderer, node, store, 0).getString();
-            struct tm * timeinfo = localtime(&operand);
-            static constexpr int MAX_BUFFER_SIZE = 256;
-            string buffer;
-            buffer.resize(MAX_BUFFER_SIZE);
-            buffer.resize(strftime(&buffer[0], MAX_BUFFER_SIZE, argument.c_str(), timeinfo));
-            return Variant(move(buffer));
-        }
-    };
 
     struct ColorFilterNode : FilterNodeType {
         ColorFilterNode(const string& symbol, int minArguments, int maxArguments) : FilterNodeType(symbol, minArguments, maxArguments) { }
@@ -519,6 +506,25 @@ namespace Liquid {
         }
     };
 
+    struct NewlineToBrFilterNode : FilterNodeType {
+        NewlineToBrFilterNode() : FilterNodeType("newline_to_br", 0, 0) { }
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
+            auto operand = getOperand(renderer, node, store);
+            if (operand.type)
+                return Node();
+            string accumulator;
+            string str = operand.getString();
+            accumulator.reserve(str.size());
+            for (size_t i = 0; i < str.size(); ++i) {
+                if (str[i] == '\n')
+                    accumulator += "<br/>";
+                else if (str[i] != '\r')
+                    accumulator += str[i];
+            }
+            return Variant(accumulator);
+        }
+    };
+
     #if LIQUID_INCLUDE_RAPIDJSON_VARIABLE
     struct JSONFilterNode : FilterNodeType {
         JSONFilterNode() : FilterNodeType("json") { }
@@ -559,7 +565,8 @@ namespace Liquid {
         context.registerType<ScriptTagFilterNode>();
         context.registerType<LinkToFilterNode>();
         context.registerType<HighlightFilterNode>();
-        context.registerType<DateFilterNode>();
+        context.registerType<StylesheetTagFilterNode>();
+        context.registerType<NewlineToBrFilterNode>();
 
         #if LIQUID_INCLUDE_RAPIDJSON_VARIABLE
             context.registerType<JSONFilterNode>();

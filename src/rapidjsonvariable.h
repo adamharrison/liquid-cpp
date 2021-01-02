@@ -11,7 +11,7 @@ namespace Liquid {
 
     struct RapidJSONVariableResolver : LiquidVariableResolver {
         RapidJSONVariableResolver() {
-            getType = +[](void* variable) {
+            getType = +[](LiquidRenderer renderer, void* variable) {
                 switch (static_cast<rapidjson::Value*>(variable)->GetType()) {
                     case 0:
                         return LIQUID_VARIABLE_TYPE_NIL;
@@ -30,14 +30,14 @@ namespace Liquid {
                         return LIQUID_VARIABLE_TYPE_OTHER;
                 }
             };
-            getBool = +[](void* variable, bool* target) {
+            getBool = +[](LiquidRenderer renderer, void* variable, bool* target) {
                 int type = static_cast<rapidjson::Value*>(variable)->GetType();
                 if (type != 2 && type != 3)
                     return false;
                 *target = type == 2;
                 return true;
             };
-            getTruthy = +[](void* variable) {
+            getTruthy = +[](LiquidRenderer renderer, void* variable) {
                 switch (static_cast<rapidjson::Value*>(variable)->GetType()) {
                     case 0:
                     case 1:
@@ -50,37 +50,37 @@ namespace Liquid {
                         return true;
                 }
             };
-            getString = +[](void* variable, char* target) {
+            getString = +[](LiquidRenderer renderer, void* variable, char* target) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsString())
                     return false;
                 strcpy(target, static_cast<rapidjson::Value*>(variable)->GetString());
                 return true;
             };
-            getStringLength = +[](void* variable) {
+            getStringLength = +[](LiquidRenderer renderer, void* variable) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsString())
                     return -1LL;
                 return (long long)static_cast<rapidjson::Value*>(variable)->GetStringLength();
             };
-            getInteger = +[](void* variable, long long* target) {
+            getInteger = +[](LiquidRenderer renderer, void* variable, long long* target) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsNumber())
                     return false;
                 *target = static_cast<rapidjson::Value*>(variable)->GetInt64();
                 return true;
             };
-            getFloat = +[](void* variable, double* target) {
+            getFloat = +[](LiquidRenderer renderer, void* variable, double* target) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsNumber())
                     return false;
                 *target = static_cast<rapidjson::Value*>(variable)->GetFloat();
                 return false;
             };
-            getDictionaryVariable = +[](void* variable, const char* key, void** target) {
+            getDictionaryVariable = +[](LiquidRenderer renderer, void* variable, const char* key, void** target) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsObject() || !static_cast<rapidjson::Value*>(variable)->HasMember(key))
                     return false;
                 auto& value = (*static_cast<rapidjson::Value*>(variable))[key];
                 *target = &value;
                 return true;
             };
-            getArrayVariable = +[](void* variable, long long idx, void** target) {
+            getArrayVariable = +[](LiquidRenderer renderer, void* variable, long long idx, void** target) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsArray())
                     return false;
                 if (idx < 0)
@@ -92,13 +92,13 @@ namespace Liquid {
                 return true;
             };
 
-            getArraySize = +[](void* variable) {
+            getArraySize = +[](LiquidRenderer renderer, void* variable) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsArray())
                     return -1LL;
                 return (long long)static_cast<rapidjson::Value*>(variable)->Size();
             };
 
-            iterate = +[](void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) {
+            iterate = +[](LiquidRenderer renderer, void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) {
                 if (static_cast<rapidjson::Value*>(variable)->IsArray()) {
 
                 } else if (static_cast<rapidjson::Value*>(variable)->IsObject()) {
