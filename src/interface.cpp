@@ -35,8 +35,9 @@ void liquidFreeRenderer(LiquidRenderer renderer) {
     delete (Renderer*)renderer.renderer;
 }
 
-LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size, LiquidParserError* error) {
+LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size, bool treatUnknownFiltersAsErrors, LiquidParserError* error) {
     Parser parser(*static_cast<Context*>(context.context));
+    parser.treatUnknownFiltersAsErrors = treatUnknownFiltersAsErrors;
     Node tmpl;
     if (error)
         error->type = LiquidParserErrorType::LIQUID_PARSER_ERROR_TYPE_NONE;

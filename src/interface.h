@@ -184,7 +184,7 @@ extern "C" {
     void liquidRendererSetReturnValueVariable(LiquidRenderer renderer, void* variable);
     void liquidFreeRenderer(LiquidRenderer renderer);
 
-    LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size, LiquidParserError* error);
+    LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size, bool treatUnknownFiltersAsErrors, LiquidParserError* error);
     void liquidFreeTemplate(LiquidTemplate tmpl);
 
     LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRenderError* error);

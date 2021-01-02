@@ -13,6 +13,18 @@ sub operate {
 	return $operand->strftime(@arguments);
 }
 
+
+package WWW::Shopify::Liquid::Filter::XS::Sprintf;
+sub name { "sprintf" }
+sub min_arguments { return 1; }
+sub max_arguments { return 1; }
+sub operate {
+	my ($self, $hash, $operand, @arguments) = @_;
+	return '' unless $operand;
+	return sprintf($operand, @arguments);
+}
+
+
 package WWW::Shopify::Liquid::XS::Exception;
 use overload
 	fallback => 1,
@@ -116,7 +128,7 @@ use Encode;
 sub new {
     my ($package, $context, $text, $file) = @_;
     my $error = [];
-    my $template = WWW::Shopify::Liquid::XS::createTemplate($context, encode("UTF-8", $text), $error);
+    my $template = WWW::Shopify::Liquid::XS::createTemplate($context, encode("UTF-8", $text), 1, $error);
     if (!$template) {
         $error = WWW::Shopify::Liquid::XS::Exception->new($error);
         $error->{line}->[3] = $file;
@@ -359,6 +371,7 @@ sub new {
     $_->apply($self) for (@{$self->{dialects}});
     WWW::Shopify::Liquid::XS::implementWebDialect($self->{context}) if $settings{'implement_web_dialect'};
     $self->register_filter('WWW::Shopify::Liquid::Filter::XS::Date');
+    $self->register_filter('WWW::Shopify::Liquid::Filter::XS::Sprintf');
     return $self;
 }
 

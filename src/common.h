@@ -248,7 +248,7 @@ namespace Liquid {
                 case Type::FLOAT: {
                     // We can't use to_string because that'll add an annoying amount of unecesarry 0s after the decimal point.
                     char buffer[512];
-                    int length = snprintf(buffer, sizeof(buffer), "%.0f", f);
+                    int length = snprintf(buffer, sizeof(buffer), "%g", f);
                     return string(buffer, length);
                 }
                 case Type::INT:

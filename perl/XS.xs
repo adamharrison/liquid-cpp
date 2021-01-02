@@ -76,7 +76,7 @@ long long lpGetStringLength(LiquidRenderer renderer, void* variable) {
 
 bool lpGetInteger(LiquidRenderer renderer, void* variable, long long* target) {
     dTHX;
-    *target = (long long)SvNV((SV*)variable);
+    *target = (long long)SvIV((SV*)variable);
     return true;
 }
 
@@ -231,18 +231,20 @@ bool lpIterate(LiquidRenderer renderer, void* variable, bool (*callback)(void* v
     if (length < 0)
         length += av_top_index(av)+1;
 
-    if (reverse) {
-        start = av_top_index(av) - start;
-        for (size_t i = length; i >= start; --i) {
-            SV** sv = av_fetch(av, i, 0);
-            if (sv)
-                callback(*sv, data);
-        }
-    } else {
-        for (size_t i = start; i <= length; ++i) {
-            SV** sv = av_fetch(av, i, 0);
-            if (sv)
-                callback(*sv, data);
+    if (length >= 0) {
+        if (reverse) {
+            start = av_top_index(av) - start;
+            for (size_t i = length; i >= start; --i) {
+                SV** sv = av_fetch(av, i, 0);
+                if (sv)
+                    callback(*sv, data);
+            }
+        } else {
+            for (size_t i = start; i <= length; ++i) {
+                SV** sv = av_fetch(av, i, 0);
+                if (sv)
+                    callback(*sv, data);
+            }
         }
     }
     return false;
@@ -694,13 +696,14 @@ rendererSetMakeMethodCalls(renderer, value)
 
 
 void*
-createTemplate(context, str, error)
+createTemplate(context, str, treatUnknownFiltersAsErrors, error)
     void* context;
     char* str;
+    bool treatUnknownFiltersAsErrors;
     SV* error;
     CODE:
         LiquidParserError parserError;
-        RETVAL = liquidCreateTemplate(*(LiquidContext*)&context, str, strlen(str), &parserError).ast;
+        RETVAL = liquidCreateTemplate(*(LiquidContext*)&context, str, strlen(str), treatUnknownFiltersAsErrors, &parserError).ast;
         if (SvROK(error)) {
             if (parserError.type) {
                 AV* av = (AV*)SvRV(error);
