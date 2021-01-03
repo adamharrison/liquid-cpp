@@ -73,10 +73,15 @@
 		<Unit filename="perl/test.pl" />
 		<Unit filename="ruby/Rakefile" />
 		<Unit filename="ruby/ext/liquidc/extconf.rb" />
-		<Unit filename="ruby/ext/liquidc/liquid.c">
+		<Unit filename="ruby/lib/liquidc.rb" />
+		<Unit filename="ruby/liquidc-dir/Rakefile" />
+		<Unit filename="ruby/liquidc-dir/lib/liquidc-dir.rb" />
+		<Unit filename="ruby/liquidc/Rakefile" />
+		<Unit filename="ruby/liquidc/ext/liquidc/extconf.rb" />
+		<Unit filename="ruby/liquidc/ext/liquidc/liquid.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="ruby/lib/liquidc.rb" />
+		<Unit filename="ruby/liquidc/t/test.rb" />
 		<Unit filename="ruby/t/test.rb" />
 		<Unit filename="src/common.h" />
 		<Unit filename="src/context.cpp" />

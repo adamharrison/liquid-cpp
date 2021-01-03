@@ -1,0 +1,6 @@
+Makefile
+*.o
+*.so
+tmp
+*.gem
+pkg
