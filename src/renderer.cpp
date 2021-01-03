@@ -17,7 +17,7 @@ namespace Liquid {
         currentMemoryUsage = 0;
         currentRenderingDepth = 0;
         error = Error::Type::LIQUID_RENDERER_ERROR_TYPE_NONE;
-        Node node = ast.type->render(*this, ast, store);
+        Node node = retrieveRenderedNode(ast, store);
         assert(node.type == nullptr);
         auto s = node.getString();
         callback(s.data(), s.size(), data);

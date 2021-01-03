@@ -1,5 +1,5 @@
-#ifndef DIALECT_H
-#define DIALECT_H
+#ifndef LIQUIDDIALECT_H
+#define LIQUIDDIALECT_H
 #include "common.h"
 
 namespace Liquid {

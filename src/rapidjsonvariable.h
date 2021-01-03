@@ -1,6 +1,6 @@
 
-#ifndef RAPIDJSONVARAIBLE_H
-#define RAPIDJSONVARIABLE_H
+#ifndef LIQUIDRAPIDJSONVARAIBLE_H
+#define LIQUIDRAPIDJSONVARIABLE_H
 
 #include "common.h"
 #include "context.h"

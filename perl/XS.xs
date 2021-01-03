@@ -686,6 +686,33 @@ freeRenderer(renderer)
         liquidFreeRenderer(*(LiquidRenderer*)&renderer);
 
 
+
+void*
+createOptimizer(renderer)
+    void* renderer;
+    CODE:
+        LiquidOptimizer optimizer = liquidCreateOptimizer(*(LiquidRenderer*)&renderer);
+        RETVAL = optimizer.optimizer;
+    OUTPUT:
+        RETVAL
+
+void
+optimizeTemplate(optimizer, tmpl, store)
+    void* optimizer;
+    void* tmpl;
+    SV* store;
+    CODE:
+        liquidOptimizerTemplate(*(LiquidOptimizer*)&optimizer, *(LiquidTemplate*)&tmpl, store);
+
+
+void
+freeOptimizer(optimizer)
+    void* optimizer;
+    CODE:
+        liquidFreeOptimizer(*(LiquidOptimizer*)&optimizer);
+
+
+
 void
 rendererSetMakeMethodCalls(renderer, value)
     void* renderer;
@@ -758,13 +785,14 @@ getError()
         RETVAL
 
 int
-registerTag(context, symbol, type, minArguments, maxArguments, renderFunction)
+registerTag(context, symbol, type, minArguments, maxArguments, optimizes, renderFunction)
     void* context;
     const char* symbol;
     const char* type;
     int minArguments;
     int maxArguments;
     SV* renderFunction;
+    int optimizes;
     CODE:
         enum ETagType eType = strcmp(type, "free") == 0 ? LIQUID_TAG_TYPE_FREE : LIQUID_TAG_TYPE_ENCLOSING;
         if (SvROK(renderFunction) && SvTYPE(SvRV(renderFunction)) == SVt_PVCV) {
@@ -777,12 +805,13 @@ registerTag(context, symbol, type, minArguments, maxArguments, renderFunction)
         RETVAL
 
 int
-registerFilter(context, symbol, minArguments, maxArguments, renderFunction)
+registerFilter(context, symbol, minArguments, maxArguments, optimizes, renderFunction)
     void* context;
     const char* symbol;
     int minArguments;
     int maxArguments;
     SV* renderFunction;
+    int optimizes;
     CODE:
         if (SvROK(renderFunction) && SvTYPE(SvRV(renderFunction)) == SVt_PVCV) {
             liquidRegisterFilter(*(LiquidContext*)&context, symbol, minArguments, maxArguments, lpRenderFilter, SvREFCNT_inc(renderFunction));
@@ -794,13 +823,14 @@ registerFilter(context, symbol, minArguments, maxArguments, renderFunction)
         RETVAL
 
 int
-registerOperator(context, symbol, arity, fixness, priority, renderFunction)
+registerOperator(context, symbol, arity, fixness, priority, optimizes, renderFunction)
     void* context;
     const char* symbol;
     const char* arity;
     const char* fixness;
     int priority;
     SV* renderFunction;
+    int optimizes;
     CODE:
         if (SvROK(renderFunction) && SvTYPE(SvRV(renderFunction)) == SVt_PVCV) {
             LiquidOperatorArity eArity = strcmp(arity, "unary") == 0 ? LIQUID_OPERATOR_ARITY_UNARY : (strcmp(arity, "binary") == 0 ? LIQUID_OPERATOR_ARITY_BINARY : (strcmp(arity, "nonary") == 0 ? LIQUID_OPERATOR_ARITY_NONARY : LIQUID_OPERATOR_ARITY_NARY));

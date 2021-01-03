@@ -1,6 +1,7 @@
 #include "interface.h"
 #include "dialect.h"
 #include "context.h"
+#include "optimizer.h"
 #include <memory>
 
 using namespace Liquid;
@@ -33,6 +34,18 @@ LiquidRenderer liquidCreateRenderer(LiquidContext context) {
 
 void liquidFreeRenderer(LiquidRenderer renderer) {
     delete (Renderer*)renderer.renderer;
+}
+
+LiquidOptimizer liquidCreateOptimizer(LiquidRenderer renderer) {
+    return LiquidOptimizer({ new Optimizer(*static_cast<Renderer*>(renderer.renderer)) });
+}
+
+void liquidOptimizerTemplate(LiquidOptimizer optimizer, LiquidTemplate tmpl, void* variableStore) {
+    static_cast<Optimizer*>(optimizer.optimizer)->optimize(*static_cast<Node*>(tmpl.ast), Variable({ variableStore }));
+}
+
+void liquidFreeOptimizer(LiquidOptimizer optimizer) {
+    delete (Optimizer*)optimizer.optimizer;
 }
 
 LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size, bool treatUnknownFiltersAsErrors, LiquidParserError* error) {
@@ -75,24 +88,24 @@ void liquidWalkTemplate(LiquidTemplate tmpl, LiquidWalkTemplateFunction callback
     });
 }
 
-void* liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data) {
+void* liquidRegisterTag(LiquidContext context, const char* symbol, enum ELiquidTagType type, int minArguments, int maxArguments, LiquidOptimizationScheme optimization, LiquidRenderFunction renderFunction, void* data) {
     Context* ctx = static_cast<Context*>(context.context);
-    unique_ptr<NodeType> registeredType = make_unique<TagNodeType>((TagNodeType::Composition)type, symbol, minArguments, maxArguments);
+    unique_ptr<NodeType> registeredType = make_unique<TagNodeType>((TagNodeType::Composition)type, symbol, minArguments, maxArguments, optimization);
     registeredType->userRenderFunction = renderFunction;
     registeredType->userData = data;
     return ctx->registerType(move(registeredType));
 }
-void* liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data) {
+void* liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidOptimizationScheme optimization, LiquidRenderFunction renderFunction, void* data) {
     Context* ctx = static_cast<Context*>(context.context);
-    unique_ptr<NodeType> registeredType = make_unique<FilterNodeType>(symbol, minArguments, maxArguments);
+    unique_ptr<NodeType> registeredType = make_unique<FilterNodeType>(symbol, minArguments, maxArguments, optimization);
     registeredType->userRenderFunction = renderFunction;
     registeredType->userData = data;
     return ctx->registerType(move(registeredType));
 }
 
-void* liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity arity, enum ELiquidOperatorFixness fixness, int priority, LiquidRenderFunction renderFunction, void* data) {
+void* liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity arity, enum ELiquidOperatorFixness fixness, int priority, LiquidOptimizationScheme optimization, LiquidRenderFunction renderFunction, void* data) {
     Context* ctx = static_cast<Context*>(context.context);
-    unique_ptr<NodeType> registeredType = make_unique<OperatorNodeType>(symbol, (OperatorNodeType::Arity)arity, priority, (OperatorNodeType::Fixness)fixness);
+    unique_ptr<NodeType> registeredType = make_unique<OperatorNodeType>(symbol, (OperatorNodeType::Arity)arity, priority, (OperatorNodeType::Fixness)fixness, optimization);
     registeredType->userRenderFunction = renderFunction;
     registeredType->userData = data;
     return ctx->registerType(move(registeredType));

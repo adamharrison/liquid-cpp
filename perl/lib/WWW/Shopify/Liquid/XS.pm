@@ -75,7 +75,7 @@ use Scalar::Util qw(weaken);
 
 sub new {
     my ($package, $liquid) = @_;
-    my $self = bless { liquid => $liquid, max_inclusion_depth => 10 }, $package;
+    my $self = bless { liquid => $liquid, max_inclusion_depth => 10, inclusion_depth => 0 }, $package;
     weaken($self->{liquid});
     $self->{renderer} = WWW::Shopify::Liquid::XS::createRenderer($liquid->{context}, $self);
     return $self;
@@ -115,10 +115,18 @@ sub make_method_calls {
 sub clone_hash { $_[0]->{clone_hash} = $_[1] if @_ > 1; return $_[0]->{clone_hash}; }
 
 package WWW::Shopify::Liquid::XS::Optimizer;
-use base 'WWW::Shopify::Liquid::XS::Renderer';
+
+sub new {
+    my ($package, $renderer) = @_;
+    my $self = bless {
+        optimizer => WWW::Shopify::Liquid::XS::createOptimizer($renderer->{renderer})
+    }, $package;
+    return $self;
+}
 
 sub optimize {
     my ($self, $hash, $template) = @_;
+    WWW::Shopify::Liquid::XS::optimizeTemplate($self->{optimizer}, $template->{template}, $hash);
     return $template;
 }
 
@@ -158,6 +166,7 @@ sub is_enclosing { 0; }
 sub max_arguments { return 1; }
 sub min_arguments { return 1; }
 sub name { "include"; }
+sub optimizes { 0; }
 
 sub retrieve_include {
 	my ($self, $hash, $string) = @_;
@@ -196,7 +205,6 @@ sub operate {
 	my $result = $self->process_include($hash, $arguments[0], $path, $text, $arguments[1]);
 	$self->{renderer}->inclusion_depth($include_depth);
 	return $result;
-
 }
 
 
@@ -367,7 +375,7 @@ sub new {
     WWW::Shopify::Liquid::XS::implementPermissiveStandardDialect($self->{context});
     $self->register_tag('WWW::Shopify::Liquid::XS::Tag::Include');
     $self->{renderer} = WWW::Shopify::Liquid::XS::Renderer->new($self);
-    $self->{optimizer} = WWW::Shopify::Liquid::XS::Optimizer->new($self);
+    $self->{optimizer} = WWW::Shopify::Liquid::XS::Optimizer->new($self->{renderer});
     $_->apply($self) for (@{$self->{dialects}});
     WWW::Shopify::Liquid::XS::implementWebDialect($self->{context}) if $settings{'implement_web_dialect'};
     $self->register_filter('WWW::Shopify::Liquid::Filter::XS::Date');
@@ -424,8 +432,9 @@ sub optimize_ast {
 sub register_tag {
     my ($self, $tag) = @_;
     my $opsub = $tag->can('operate');
+    my $optimizes = !$tag->can('optimizes') || $tag->optimizes ? 2 : 0;
     die WWW::Shopify::Liquid::XS::Exception->new("Requies tag to have an operate sub; currently custom processing is not supported.") unless $opsub;
-    die WWW::Shopify::Liquid::XS::Exception->new("Can't register tag '" . $tag->name . "'.") unless WWW::Shopify::Liquid::XS::registerTag($self->{context}, $tag->name, ($tag->is_enclosing ? "enclosing" : "free"), $tag->min_arguments, (defined $tag->max_arguments ? $tag->max_arguments : -1), $tag->is_enclosing ? sub {
+    die WWW::Shopify::Liquid::XS::Exception->new("Can't register tag '" . $tag->name . "'.") unless WWW::Shopify::Liquid::XS::registerTag($self->{context}, $tag->name, ($tag->is_enclosing ? "enclosing" : "free"), $tag->min_arguments, (defined $tag->max_arguments ? $tag->max_arguments : -1), $optimizes, $tag->is_enclosing ? sub {
         my ($renderer, $node, $hash, $contents, @arguments) = @_;
         return $opsub->((bless {
             node => $node,
@@ -443,8 +452,9 @@ sub register_tag {
 sub register_filter {
     my ($self, $filter) = @_;
     my $opsub = $filter->can('operate');
+    my $optimizes = !$filter->can('optimizes') || $filter->optimizes ? 2 : 0;
     die WWW::Shopify::Liquid::XS::Exception->new("Requires filter to have an operate sub; currently custom processing is not supported.") unless $opsub;
-    die WWW::Shopify::Liquid::XS::Exception->new("Can't register filter '" . $filter->name . "'.") unless WWW::Shopify::Liquid::XS::registerFilter($self->{context}, $filter->name, $filter->min_arguments, (defined $filter->max_arguments ? $filter->max_arguments : -1), sub {
+    die WWW::Shopify::Liquid::XS::Exception->new("Can't register filter '" . $filter->name . "'.") unless WWW::Shopify::Liquid::XS::registerFilter($self->{context}, $filter->name, $filter->min_arguments, (defined $filter->max_arguments ? $filter->max_arguments : -1), $optimizes, sub {
         my ($renderer, $node, $hash, $operand, @arguments) = @_;
         my $result = $opsub->((bless {
             node => $node,
@@ -458,8 +468,9 @@ sub register_filter {
 sub register_operator {
     my ($self, $operator) = @_;
     my $opsub = $operator->can('operate');
+    my $optimizes = !$operator->can('optimizes') || $operator->optimizes ? 2 : 0;
     die WWW::Shopify::Liquid::XS::Exception->new("Requires operator to have an operate sub; currently custom processing is not supported.") unless $opsub;;
-    die WWW::Shopify::Liquid::XS::Exception->new("Can't register operator '" . $operator->symbol. "'.") unless WWW::Shopify::Liquid::XS::registerOperator($self->{context}, $operator->symbol, $operator->arity, $operator->fixness, $operator->priority, sub {
+    die WWW::Shopify::Liquid::XS::Exception->new("Can't register operator '" . $operator->symbol. "'.") unless WWW::Shopify::Liquid::XS::registerOperator($self->{context}, $operator->symbol, $operator->arity, $operator->fixness, $operator->priority, $optimizes, sub {
         my ($renderer, $node, $hash, @operands) = @_;
         my $result = $opsub->((bless {
             node => $node,

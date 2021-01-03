@@ -1,5 +1,5 @@
-#ifndef DIALECTSWEB_H
-#define DIALECTSWEB_H
+#ifndef LIQUIDDIALECTSWEB_H
+#define LIQUIDDIALECTSWEB_H
 #include "dialect.h"
 
 #if LIQUID_INCLUDE_WEB_DIALECT

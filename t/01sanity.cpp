@@ -2,6 +2,7 @@
 #include "../src/lexer.h"
 #include "../src/parser.h"
 #include "../src/renderer.h"
+#include "../src/optimizer.h"
 #include "../src/dialect.h"
 #include "../src/cppvariable.h"
 
@@ -31,6 +32,11 @@ Renderer& getRenderer() {
 Parser& getParser() {
     static Parser parser(getContext());
     return parser;
+}
+
+Optimizer& getOptimizer() {
+    static Optimizer optimizer(getRenderer());
+    return optimizer;
 }
 
 
@@ -393,6 +399,47 @@ TEST(sanity, filters) {
     ast = getParser().parse("{{ a.size }}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "4");
+}
+
+
+
+TEST(sanity, optimizer) {
+    CPPVariable hash, internal;
+    Node ast;
+    std::string str;
+
+    internal["c"] = "D";
+
+    hash["a"] = internal;
+
+    const NodeType* ifNode = getContext().getTagType("if");
+    bool atLeastOne = false;
+
+    ast = getParser().parse("{% if a %}{{ a.b }}{% endif %}");
+
+    ast.walk([ifNode, &atLeastOne](const Node& node) {
+        if (node.type == ifNode)
+            atLeastOne = true;
+    });
+    ASSERT_TRUE(atLeastOne);
+
+    atLeastOne = false;
+    getOptimizer().optimize(ast, hash);
+    ast.walk([ifNode, &atLeastOne](const Node& node) {
+        if (node.type == ifNode)
+            atLeastOne = true;
+    });
+
+    ASSERT_TRUE(!atLeastOne);
+
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "");
+
+    internal["b"] = "C";
+    hash["a"] = move(internal);
+
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "C");
 }
 
 TEST(sanity, composite) {

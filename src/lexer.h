@@ -1,5 +1,5 @@
-#ifndef LEXER_H
-#define LEXER_H
+#ifndef LIQUIDLEXER_H
+#define LIQUIDLEXER_H
 
 #include <cstddef>
 #include <cstdlib>

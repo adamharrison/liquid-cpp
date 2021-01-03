@@ -1,5 +1,5 @@
-#ifndef CONTEXT_H
-#define CONTEXT_H
+#ifndef LIQUIDCONTEXT_H
+#define LIQUIDCONTEXT_H
 
 #include "common.h"
 #include "parser.h"
@@ -37,7 +37,7 @@ namespace Liquid {
         int minArguments;
         int maxArguments;
 
-        TagNodeType(Composition composition, string symbol, int minArguments = -1, int maxArguments = -1) : NodeType(NodeType::Type::TAG, symbol, -1), composition(composition), minArguments(minArguments), maxArguments(maxArguments) { }
+        TagNodeType(Composition composition, string symbol, int minArguments = -1, int maxArguments = -1, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : NodeType(NodeType::Type::TAG, symbol, -1, optimization), composition(composition), minArguments(minArguments), maxArguments(maxArguments) { }
 
         // Used for registering intermedaites and qualiifers.
         template <class T>
@@ -58,7 +58,7 @@ namespace Liquid {
     };
 
     struct EnclosedNodeType : TagNodeType {
-        EnclosedNodeType(string symbol, int minArguments = -1, int maxArguments = -1) : TagNodeType(Composition::ENCLOSED, symbol, minArguments, maxArguments) { }
+        EnclosedNodeType(string symbol, int minArguments = -1, int maxArguments = -1, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : TagNodeType(Composition::ENCLOSED, symbol, minArguments, maxArguments, optimization) { }
     };
 
     struct OperatorNodeType : NodeType {
@@ -78,7 +78,7 @@ namespace Liquid {
         };
         Fixness fixness;
 
-        OperatorNodeType(string symbol, Arity arity, int priority = 0, Fixness fixness = Fixness::INFIX) : NodeType(Type::OPERATOR, symbol), arity(arity), priority(priority), fixness(fixness) {
+        OperatorNodeType(string symbol, Arity arity, int priority = 0, Fixness fixness = Fixness::INFIX, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : NodeType(Type::OPERATOR, symbol, -1, optimization), arity(arity), priority(priority), fixness(fixness) {
             switch (arity) {
                 case Arity::NONARY:
                     maxChildren = 0;
@@ -100,23 +100,24 @@ namespace Liquid {
         int minArguments;
         int maxArguments;
 
-        FilterNodeType(string symbol, int minArguments = -1, int maxArguments = -1) : NodeType(NodeType::Type::FILTER, symbol, -1), minArguments(minArguments), maxArguments(maxArguments) { }
+        FilterNodeType(string symbol, int minArguments = -1, int maxArguments = -1, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : NodeType(NodeType::Type::FILTER, symbol, -1, optimization), minArguments(minArguments), maxArguments(maxArguments) { }
 
         Node getOperand(Renderer& renderer, const Node& node, Variable store) const;
     };
 
 
     struct DotFilterNodeType : NodeType {
-        DotFilterNodeType(string symbol) : NodeType(NodeType::Type::DOT_FILTER, symbol, -1) { }
+        DotFilterNodeType(string symbol, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : NodeType(NodeType::Type::DOT_FILTER, symbol, -1, optimization) { }
 
         Node getOperand(Renderer& renderer, const Node& node, Variable store) const;
     };
 
     struct Context {
         struct ConcatenationNode : NodeType {
-            ConcatenationNode() : NodeType(Type::OPERATOR) { }
+            ConcatenationNode() : NodeType(Type::OPERATOR, "", -1, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
 
             Node render(Renderer& renderer, const Node& node, Variable store) const;
+            bool optimize(Optimizer& optimizer, Node& node, Variable store) const;
         };
 
         struct OutputNode : NodeType {
@@ -148,7 +149,7 @@ namespace Liquid {
         // These are purely for parsing purpose, and should not make their way to the rednerer.
         struct GroupDereferenceNode : PassthruNode { GroupDereferenceNode() : PassthruNode(Type::GROUP_DEREFERENCE) { } };
         // Used exclusively for tags. Should be never be rendered by itself.
-        struct ArgumentNode : NodeType { ArgumentNode() : NodeType(Type::ARGUMENTS) { } };
+        struct ArgumentNode : NodeType { ArgumentNode() : NodeType(Type::ARGUMENTS, "", -1, LIQUID_OPTIMIZATION_SCHEME_NONE) { } };
         struct ArrayLiteralNode : NodeType {
             ArrayLiteralNode() : NodeType(Type::ARRAY_LITERAL) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const {
@@ -170,8 +171,12 @@ namespace Liquid {
 
             Node render(Renderer& renderer, const Node& node, Variable store) const {
                 Variable storePointer = renderer.getVariable(node, store);
+                if (!storePointer.exists())
+                    return Node();
                 return Node(renderer.parseVariant(storePointer));
             }
+
+            bool optimize(Optimizer& optimizer, Node& node, Variable store) const;
         };
 
         unordered_map<string, unique_ptr<NodeType>> tagTypes;

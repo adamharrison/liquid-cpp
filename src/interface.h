@@ -1,5 +1,5 @@
-#ifndef INTERFACE_H
-#define INTERFACE_H
+#ifndef LIQUIDINTERFACE_H
+#define LIQUIDINTERFACE_H
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -7,6 +7,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 
     #define LIQUID_ERROR_MESSAGE_MAX_LENGTH 256
     #define LIQUID_FILE_MAX_LENGTH 256
@@ -72,10 +73,18 @@ extern "C" {
     typedef struct SLiquidRenderError LiquidRenderError;
 
 
-    enum ETagType {
+    enum ELiquidOptimizationScheme {
+        LIQUID_OPTIMIZATION_SCHEME_NONE,
+        LIQUID_OPTIMIZATION_SCHEME_PARTIAL,
+        LIQUID_OPTIMIZATION_SCHEME_FULL
+    };
+    typedef enum ELiquidOptimizationScheme LiquidOptimizationScheme;
+
+    enum ELiquidTagType {
         LIQUID_TAG_TYPE_ENCLOSING,
         LIQUID_TAG_TYPE_FREE
     };
+    typedef enum ELiquidTagType LiquidTagType;
 
     enum ELiquidOperatorArity {
         LIQUID_OPERATOR_ARITY_NONARY,
@@ -104,6 +113,10 @@ extern "C" {
         void* ast;
     };
     typedef struct SLiquidTemplate LiquidTemplate;
+    struct SLiquidOptimizer {
+        void* optimizer;
+    };
+    typedef struct SLiquidOptimizer LiquidOptimizer;
     struct SLiquidNode {
         void* node;
     };
@@ -184,6 +197,10 @@ extern "C" {
     void liquidRendererSetReturnValueVariable(LiquidRenderer renderer, void* variable);
     void liquidFreeRenderer(LiquidRenderer renderer);
 
+    LiquidOptimizer liquidCreateOptimizer(LiquidRenderer renderer);
+    void liquidOptimizerTemplate(LiquidOptimizer optimizer, LiquidTemplate tmpl, void* variableStore);
+    void liquidFreeOptimizer(LiquidOptimizer optimizer);
+
     LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size, bool treatUnknownFiltersAsErrors, LiquidParserError* error);
     void liquidFreeTemplate(LiquidTemplate tmpl);
 
@@ -208,10 +225,10 @@ extern "C" {
     void liquidRegisterVariableResolver(LiquidRenderer renderer, LiquidVariableResolver resolver);
 
     // Passing -1 to min/maxArguments means no min or max.
-    void* liquidRegisterTag(LiquidContext context, const char* symbol, enum ETagType type, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data);
-    void* liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidRenderFunction renderFunction, void* data);
-    void* liquidRegisterDotFilter(LiquidContext context, const char* symbol, LiquidRenderFunction renderFunction, void* data);
-    void* liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity arity, enum ELiquidOperatorFixness fixness, int priority, LiquidRenderFunction renderFunction, void* data);
+    void* liquidRegisterTag(LiquidContext context, const char* symbol, enum ELiquidTagType type, int minArguments, int maxArguments, LiquidOptimizationScheme optimization, LiquidRenderFunction renderFunction, void* data);
+    void* liquidRegisterFilter(LiquidContext context, const char* symbol, int minArguments, int maxArguments, LiquidOptimizationScheme optimization, LiquidRenderFunction renderFunction, void* data);
+    void* liquidRegisterDotFilter(LiquidContext context, const char* symbol, LiquidOptimizationScheme optimization, LiquidRenderFunction renderFunction, void* data);
+    void* liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity arity, enum ELiquidOperatorFixness fixness, int priority, LiquidOptimizationScheme optimization, LiquidRenderFunction renderFunction, void* data);
 
 #ifdef __cplusplus
 }

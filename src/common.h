@@ -1,5 +1,5 @@
-#ifndef COMMON_H
-#define COMMON_H
+#ifndef LIQUIDCOMMON_H
+#define LIQUIDCOMMON_H
 
 #include <unordered_map>
 #include <string>
@@ -413,6 +413,7 @@ namespace Liquid {
     struct Renderer;
     struct Parser;
     struct Context;
+    struct Optimizer;
 
     struct NodeType {
         enum Type {
@@ -428,20 +429,22 @@ namespace Liquid {
             FILTER,
             DOT_FILTER
         };
+
         Type type;
         string symbol;
         int maxChildren;
+        LiquidOptimizationScheme optimization;
         void* userData = nullptr;
         LiquidRenderFunction userRenderFunction = nullptr;
 
-        NodeType(Type type, string symbol = "", int maxChildren = -1) : type(type), symbol(symbol), maxChildren(maxChildren) { }
+        NodeType(Type type, string symbol = "", int maxChildren = -1, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : type(type), symbol(symbol), maxChildren(maxChildren), optimization(optimization) { }
         NodeType(const NodeType&) = default;
         NodeType(NodeType&&) = default;
         ~NodeType() { }
 
         virtual Node render(Renderer& renderer, const Node& node, Variable store) const;
         virtual LiquidParserError validate(const Context& context, const Node& node) const { return LiquidParserError { LIQUID_PARSER_ERROR_TYPE_NONE }; }
-        virtual void optimize(const Context& context, Node& node, Variable store) const { }
+        virtual bool optimize(Optimizer& optimizer, Node& node, Variable store) const;
 
         Node getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const;
         int getArgumentCount(const Node& node) const;

@@ -1,6 +1,6 @@
 
-#ifndef CPPVARIABLE_H
-#define CPPVARIABLE_H
+#ifndef LIQUIDCPPVARIABLE_H
+#define LIQUIDCPPVARIABLE_H
 
 #include "common.h"
 #include "context.h"

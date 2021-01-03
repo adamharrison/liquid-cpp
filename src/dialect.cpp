@@ -1,6 +1,7 @@
 #include "context.h"
 #include "dialect.h"
 #include "parser.h"
+#include "optimizer.h"
 #include <cmath>
 #include <ctime>
 #include <algorithm>
@@ -9,7 +10,7 @@
 namespace Liquid {
 
     struct AssignNode : TagNodeType {
-        AssignNode() : TagNodeType(Composition::FREE, "assign", 1, 1) { }
+        AssignNode() : TagNodeType(Composition::FREE, "assign", 1, 1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto& argumentNode = node.children.front();
@@ -34,7 +35,7 @@ namespace Liquid {
     };
 
     struct CaptureNode : TagNodeType {
-        CaptureNode() : TagNodeType(Composition::ENCLOSED, "capture", 1, 1) { }
+        CaptureNode() : TagNodeType(Composition::ENCLOSED, "capture", 1, 1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto& argumentNode = node.children.front();
@@ -48,7 +49,7 @@ namespace Liquid {
     };
 
     struct IncrementNode : TagNodeType {
-        IncrementNode() : TagNodeType(Composition::FREE, "increment", 1, 1) { }
+        IncrementNode() : TagNodeType(Composition::FREE, "increment", 1, 1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto& argumentNode = node.children.front();
@@ -66,7 +67,7 @@ namespace Liquid {
     };
 
      struct DecrementNode : TagNodeType {
-        DecrementNode() : TagNodeType(Composition::FREE, "decrement", 1, 1) { }
+        DecrementNode() : TagNodeType(Composition::FREE, "decrement", 1, 1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto& argumentNode = node.children.front();
@@ -84,19 +85,17 @@ namespace Liquid {
     };
 
     struct CommentNode : EnclosedNodeType {
-        CommentNode() : EnclosedNodeType("comment", 0, 0) { }
+        CommentNode() : EnclosedNodeType("comment", 0, 0, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
     };
 
-    template <bool Inverse>
+    template <bool INVERSE>
     struct BranchNode : TagNodeType {
         static Node internalRender(Renderer& renderer, const Node& node, Variable store) {
-            assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
-            auto result = renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
-            assert(result.type == nullptr);
+            Node result = renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
             bool truthy = result.variant.isTruthy(renderer.context.falsiness);
-            if (Inverse)
+            if (INVERSE)
                 truthy = !truthy;
             if (truthy)
                 return renderer.retrieveRenderedNode(*node.children[1].get(), store);
@@ -104,11 +103,35 @@ namespace Liquid {
                 // Loop through the elsifs and elses, and anything that's true, run the next concatenation.
                 for (size_t i = 2; i < node.children.size()-1; i += 2) {
                     auto conditionalResult = renderer.retrieveRenderedNode(*node.children[i].get(), store);
-                    if (!conditionalResult.type && conditionalResult.variant.isTruthy(renderer.context.falsiness))
+                    if (!conditionalResult.type && conditionalResult.variant.isTruthy(renderer.context.falsiness)) {
                         return renderer.retrieveRenderedNode(*node.children[i+1].get(), store);
+                    }
                 }
                 return Node();
             }
+        }
+
+        static bool internalOptimize(Optimizer& optimizer, Node& node, Variable store) {
+            auto& arguments = node.children.front();
+            if (arguments->children.front().get()->type)
+                return false;
+            bool truthy = arguments->children.front().get()->variant.isTruthy(optimizer.renderer.context.falsiness);
+            if (INVERSE)
+                truthy = !truthy;
+            if (truthy) {
+                unique_ptr<Node> ptr = move(node.children[1]);
+                node = move(*ptr.get());
+                return true;
+            }
+            // Loop through the elsifs and elses, and anything that's true, run the next concatenation.
+            for (size_t i = 2; i < node.children.size()-1; i += 2) {
+                if (!node.children[i+1].get()->type && node.children[i+1].get()->variant.isTruthy(optimizer.renderer.context.falsiness)) {
+                    unique_ptr<Node> ptr = move(node.children[i+1]);
+                    node = move(*ptr.get());
+                    return true;
+                }
+            }
+            return true;
         }
 
 
@@ -127,7 +150,7 @@ namespace Liquid {
             }
         };
 
-        BranchNode(const std::string symbol) : TagNodeType(Composition::ENCLOSED, symbol, 1, 1) {
+        BranchNode(const std::string symbol) : TagNodeType(Composition::ENCLOSED, symbol, 1, 1, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) {
             intermediates["elsif"] = make_unique<ElsifNode>();
             intermediates["else"] = make_unique<ElseNode>();
         }
@@ -148,8 +171,13 @@ namespace Liquid {
 
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
-            return BranchNode<Inverse>::internalRender(renderer, node, store);
+            return BranchNode<INVERSE>::internalRender(renderer, node, store);
         }
+
+        bool optimize(Optimizer& optimizer, Node& node, Variable store) const {
+            return BranchNode<INVERSE>::internalOptimize(optimizer, node, store);
+        }
+
     };
 
 
@@ -175,7 +203,7 @@ namespace Liquid {
             Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
         };
 
-        CaseNode() : TagNodeType(Composition::ENCLOSED, "case", 1, 1) {
+        CaseNode() : TagNodeType(Composition::ENCLOSED, "case", 1, 1, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) {
             intermediates["when"] = make_unique<WhenNode>();
             intermediates["else"] = make_unique<ElseNode>();
         }
@@ -238,7 +266,7 @@ namespace Liquid {
             OffsetQualifierNode() : TagNodeType::QualifierNodeType("offset", TagNodeType::QualifierNodeType::Arity::UNARY) { }
         };
 
-        ForNode() : TagNodeType(Composition::ENCLOSED, "for") {
+        ForNode() : TagNodeType(Composition::ENCLOSED, "for", -1, -1) {
             registerType<ElseNode>();
             registerType<ReverseQualifierNode>();
             registerType<LimitQualifierNode>();
@@ -385,7 +413,7 @@ namespace Liquid {
     };
 
     struct CycleNode : TagNodeType {
-        CycleNode() : TagNodeType(Composition::FREE, "cycle", 2) { }
+        CycleNode() : TagNodeType(Composition::FREE, "cycle", 2, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             assert(node.children.size() == 1 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
@@ -416,8 +444,6 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            if (op1.type || op2.type)
-                return Node();
             switch (op1.variant.type) {
                 case Variant::Type::INT:
                     switch (op2.variant.type) {
@@ -475,8 +501,6 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            if (op1.type || op2.type)
-                return Node();
             long long divisor = op2.variant.getInt();
             if (divisor == 0)
                 return Node();
@@ -489,8 +513,6 @@ namespace Liquid {
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            if (op1.type)
-                return Node();
             if (op1.variant.type == Variant::Type::INT)
                 return Variant(op1.variant.i * -1);
             if (op1.variant.type == Variant::Type::FLOAT)
@@ -504,8 +526,6 @@ namespace Liquid {
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            if (op1.type)
-                return Node();
             return Variant(!op1.variant.isTruthy(renderer.context.falsiness));
         }
     };
@@ -521,8 +541,6 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            if (op1.type || op2.type)
-                return Node();
             switch (op1.variant.type) {
                 case Variant::Type::INT:
                     switch (op2.variant.type) {
@@ -566,8 +584,6 @@ namespace Liquid {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
 
-            if (op1.type || op2.type)
-                return Node();
             if (op2.variant.type == Variant::Type::NIL)
                 return Node(operate(op1.variant.type, Variant::Type::NIL));
             switch (op1.variant.type) {
@@ -620,26 +636,47 @@ namespace Liquid {
     struct NotEqualOperatorNode : QualitativeComparaisonOperatorNode<std::not_equal_to<>> { NotEqualOperatorNode() : QualitativeComparaisonOperatorNode<std::not_equal_to<>>("!=", 2) {  } };
 
     struct AndOperatorNode : OperatorNodeType {
-        AndOperatorNode() : OperatorNodeType("and", Arity::BINARY, 1) { }
+        AndOperatorNode() : OperatorNodeType("and", Arity::BINARY, 1, Fixness::INFIX, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            if (op1.type || !op1.variant.isTruthy(renderer.context.falsiness))
-                return Node(Variant(false));
+            if (!op1.variant.isTruthy(renderer.context.falsiness))
+                return Variant(false);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            Variant ret = Variant(!op2.type && op2.variant.isTruthy(renderer.context.falsiness));
-            return Node(ret);
+            return Variant(op2.variant.isTruthy(renderer.context.falsiness));
+        }
+
+        bool optimize(Optimizer& optimizer, Node& node, Variable store) {
+            if (
+                (!node.children[0].get()->type && !node.children[0].get()->variant.isTruthy(optimizer.renderer.context.falsiness)) ||
+                (!node.children[1].get()->type && !node.children[1].get()->variant.isTruthy(optimizer.renderer.context.falsiness))
+            ) {
+                node = Variant(false);
+                return true;
+            }
+            return false;
         }
     };
     struct OrOperatorNode : OperatorNodeType {
-        OrOperatorNode() : OperatorNodeType("or", Arity::BINARY, 1) { }
+        OrOperatorNode() : OperatorNodeType("or", Arity::BINARY, 1, Fixness::INFIX, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            if (!op1.type && op1.variant.isTruthy(renderer.context.falsiness))
-                return Node(Variant(true));
+            if (op1.variant.isTruthy(renderer.context.falsiness))
+                return Variant(true);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
-            return Node(Variant(!op2.type && op2.variant.isTruthy(renderer.context.falsiness)));
+            return Variant(op2.variant.isTruthy(renderer.context.falsiness));
+        }
+
+        bool optimize(Optimizer& optimizer, Node& node, Variable store) {
+            if (
+                (!node.children[0].get()->type && node.children[0].get()->variant.isTruthy(optimizer.renderer.context.falsiness)) ||
+                (!node.children[1].get()->type && node.children[1].get()->variant.isTruthy(optimizer.renderer.context.falsiness))
+            ) {
+                node = Variant(true);
+                return true;
+            }
+            return false;
         }
     };
 
@@ -649,11 +686,9 @@ namespace Liquid {
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            if (op1.type)
-                return Node();
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
 
-            if (op2.type || op2.variant.type != Variant::Type::STRING)
+            if (op2.variant.type != Variant::Type::STRING)
                 return Node();
             switch (op1.variant.type) {
                 case Variant::Type::STRING:
@@ -677,7 +712,7 @@ namespace Liquid {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             // Requires integers.
-            if (op1.type || op2.type || op1.variant.type != Variant::Type::INT || op2.variant.type != Variant::Type::INT)
+            if (op1.variant.type != Variant::Type::INT || op2.variant.type != Variant::Type::INT)
                 return Node();
             auto result = Node(Variant(vector<Variant>()));
             // TODO: This can allocate a lot of memory. Short-circuit that; but should be plugge dinto the allocator.
@@ -704,8 +739,6 @@ namespace Liquid {
             assert(node.children[1]->type && node.children[1]->type->type == NodeType::Type::ARGUMENTS);
             Node op1 = getOperand(renderer, node, store);
             Node op2 = getArgument(renderer, node, store, 0);
-            if (op1.type || op2.type)
-                return Node();
             switch (op1.variant.type) {
                 case Variant::Type::INT:
                     switch (op2.variant.type) {
@@ -748,8 +781,6 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type || argument.type)
-                return Node();
             long long divisor = argument.variant.getInt();
             if (divisor == 0)
                 return Node();
@@ -882,8 +913,6 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type || argument.type)
-                return Node();
             return Variant(operand.getString() + argument.getString());
         }
     };
@@ -900,8 +929,6 @@ namespace Liquid {
         CapitalizeFilterNode() : FilterNodeType("capitalize", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type)
-                return Node();
             string str = operand.getString();
             str[0] = toupper(str[0]);
             return Node(str);
@@ -911,8 +938,6 @@ namespace Liquid {
         DowncaseFilterNode() : FilterNodeType("downcase", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type)
-                return Node();
             string str = operand.getString();
             std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::tolower(c); });
             return Variant(str);
@@ -949,8 +974,6 @@ namespace Liquid {
             auto operand = getOperand(renderer, node, store);
             auto argument1 = getArgument(renderer, node, store, 1);
             auto argument2 = getArgument(renderer, node, store, 2);
-            if (operand.type)
-                return Node();
             return Variant(operand.variant.getInt() > 1 ? argument2.getString() : argument1.getString());
         }
     };
@@ -960,8 +983,6 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type || argument.type)
-                return Node();
             return Variant(argument.getString() + operand.getString());
         }
     };
@@ -970,8 +991,6 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type || argument.type)
-                return Node();
             string accumulator;
             string str = operand.getString();
             string rm = argument.getString();
@@ -990,8 +1009,6 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type || argument.type)
-                return Node();
             string accumulator;
             string str = operand.getString();
             string rm = argument.getString();
@@ -1012,8 +1029,6 @@ namespace Liquid {
             auto operand = getOperand(renderer, node, store);
             auto argumentPattern = getArgument(renderer, node, store, 0);
             auto argumentReplacement = getArgument(renderer, node, store, 1);
-            if (operand.type || argumentPattern.type || argumentReplacement.type)
-                return Node();
             string accumulator;
             string str = operand.getString();
             string pattern = argumentPattern.getString();
@@ -1035,8 +1050,6 @@ namespace Liquid {
             auto operand = getOperand(renderer, node, store);
             auto argumentPattern = getArgument(renderer, node, store, 0);
             auto argumentReplacement = getArgument(renderer, node, store, 1);
-            if (operand.type || argumentPattern.type || argumentReplacement.type)
-                return Node();
             string accumulator;
             string str = operand.getString();
             string pattern = argumentPattern.getString();
@@ -1060,7 +1073,7 @@ namespace Liquid {
             auto arg1 = getArgument(renderer, node, store, 0);
             auto arg2 = getArgument(renderer, node, store, 0);
 
-            if (operand.type || arg1.type || arg2.type || operand.variant.type != Variant::Type::STRING)
+            if (operand.variant.type != Variant::Type::STRING)
                 return Node();
             string str = operand.getString();
             long long offset = std::max(std::min(arg1.variant.getInt(), (long long)str.size()), 0LL);
@@ -1073,8 +1086,6 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type || argument.type)
-                return Node();
             Variant result({ });
             string str = operand.getString();
             string splitter = argument.getString();
@@ -1092,8 +1103,6 @@ namespace Liquid {
         StripFilterNode() : FilterNodeType("strip", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type)
-                return Node();
             string str = operand.getString();
             size_t start, end;
             for (start = 0; start < str.size() && isblank(str[start]); ++start);
@@ -1105,8 +1114,6 @@ namespace Liquid {
         LStripFilterNode() : FilterNodeType("lstrip", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type)
-                return Node();
             string str = operand.getString();
             size_t start;
             for (start = 0; start < str.size() && isblank(str[start]); ++start);
@@ -1117,8 +1124,6 @@ namespace Liquid {
         RStripFilterNode() : FilterNodeType("rstrip", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type)
-                return Node();
             string str = operand.getString();
             size_t end;
             for (end = str.size()-1; end > 0 && isblank(str[end]); --end);
@@ -1129,8 +1134,6 @@ namespace Liquid {
         StripNewlinesFilterNode() : FilterNodeType("strip_newlines", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type)
-                return Node();
             string str = operand.getString();
             string accumulator;
             accumulator.reserve(str.size());
@@ -1147,8 +1150,6 @@ namespace Liquid {
             auto operand = getOperand(renderer, node, store);
             auto characterCount = getArgument(renderer, node, store, 0);
             auto customEllipsis = getArgument(renderer, node, store, 1);
-            if (operand.type || characterCount.type || customEllipsis.type)
-                return Node();
             string ellipsis = "...";
             if (customEllipsis.variant.type == Variant::Type::STRING)
                 ellipsis = customEllipsis.getString();
@@ -1166,8 +1167,6 @@ namespace Liquid {
             auto operand = getOperand(renderer, node, store);
             auto wordCount = getArgument(renderer, node, store, 0);
             auto customEllipsis = getArgument(renderer, node, store, 1);
-            if (operand.type || wordCount.type || customEllipsis.type)
-                return Node();
             string ellipsis = "...";
             string str = operand.getString();
             int targetWordCount = wordCount.variant.getInt();
@@ -1193,8 +1192,6 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type || argument.type)
-                return Node();
             string str = operand.getString();
             std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::toupper(c); });
             return Variant(str);
@@ -1203,15 +1200,6 @@ namespace Liquid {
 
     struct ArrayFilterNodeType : FilterNodeType {
         ArrayFilterNodeType(const std::string& symbol, int minArguments = -1, int maxArguments = -1) : FilterNodeType(symbol, minArguments, maxArguments) { }
-
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
-            auto operand = getOperand(renderer, node, store);
-            auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type || argument.type)
-                return Node();
-
-            return Node();
-        }
     };
 
     struct JoinFilterNode : ArrayFilterNodeType {
@@ -1261,8 +1249,6 @@ namespace Liquid {
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type)
-                return Node();
             if (operand.variant.type == Variant::Type::ARRAY)
                 return variantOperate(renderer, node, store, operand.variant);
             else if (operand.variant.type == Variant::Type::VARIABLE)
@@ -1276,7 +1262,7 @@ namespace Liquid {
 
         void accumulate(Renderer& renderer, Variant& accumulator, Variable v) const {
             renderer.variableResolver.iterate(renderer, v, +[](void* variable, void* data) {
-                    static_cast<Variant*>(data)->a.push_back(Variant(static_cast<Variable*>(variable)));
+                static_cast<Variant*>(data)->a.push_back(Variant(static_cast<Variable*>(variable)));
                 return true;
             }, &accumulator, 0, -1, false);
         }
@@ -1290,8 +1276,6 @@ namespace Liquid {
             Variant accumulator;
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type)
-                return Node();
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
                     accumulate(renderer, accumulator, operand.variant.v);
@@ -1356,8 +1340,6 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type)
-                return Node();
             MapStruct mapStruct = { renderer, argument.getString() };
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
@@ -1379,8 +1361,6 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             Variant accumulator;
             auto operand = getOperand(renderer, node, store);
-            if (operand.type)
-                return Node();
             auto& v = operand.variant;
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
@@ -1409,8 +1389,6 @@ namespace Liquid {
             string property;
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type)
-                return Node();
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE: {
                     renderer.variableResolver.iterate(renderer, operand.variant.v, +[](void* variable, void* data) {
@@ -1502,11 +1480,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto arg1 = getArgument(renderer, node, store, 0);
-            if (operand.type)
-                return Node();
             auto arg2 = getArgument(renderer, node, store, 1);
-            if (arg2.type)
-                return Node();
             WhereStruct whereStruct = { renderer, arg1.getString(), arg2.variant };
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
@@ -1551,11 +1525,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto arg1 = getArgument(renderer, node, store, 0);
-            if (operand.type)
-                return Node();
             auto arg2 = getArgument(renderer, node, store, 1);
-            if (arg2.type)
-                return Node();
             UniqStruct uniqStruct = { renderer };
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
@@ -1595,9 +1565,6 @@ namespace Liquid {
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type)
-                return Node();
-
             switch (operand.variant.type) {
                 case Variant::Type::ARRAY:
                     return variantOperate(renderer, node, store, operand.variant);
@@ -1653,9 +1620,6 @@ namespace Liquid {
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type)
-                return Node();
-
             switch (operand.variant.type) {
                 case Variant::Type::ARRAY:
                     return variantOperate(renderer, node, store, operand.variant);
@@ -1693,8 +1657,6 @@ namespace Liquid {
         Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             Variable v;
             auto argument = getArgument(renderer, node, store, 0);
-            if (!argument.type)
-                return Node();
             int idx = argument.variant.i;
             if (!renderer.variableResolver.getArrayVariable(renderer, operand, idx, v))
                 return Node();
@@ -1703,8 +1665,6 @@ namespace Liquid {
 
         Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant& operand) const {
             auto argument = getArgument(renderer, node, store, 0);
-            if (!argument.type)
-                return Node();
             long long idx = argument.variant.i;
             if (operand.type != Variant::Type::ARRAY || idx >= (long long)operand.a.size())
                 return Node();
@@ -1718,9 +1678,6 @@ namespace Liquid {
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type)
-                return Node();
-
             switch (operand.variant.type) {
                 case Variant::Type::ARRAY:
                     return variantOperate(renderer, node, store, operand.variant);
@@ -1751,9 +1708,6 @@ namespace Liquid {
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type)
-                return Node();
-
             switch (operand.variant.type) {
                 case Variant::Type::ARRAY:
                     return variantOperate(renderer, node, store, operand.variant);
@@ -1792,7 +1746,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type || operand.variant.isTruthy(renderer.context.falsiness))
+            if (operand.variant.isTruthy(renderer.context.falsiness))
                 return operand;
             return argument;
         }
