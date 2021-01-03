@@ -21,7 +21,7 @@ module Liquid
             })
         end
 
-        def self.parse(str, attrs)
+        def self.parse(str, attrs = {})
             return Liquid::Template.new(str, attrs)
         end
 
@@ -34,7 +34,7 @@ module Liquid
         def self.register_filter(mod)
             mod.public_instance_methods.each { |x|
                 @@globalContext.registerFilter(x.to_s, -1, -1, 0, Proc.new{ |renderer, node, stash, operand|
-                    mod[x](operand)
+                    mod[x].call(operand)
                 })
             }
         end

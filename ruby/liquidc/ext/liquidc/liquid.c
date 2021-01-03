@@ -329,12 +329,28 @@ VALUE liquidCTemplate_alloc(VALUE self) {
     return TypedData_Wrap_Struct(self, &liquidCTemplate_type, data);
 }
 
-VALUE liquidCTemplate_m_initialize(VALUE self, VALUE contextValue, VALUE tmplContents, VALUE treatUnknownFiltersAsErrors) {
+VALUE liquidCTemplate_m_initialize(int argc, VALUE* argv, VALUE self) {
     char* tmplBody;
     size_t length;
     LiquidTemplate* tmpl;
     LiquidCRubyContext* context;
     LiquidParserError error;
+    VALUE errorMode;
+    bool treatUnknownFiltersAsErrors;
+    bool treatUnknownVariablesAsErrors;
+
+    VALUE contextValue, tmplContents, attrs;
+    if (argc < 2) {
+        rb_raise(rb_eArgError, "wrong number of arguments (given %d, expected at least 2)", argc);
+        return self;
+    }
+    contextValue = argv[0];
+    tmplContents = argv[1];
+    if (argc > 2)
+        attrs = argv[2];
+    else
+        attrs = Qnil;
+
     TypedData_Get_Struct(self, LiquidTemplate, &liquidCTemplate_type, tmpl);
     TypedData_Get_Struct(contextValue, LiquidCRubyContext, &liquidC_type, context);
 
@@ -342,7 +358,19 @@ VALUE liquidCTemplate_m_initialize(VALUE self, VALUE contextValue, VALUE tmplCon
     tmplBody = StringValueCStr(tmplContents);
     length = RSTRING_LEN(tmplContents);
 
-    *tmpl = liquidCreateTemplate(context->context, tmplBody, length, RTEST(treatUnknownFiltersAsErrors), &error);
+    treatUnknownFiltersAsErrors = false;
+    treatUnknownVariablesAsErrors = false;
+    if (attrs != Qnil) {
+        Check_Type(attrs, T_HASH);
+        errorMode = rb_hash_aref(attrs, rb_str_new2("error_mode"));
+        if (rb_to_id(errorMode) == rb_intern("strict")) {
+            treatUnknownFiltersAsErrors = true;
+        } else if (rb_to_id(errorMode) == rb_intern("warn")) {
+
+        }
+    }
+
+    *tmpl = liquidCreateTemplate(context->context, tmplBody, length, false, &error);
 
     if (error.type != LIQUID_PARSER_ERROR_TYPE_NONE) {
         rb_raise(rb_eTypeError, "LiquidC Template init failure: %d, %s.", error.type, error.message);
@@ -352,19 +380,40 @@ VALUE liquidCTemplate_m_initialize(VALUE self, VALUE contextValue, VALUE tmplCon
 }
 
 
-VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
-    VALUE str;
+VALUE method_liquidCTemplateRender(int argc, VALUE* argv, VALUE self) {
+    VALUE str, stash, tmpl, attrs;
     LiquidTemplate* liquidTemplate;
     LiquidRenderer* liquidRenderer;
     LiquidRenderError error;
     LiquidTemplateRender result;
-    Check_Type(stash, T_HASH);
+    bool strictVariables, strictFilters;
+
     TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, liquidRenderer);
+    if (argc < 2) {
+        rb_raise(rb_eArgError, "wrong number of arguments (given %d, expected at least 2)", argc);
+        return self;
+    }
+    stash = argv[0];
+    tmpl = argv[1];
+    Check_Type(stash, T_HASH);
     TypedData_Get_Struct(tmpl, LiquidTemplate, &liquidCTemplate_type, liquidTemplate);
+    if (argc > 2)
+        attrs = argv[2];
+    else
+        attrs = Qnil;
+
+    strictVariables = false;
+    strictFilters = true;
+    if (attrs != Qnil) {
+        Check_Type(attrs, T_HASH);
+        strictVariables = RTEST(rb_hash_aref(attrs, rb_str_new2("strict_variables")));
+        strictFilters = RTEST(rb_hash_aref(attrs, rb_str_new2("strict_filters")));
+    }
+
     result = liquidRenderTemplate(*liquidRenderer, (void*)stash, *liquidTemplate, &error);
 
     if (error.type != LIQUID_RENDERER_ERROR_TYPE_NONE) {
-        rb_raise(rb_eTypeError, "LiquidC Template render failure: %d, %s.", error.type, error.message);
+        rb_raise(rb_eArgError, "LiquidC Template render failure: %d, %s.", error.type, error.message);
         return self;
     }
 
@@ -559,12 +608,12 @@ void Init_liquidc() {
 
 	rb_define_alloc_func(liquidCRenderer, liquidCRenderer_alloc);
     rb_define_method(liquidCRenderer, "initialize", liquidCRenderer_m_initialize, 1);
-    rb_define_method(liquidCRenderer, "render", method_liquidCTemplateRender, 2);
+    rb_define_method(liquidCRenderer, "render", method_liquidCTemplateRender, -1);
 
     rb_define_alloc_func(liquidCOptimizer, liquidCOptimizer_alloc);
     rb_define_method(liquidCOptimizer, "initialize", liquidCOptimizer_m_initialize, 1);
     rb_define_method(liquidCOptimizer, "optimize", method_liquidCOptimizer_optimize, 2);
 
 	rb_define_alloc_func(liquidCTemplate, liquidCTemplate_alloc);
-	rb_define_method(liquidCTemplate, "initialize", liquidCTemplate_m_initialize, 2);
+	rb_define_method(liquidCTemplate, "initialize", liquidCTemplate_m_initialize, -1);
 }

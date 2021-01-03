@@ -219,8 +219,10 @@ This is what I'm aiming for at any rate.
 
 ### TODO
 
+* In ruby integration, allow for all types of strict/lax modes.
+* Allow for tag registration in the drop in replacement module for Ruby.
 * Ability to partially render content, then spit back out the remaining liquid that genreated it.
-
+* General polish pass to clean up reundant code, and ensure consistency across the C, C++, Perl and Ruby APIs.
 
 ## License
 
