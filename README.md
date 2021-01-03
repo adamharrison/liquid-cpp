@@ -1,11 +1,20 @@
 
 ## Introduction
 
-Is a soon-to-be fully featured C++17 renderer for Liquid; Shopify's templating language.
+A fully featured, extensible, modular, and (reasonably) portable C++17 parser, renderer and optimizer for [Liquid](https://shopify.github.io/liquid/); Shopify's templating language. It's designed to provide official support for using liquid in the following languages:
+
+* C++
+* C
+* Ruby
+* Perl
+
+Other languages (Javascript, Python, etc..) may come later, but any support for them will be unofficial.
 
 ## Status
 
-In development. Currently a bit all over the place. **Do not use in production code, as this has not been vetted for memory bugs, or anything beyond general performance and features.** 
+In development. **Do not use in production code, as this has not been vetted for memory bugs, or anything beyond general performance and features.**
+
+A memory audit of both the core, and the C interface will be forthcoming shortly.
 
 ### Quick Start
 
@@ -118,11 +127,11 @@ The ruby module uses the C interface to interface with the liquid library.
 
 Currently the package isn't uploaded on rubygems, so it has to be build manually. Luckily; this is easy:
 
-```cd ruby && rake compile && rake gem && gem install pkg/*.gem && cd -```
+```cd ruby/liquidc && rake compile && rake gem && gem install pkg/*.gem && cd - && cd ruby/liquidc-dir && rake compile && rake gem && gem install pkg/*.gem && cd -```
 
 ##### Usage
 
-There're two ways to get the ruby library working;
+There're two ways to get the ruby library working. You can use the OO way, which mirrors the C++ API.
 
 ```ruby
 require 'liquidc'
@@ -132,9 +141,7 @@ template = LiquidC::Template.new(context, "{% if a %}asdfghj {{ a }}{% endif %}"
 puts renderer.render({ "a" => 1 }, template)
 ```
 
-###### Coming Soon!
-
-Or, alternatively, one can use the "drop in replacement" module, which wraps all this, which will register the exact same constructs as the normal liquid library.
+Or, alternatively, one can use the "drop in replacement" module, which wraps all this, which will register the exact same constructs as the normal `liquid` gem.
 The advantage of this is that by simply replacing your require statements, you should be able to use your existing code; but it'll be close to an order of magnitude
 faster.
 
@@ -145,13 +152,13 @@ template = Liquid::Template.parse("{% if a %}asdfghj {{ a }}{% endif %}")
 puts template.render({ "a" => 1 }, template)
 ```
 
-This is generally discouraged, as you lose some useful features of the library; like the ability to have independent liquid contexts with different
-tags, filters, operators, and settings; and you have explicit thread-safe rendering of shared templates, vs. just shoving everything into a global namespace.
+This is generally discouraged, as you lose object-orientation and modularity; like the ability to have independent liquid contexts with different
+tags, filters, operators, and settings vs. some weird mishmash where just shove everything into a global namespace, and "act" like you're using some OO.
 But, it's of course, up to you.
 
 #### Perl
 
-The perl module uses the C interface to interface with the liquid library.
+The perl module uses the C interface to interface with the liquid library, and attempts to mimic `WWW::Shopify::Liquid`.
 
 ##### Install
 
@@ -196,23 +203,23 @@ This is what I'm aiming for at any rate.
 * Ability to easily specify additions of filters, operators, and tags called `Dialects`, which can be mixed and matched.
 * Small footprint. Aiming for under 5K SLOC, with full standard Liquid as part of the core library.
 * Fully featured `extern "C"` interface for easy linking to most scripting languages. OOB bindings for both Ruby and Perl will be provided, that will act as drop-in replacements for `Liquid` and `WWW::Shopify::Liquid`.
-* Significant speedup over ruby-based liquid. (Need to do benchmarks; but at first glance seems like a minimum of a 6-fold speedup over regular Liquid)
-* Fully compatible with both `Liquid`, Shopify's ruby gem, and `WWW::Shopify::Liquid`, the perl implementation. The only thing we're missing is optimizer, or AST walk capabilities.
-* Use a standard build system; like cmake, instead of a manual make.
-* Optional compatibilty with rapidjson to allow for JSON reading.
+* Significant speedup over ruby-based liquid. (Need to do benchmarks; but at first glance seems like a minimum of a 6-10x speedup over regular Liquid for both rendering and parsing)
+* Fully compatible with both `Liquid`, Shopify's ruby gem, and `WWW::Shopify::Liquid`, the perl implementation.
+* Use a standard build system; like cmake.
+* Optional compatibilty with rapidjson to allow for easy JSON reading in C++.
+* Line accurate, and helpful error messages.
+* Ability to step through and examine the liquid AST.
 
 ### Partial
 
 * Togglable extra features, such as real operators, parentheses, etc.. (This is in, but not togglable).
-* Line accurate, and helpful error messages. (Some are accurate and helpful, others are not).
-* Ability to step through and examine the liquid AST. (AST is generated, but no mechanisms to step through yet)
 * Full test suite that runs all major examples from Shopify's doucmentation. (Test suite runs some examples, but not all).
 * Ability to set limits on memory consumed, and time spent rendering. (Partially implemented).
+* Built-in optimizer that will do things like loop unrolling, conditional elimiation, etc..
 
 ### TODO
 
 * Ability to partially render content, then spit back out the remaining liquid that genreated it.
-* Built-in optimizer that will do things like loop unrolling, conditional elimiation, etc...
 
 
 ## License
