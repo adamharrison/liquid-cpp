@@ -571,6 +571,49 @@ static void lpRenderBinaryInfixOperator(LiquidRenderer renderer, LiquidNode node
     LEAVE;
 }
 
+
+static void lpRenderDotFilter(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
+    dTHX;
+    SV* callback = (SV*)data;
+    dSP;
+
+    struct RendererCustomData* customData = liquidRendererGetCustomData(renderer);
+    SV* operand = NULL;
+    liquidFilterGetOperand((void**)&operand, renderer, node, variableStore);
+
+    ENTER;
+    SAVETMPS;
+    PUSHMARK(SP);
+
+    EXTEND(SP, 4);
+
+
+    PUSHs(SvREFCNT_inc(customData->parent));
+    PUSHs(sv_2mortal(newSViv(PTR2IV(node.node))));
+    PUSHs(SvREFCNT_inc(variableStore));
+    PUSHs(SvREFCNT_inc(operand));
+
+    PUTBACK;
+
+    int count = call_sv(callback, G_SCALAR);
+
+    SPAGAIN;
+
+    SvREFCNT_dec(customData->parent);
+    SvREFCNT_dec(variableStore);
+    SvREFCNT_dec(operand);
+
+    if (count > 0) {
+        lpSetReturnValue(my_perl, renderer, POPs);
+    } else {
+        liquidRendererSetReturnValueNil(renderer);
+    }
+
+    PUTBACK;
+    FREETMPS;
+    LEAVE;
+}
+
 static void lpWalkTemplateCallback(LiquidTemplate tmpl, const LiquidNode node, void* data) {
     dTHX;
     SV* callback = (SV*)data;
@@ -702,7 +745,7 @@ optimizeTemplate(optimizer, tmpl, store)
     void* tmpl;
     SV* store;
     CODE:
-        liquidOptimizerTemplate(*(LiquidOptimizer*)&optimizer, *(LiquidTemplate*)&tmpl, store);
+        liquidOptimizeTemplate(*(LiquidOptimizer*)&optimizer, *(LiquidTemplate*)&tmpl, store);
 
 
 void
@@ -794,9 +837,9 @@ registerTag(context, symbol, type, minArguments, maxArguments, optimizes, render
     SV* renderFunction;
     int optimizes;
     CODE:
-        enum ETagType eType = strcmp(type, "free") == 0 ? LIQUID_TAG_TYPE_FREE : LIQUID_TAG_TYPE_ENCLOSING;
+        enum ELiquidTagType eType = strcmp(type, "free") == 0 ? LIQUID_TAG_TYPE_FREE : LIQUID_TAG_TYPE_ENCLOSING;
         if (SvROK(renderFunction) && SvTYPE(SvRV(renderFunction)) == SVt_PVCV) {
-            liquidRegisterTag(*(LiquidContext*)&context, symbol, eType, minArguments, maxArguments, (eType == LIQUID_TAG_TYPE_FREE ? lpRenderFreeTag : lpRenderEnclosingTag), SvREFCNT_inc(renderFunction));
+            liquidRegisterTag(*(LiquidContext*)&context, symbol, eType, minArguments, maxArguments, optimizes, (eType == LIQUID_TAG_TYPE_FREE ? lpRenderFreeTag : lpRenderEnclosingTag), SvREFCNT_inc(renderFunction));
             RETVAL = 0;
         } else {
             RETVAL = -1;
@@ -814,7 +857,7 @@ registerFilter(context, symbol, minArguments, maxArguments, optimizes, renderFun
     int optimizes;
     CODE:
         if (SvROK(renderFunction) && SvTYPE(SvRV(renderFunction)) == SVt_PVCV) {
-            liquidRegisterFilter(*(LiquidContext*)&context, symbol, minArguments, maxArguments, lpRenderFilter, SvREFCNT_inc(renderFunction));
+            liquidRegisterFilter(*(LiquidContext*)&context, symbol, minArguments, maxArguments, optimizes, lpRenderFilter, SvREFCNT_inc(renderFunction));
             RETVAL = 0;
         } else {
             RETVAL = -1;
@@ -837,10 +880,31 @@ registerOperator(context, symbol, arity, fixness, priority, optimizes, renderFun
             LiquidOperatorFixness eFixness = (strcmp(fixness, "prefix") == 0 ? LIQUID_OPERATOR_FIXNESS_PREFIX : (strcmp(fixness, "affix") == 0 ? LIQUID_OPERATOR_FIXNESS_AFFIX : LIQUID_OPERATOR_FIXNESS_INFIX));
             assert(eArity == LIQUID_OPERATOR_ARITY_BINARY);
             assert(eFixness == LIQUID_OPERATOR_FIXNESS_INFIX);
-            liquidRegisterOperator(*(LiquidContext*)&context, symbol, eArity, eFixness, priority, lpRenderBinaryInfixOperator, SvREFCNT_inc(renderFunction));
+            liquidRegisterOperator(*(LiquidContext*)&context, symbol, eArity, eFixness, priority, optimizes, lpRenderBinaryInfixOperator, SvREFCNT_inc(renderFunction));
             RETVAL = 0;
         } else {
             RETVAL = -1;
         }
     OUTPUT:
         RETVAL
+
+
+int
+registerDotFilter(context, symbol, arity, fixness, priority, optimizes, renderFunction)
+    void* context;
+    const char* symbol;
+    const char* arity;
+    const char* fixness;
+    int priority;
+    SV* renderFunction;
+    int optimizes;
+    CODE:
+        if (SvROK(renderFunction) && SvTYPE(SvRV(renderFunction)) == SVt_PVCV) {
+            liquidRegisterDotFilter(*(LiquidContext*)&context, symbol, optimizes, lpRenderDotFilter, SvREFCNT_inc(renderFunction));
+            RETVAL = 0;
+        } else {
+            RETVAL = -1;
+        }
+    OUTPUT:
+        RETVAL
+

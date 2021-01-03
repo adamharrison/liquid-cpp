@@ -198,7 +198,7 @@ extern "C" {
     void liquidFreeRenderer(LiquidRenderer renderer);
 
     LiquidOptimizer liquidCreateOptimizer(LiquidRenderer renderer);
-    void liquidOptimizerTemplate(LiquidOptimizer optimizer, LiquidTemplate tmpl, void* variableStore);
+    void liquidOptimizeTemplate(LiquidOptimizer optimizer, LiquidTemplate tmpl, void* variableStore);
     void liquidFreeOptimizer(LiquidOptimizer optimizer);
 
     LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size, bool treatUnknownFiltersAsErrors, LiquidParserError* error);
@@ -230,6 +230,7 @@ extern "C" {
     void* liquidRegisterDotFilter(LiquidContext context, const char* symbol, LiquidOptimizationScheme optimization, LiquidRenderFunction renderFunction, void* data);
     void* liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELiquidOperatorArity arity, enum ELiquidOperatorFixness fixness, int priority, LiquidOptimizationScheme optimization, LiquidRenderFunction renderFunction, void* data);
 
+    void* liquidNodeTypeGetUserData(void* nodeType);
 #ifdef __cplusplus
 }
 #endif

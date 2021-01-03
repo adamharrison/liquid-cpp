@@ -40,7 +40,7 @@ LiquidOptimizer liquidCreateOptimizer(LiquidRenderer renderer) {
     return LiquidOptimizer({ new Optimizer(*static_cast<Renderer*>(renderer.renderer)) });
 }
 
-void liquidOptimizerTemplate(LiquidOptimizer optimizer, LiquidTemplate tmpl, void* variableStore) {
+void liquidOptimizeTemplate(LiquidOptimizer optimizer, LiquidTemplate tmpl, void* variableStore) {
     static_cast<Optimizer*>(optimizer.optimizer)->optimize(*static_cast<Node*>(tmpl.ast), Variable({ variableStore }));
 }
 
@@ -109,6 +109,18 @@ void* liquidRegisterOperator(LiquidContext context, const char* symbol, enum ELi
     registeredType->userRenderFunction = renderFunction;
     registeredType->userData = data;
     return ctx->registerType(move(registeredType));
+}
+
+void* liquidRegisterDotFilter(LiquidContext context, const char* symbol, LiquidOptimizationScheme optimization, LiquidRenderFunction renderFunction, void* data) {
+    Context* ctx = static_cast<Context*>(context.context);
+    unique_ptr<NodeType> registeredType = make_unique<DotFilterNodeType>(symbol, optimization);
+    registeredType->userRenderFunction = renderFunction;
+    registeredType->userData = data;
+    return ctx->registerType(move(registeredType));
+}
+
+void* liquidNodeTypeGetUserData(void* nodeType) {
+    return static_cast<NodeType*>(nodeType)->userData;
 }
 
 

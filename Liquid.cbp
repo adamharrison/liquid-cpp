@@ -91,6 +91,8 @@
 		<Unit filename="src/interface.h" />
 		<Unit filename="src/lexer.h" />
 		<Unit filename="src/liquid.h" />
+		<Unit filename="src/optimizer.cpp" />
+		<Unit filename="src/optimizer.h" />
 		<Unit filename="src/parser.cpp" />
 		<Unit filename="src/parser.h" />
 		<Unit filename="src/rapidjsonvariable.h" />

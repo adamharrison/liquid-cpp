@@ -1,9 +1,14 @@
 #include <ruby.h>
 #include <liquid/liquid.h>
 
-VALUE liquidC = Qnil;
+struct SLiquidCRubyContext {
+    LiquidContext context;
+    // An array where we store registered functions, so they don't get garbage collected.
+    VALUE registeredFunctionArray;
+};
+typedef struct SLiquidCRubyContext LiquidCRubyContext;
 
-static LiquidVariableType liquidCgetType(void* variable) {
+static LiquidVariableType liquidCgetType(LiquidRenderer renderer, void* variable) {
     switch (TYPE(variable)) {
         case T_FIXNUM:
         case T_BIGNUM:
@@ -28,7 +33,7 @@ static LiquidVariableType liquidCgetType(void* variable) {
 }
 
 
-static bool liquidCgetBool(void* variable, bool* target) {
+static bool liquidCgetBool(LiquidRenderer renderer, void* variable, bool* target) {
     switch (TYPE(variable)) {
         case T_TRUE:
         case T_FALSE:
@@ -40,11 +45,11 @@ static bool liquidCgetBool(void* variable, bool* target) {
 
 }
 
-static bool liquidCgetTruthy(void* variable) {
+static bool liquidCgetTruthy(LiquidRenderer renderer, void* variable) {
     return RTEST(variable);
 }
 
-static bool liquidCgetString(void* variable, char* target) {
+static bool liquidCgetString(LiquidRenderer renderer, void* variable, char* target) {
     VALUE value;
     char* str;
     value = (VALUE)variable;
@@ -55,11 +60,11 @@ static bool liquidCgetString(void* variable, char* target) {
     return true;
 }
 
-static long long liquidCgetStringLength(void* variable) {
+static long long liquidCgetStringLength(LiquidRenderer renderer, void* variable) {
     return RSTRING_LEN((VALUE)variable);
 }
 
-static bool liquidCgetInteger(void* variable, long long* target) {
+static bool liquidCgetInteger(LiquidRenderer renderer, void* variable, long long* target) {
     VALUE value;
     value = (VALUE)variable;
     switch (TYPE(value)) {
@@ -72,7 +77,7 @@ static bool liquidCgetInteger(void* variable, long long* target) {
     return false;
 }
 
-static bool liquidCgetFloat(void* variable, double* target) {
+static bool liquidCgetFloat(LiquidRenderer renderer, void* variable, double* target) {
     VALUE value;
     value = (VALUE)variable;
     switch (TYPE(value)) {
@@ -85,7 +90,7 @@ static bool liquidCgetFloat(void* variable, double* target) {
     return false;
 }
 
-static bool liquidCgetDictionaryVariable(void* variable, const char* key, void** target) {
+static bool liquidCgetDictionaryVariable(LiquidRenderer renderer, void* variable, const char* key, void** target) {
     VALUE value;
     if (TYPE((VALUE)variable) != T_HASH)
         return false;
@@ -96,7 +101,7 @@ static bool liquidCgetDictionaryVariable(void* variable, const char* key, void**
     return true;
 }
 
-static bool liquidCgetArrayVariable(void* variable, size_t idx, void** target) {
+static bool liquidCgetArrayVariable(LiquidRenderer renderer, void* variable, long long idx, void** target) {
     VALUE value;
 	if (TYPE((VALUE)variable) != T_ARRAY)
         return false;
@@ -107,11 +112,11 @@ static bool liquidCgetArrayVariable(void* variable, size_t idx, void** target) {
     return true;
 }
 
-static bool liquidCiterate(void* variable, bool liquidCcallback(void* variable, void* data), void* data, int start, int limit, bool reverse) {
+static bool liquidCiterate(LiquidRenderer renderer, void* variable, bool liquidCcallback(void* variable, void* data), void* data, int start, int limit, bool reverse) {
     return false;
 }
 
-static long long liquidCgetArraySize(void* variable) {
+static long long liquidCgetArraySize(LiquidRenderer renderer, void* variable) {
     VALUE value = (VALUE)variable;
     if (TYPE(value) != T_ARRAY)
         return -1;
@@ -125,7 +130,7 @@ static void* liquidCsetDictionaryVariable(LiquidRenderer renderer, void* variabl
     return target;
 }
 
-static void* liquidCsetArrayVariable(LiquidRenderer renderer, void* variable, size_t idx, void* target) {
+static void* liquidCsetArrayVariable(LiquidRenderer renderer, void* variable, long long idx, void* target) {
     if (TYPE(variable) != T_ARRAY)
         return NULL;
     rb_ary_store((VALUE)variable, idx, (VALUE)target);
@@ -172,20 +177,24 @@ static int liquidCcompare(void* a, void* b) {
 
 
 void liquidC_free(void* data) {
-    if (((LiquidContext*)data)->context)
-        liquidFreeContext(*((LiquidContext*)data));
+    if (((LiquidCRubyContext*)data)->context.context)
+        liquidFreeContext(((LiquidCRubyContext*)data)->context);
     free(data);
 }
 
 size_t liquidC_size(const void* data) {
-    return sizeof(LiquidContext);
+    return sizeof(LiquidCRubyContext);
+}
+
+void liquidC_mark(void* self) {
+    rb_gc_mark(((LiquidCRubyContext*)self)->registeredFunctionArray);
 }
 
 
 static const rb_data_type_t liquidC_type = {
     .wrap_struct_name = "LiquidC",
     .function = {
-            .dmark = NULL,
+            .dmark = liquidC_mark,
             .dfree = liquidC_free,
             .dsize = liquidC_size,
     },
@@ -195,16 +204,17 @@ static const rb_data_type_t liquidC_type = {
 
 
 VALUE liquidC_alloc(VALUE self) {
-    LiquidContext* data = (LiquidContext*)malloc(sizeof(LiquidContext));
-    data->context = NULL;
+    LiquidCRubyContext* data = (LiquidCRubyContext*)malloc(sizeof(LiquidCRubyContext));
+    data->context.context = NULL;
+    data->registeredFunctionArray = rb_ary_new();
     return TypedData_Wrap_Struct(self, &liquidC_type, data);
 }
 
 VALUE liquidC_m_initialize(int argc, VALUE* argv, VALUE self) {
-        LiquidContext* context;
+        LiquidCRubyContext* context;
         char* str;
-        TypedData_Get_Struct(self, LiquidContext, &liquidC_type, context);
-        *context = liquidCreateContext();
+        TypedData_Get_Struct(self, LiquidCRubyContext, &liquidC_type, context);
+        context->context = liquidCreateContext();
         if (liquidGetError()) {
             rb_raise(rb_eTypeError, "LiquidC init failure: %s.", liquidGetError());
             return self;
@@ -213,32 +223,14 @@ VALUE liquidC_m_initialize(int argc, VALUE* argv, VALUE self) {
         if (argc > 0) {
             str = StringValueCStr(argv[0]);
             if (strcmp(str, "strict") == 0)
-                liquidImplementStrictStandardDialect(*context);
+                liquidImplementStrictStandardDialect(context->context);
             else
-                liquidImplementPermissiveStandardDialect(*context);
+                liquidImplementPermissiveStandardDialect(context->context);
         }
         else
-            liquidImplementStrictStandardDialect(*context);
+            liquidImplementStrictStandardDialect(context->context);
         return self;
 }
-
-VALUE liquidC_registerTag(VALUE self, VALUE symbol, VALUE type, VALUE minArguments, VALUE maxArguments, VALUE renderFunction) {
-    return Qnil;
-}
-
-VALUE liquidC_registerFilter(VALUE self, VALUE symbol, VALUE minArguments, VALUE maxArguments, VALUE renderFunction) {
-    return Qnil;
-}
-
-VALUE liquidC_registerOperator(VALUE self, VALUE symbol, VALUE type, VALUE priority, VALUE renderFunction) {
-    return Qnil;
-}
-
-VALUE liquidC_registerDotFilter(VALUE self, VALUE symbol) {
-    return Qnil;
-}
-
-
 
 void liquidCRenderer_free(void* data) {
     if (((LiquidRenderer*)data)->renderer)
@@ -272,7 +264,7 @@ VALUE liquidCRenderer_alloc(VALUE self) {
 
 VALUE liquidCRenderer_m_initialize(VALUE self, VALUE contextValue) {
     LiquidRenderer* renderer;
-    LiquidContext* context;
+    LiquidCRubyContext* context;
     LiquidVariableResolver resolver = {
         liquidCgetType,
         liquidCgetBool,
@@ -300,8 +292,8 @@ VALUE liquidCRenderer_m_initialize(VALUE self, VALUE contextValue) {
         liquidCcompare
     };
     TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, renderer);
-    TypedData_Get_Struct(contextValue, LiquidContext, &liquidC_type, context);
-    *renderer = liquidCreateRenderer(*context);
+    TypedData_Get_Struct(contextValue, LiquidCRubyContext, &liquidC_type, context);
+    *renderer = liquidCreateRenderer(context->context);
     liquidRegisterVariableResolver(*renderer, resolver);
     return self;
 }
@@ -337,20 +329,20 @@ VALUE liquidCTemplate_alloc(VALUE self) {
     return TypedData_Wrap_Struct(self, &liquidCTemplate_type, data);
 }
 
-VALUE liquidCTemplate_m_initialize(VALUE self, VALUE contextValue, VALUE tmplContents) {
+VALUE liquidCTemplate_m_initialize(VALUE self, VALUE contextValue, VALUE tmplContents, VALUE treatUnknownFiltersAsErrors) {
     char* tmplBody;
     size_t length;
     LiquidTemplate* tmpl;
-    LiquidContext* context;
+    LiquidCRubyContext* context;
     LiquidParserError error;
     TypedData_Get_Struct(self, LiquidTemplate, &liquidCTemplate_type, tmpl);
-    TypedData_Get_Struct(contextValue, LiquidContext, &liquidC_type, context);
+    TypedData_Get_Struct(contextValue, LiquidCRubyContext, &liquidC_type, context);
 
     Check_Type(tmplContents, T_STRING);
     tmplBody = StringValueCStr(tmplContents);
     length = RSTRING_LEN(tmplContents);
 
-    *tmpl = liquidCreateTemplate(*context, tmplBody, length, &error);
+    *tmpl = liquidCreateTemplate(context->context, tmplBody, length, RTEST(treatUnknownFiltersAsErrors), &error);
 
     if (error.type != LIQUID_PARSER_ERROR_TYPE_NONE) {
         rb_raise(rb_eTypeError, "LiquidC Template init failure: %d, %s.", error.type, error.message);
@@ -358,7 +350,6 @@ VALUE liquidCTemplate_m_initialize(VALUE self, VALUE contextValue, VALUE tmplCon
     }
     return self;
 }
-
 
 
 VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
@@ -382,22 +373,197 @@ VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
     return str;
 }
 
+void liquidCOptimizer_free(void* data) {
+    if (((LiquidOptimizer*)data)->optimizer)
+        liquidFreeOptimizer(*((LiquidOptimizer*)data));
+    free(data);
+}
+
+size_t liquidCOptimizer_size(const void* data) {
+    return sizeof(LiquidOptimizer);
+}
+
+static const rb_data_type_t liquidCOptimizer_type = {
+    .wrap_struct_name = "Optimizer",
+    .function = {
+            .dmark = NULL,
+            .dfree = liquidCOptimizer_free,
+            .dsize = liquidCOptimizer_size,
+    },
+    .data = NULL,
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
+};
+
+
+VALUE liquidCOptimizer_alloc(VALUE self) {
+    LiquidOptimizer* data = (LiquidOptimizer*)malloc(sizeof(LiquidOptimizer));
+    data->optimizer = NULL;
+    return TypedData_Wrap_Struct(self, &liquidCOptimizer_type, data);
+}
+
+VALUE liquidCOptimizer_m_initialize(VALUE self, VALUE incomingRenderer) {
+    LiquidOptimizer* optimizer;
+    LiquidRenderer* renderer;
+    TypedData_Get_Struct(self, LiquidOptimizer, &liquidCOptimizer_type, optimizer);
+    TypedData_Get_Struct(incomingRenderer, LiquidRenderer, &liquidCRenderer_type, renderer);
+    *optimizer = liquidCreateOptimizer(*renderer);
+    return self;
+}
+
+VALUE method_liquidCOptimizer_optimize(VALUE self, VALUE stash, VALUE incomingTemplate) {
+    LiquidOptimizer* optimizer;
+    LiquidTemplate* tmpl;
+    TypedData_Get_Struct(self, LiquidOptimizer, &liquidCOptimizer_type, optimizer);
+    TypedData_Get_Struct(incomingTemplate, LiquidTemplate, &liquidCTemplate_type, tmpl);
+    liquidOptimizeTemplate(*optimizer, *tmpl, (void*)stash);
+    return self;
+}
+
+static void liquidCRenderTag(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
+    VALUE result, renderProc;
+    VALUE* arguments;
+    int argMax, i;
+    renderProc = (VALUE)data;
+
+    argMax = liquidGetArgumentCount(node);
+    arguments = malloc(sizeof(VALUE)*(argMax+4));
+    arguments[0] = LL2NUM((long long)renderer.renderer);
+    arguments[1] = LL2NUM((long long)node.node);
+    arguments[2] = (VALUE)variableStore;
+    liquidGetChild((void**)&arguments[3], renderer, node, variableStore, 1);
+    for (i = 0; i < argMax; ++i)
+        liquidGetArgument((void**)&arguments[i+4], renderer, node, variableStore, i);
+    result = rb_funcallv(renderProc, rb_intern("call"), 4+argMax, arguments);
+    liquidRendererSetReturnValueVariable(renderer, (void*)result);
+    free(arguments);
+}
+
+static void liquidCRenderFilter(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
+    VALUE result, renderProc;
+    VALUE arguments, operand;
+    int argMax, i;
+    renderProc = (VALUE)data;
+
+    argMax = liquidGetArgumentCount(node);
+    arguments = rb_ary_new2(argMax+4);
+    rb_ary_push(arguments, LL2NUM((long long)renderer.renderer));
+    rb_ary_push(arguments, LL2NUM((long long)node.node));
+    rb_ary_push(arguments, (VALUE)variableStore);
+    liquidFilterGetOperand((void**)&operand, renderer, node, variableStore);
+    rb_ary_push(arguments, operand);
+    for (i = 0; i < argMax; ++i) {
+        VALUE argument;
+        liquidGetArgument((void**)&argument, renderer, node, variableStore, i);
+        rb_ary_push(arguments, argument);
+    }
+    result = rb_proc_call(renderProc, arguments);
+    liquidRendererSetReturnValueVariable(renderer, (void*)result);
+}
+
+
+static void liquidCRenderBinaryInfixOperator(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
+    VALUE result, renderProc;
+    VALUE arguments, argument;
+    int argMax, i;
+    renderProc = (VALUE)data;
+
+    argMax = liquidGetArgumentCount(node);
+    arguments = rb_ary_new2(argMax+3);
+    rb_ary_push(arguments, LL2NUM((long long)renderer.renderer));
+    rb_ary_push(arguments, LL2NUM((long long)node.node));
+    rb_ary_push(arguments, (VALUE)variableStore);
+    for (i = 0; i < argMax; ++i) {
+        liquidGetArgument((void**)&argument, renderer, node, variableStore, i);
+        rb_ary_push(arguments, argument);
+    }
+    result = rb_proc_call(renderProc, arguments);
+    liquidRendererSetReturnValueVariable(renderer, (void*)result);
+}
+
+static void liquidCRenderDotFilter(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
+    VALUE result, renderProc;
+    VALUE arguments, operand;
+    renderProc = (VALUE)data;
+
+    liquidFilterGetOperand((void**)&operand, renderer, node, variableStore);
+
+    arguments = rb_ary_new2(4);
+    rb_ary_push(arguments, LL2NUM((long long)renderer.renderer));
+    rb_ary_push(arguments, LL2NUM((long long)node.node));
+    rb_ary_push(arguments, (VALUE)variableStore);
+    rb_ary_push(arguments, operand);
+
+    result = rb_proc_call(renderProc, arguments);
+    liquidRendererSetReturnValueVariable(renderer, (void*)result);
+}
+
+VALUE method_liquidC_registerTag(VALUE self, VALUE symbol, VALUE type, VALUE minArguments, VALUE maxArguments, VALUE optimization, VALUE renderFunction) {
+    LiquidCRubyContext* context;
+    const char* csymbol;
+    TypedData_Get_Struct(self, LiquidCRubyContext, &liquidC_type, context);
+    Check_Type(symbol, T_STRING);
+    csymbol = StringValueCStr(symbol);
+    liquidRegisterTag(context->context, csymbol, NUM2LL(type), NUM2LL(minArguments), NUM2LL(maxArguments), NUM2LL(optimization), liquidCRenderTag, (void*)renderFunction);
+    rb_ary_push(context->registeredFunctionArray, renderFunction);
+    return Qnil;
+}
+
+VALUE method_liquidC_registerFilter(VALUE self, VALUE symbol, VALUE minArguments, VALUE maxArguments, VALUE optimization, VALUE renderFunction) {
+    LiquidCRubyContext* context;
+    const char* csymbol;
+    TypedData_Get_Struct(self, LiquidCRubyContext, &liquidC_type, context);
+    Check_Type(symbol, T_STRING);
+    csymbol = StringValueCStr(symbol);
+    liquidRegisterFilter(context->context, csymbol, NUM2LL(minArguments), NUM2LL(maxArguments), NUM2LL(optimization), liquidCRenderFilter, (void*)renderFunction);
+    rb_ary_push(context->registeredFunctionArray, renderFunction);
+    return Qnil;
+}
+
+VALUE method_liquidC_registerOperator(VALUE self, VALUE symbol, VALUE priority, VALUE optimization, VALUE renderFunction) {
+    LiquidCRubyContext* context;
+    const char* csymbol;
+    TypedData_Get_Struct(self, LiquidCRubyContext, &liquidC_type, context);
+    Check_Type(symbol, T_STRING);
+    csymbol = StringValueCStr(symbol);
+    liquidRegisterOperator(context->context, csymbol, LIQUID_OPERATOR_ARITY_BINARY, LIQUID_OPERATOR_FIXNESS_INFIX, (int)NUM2LL(priority), (int)NUM2LL(optimization), liquidCRenderBinaryInfixOperator, (void*)renderFunction);
+    rb_ary_push(context->registeredFunctionArray, renderFunction);
+    return Qnil;
+}
+
+VALUE method_liquidC_registerDotFilter(VALUE self, VALUE symbol, VALUE optimization, VALUE renderFunction) {
+    LiquidCRubyContext* context;
+    const char* csymbol;
+    TypedData_Get_Struct(self, LiquidCRubyContext, &liquidC_type, context);
+    Check_Type(symbol, T_STRING);
+    csymbol = StringValueCStr(symbol);
+    liquidRegisterDotFilter(context->context, csymbol, NUM2LL(optimization), liquidCRenderDotFilter, (void*)renderFunction);
+    rb_ary_push(context->registeredFunctionArray, renderFunction);
+    return Qnil;
+}
+
+
+
 void Init_liquidc() {
-	VALUE liquidC, liquidCRenderer, liquidCTemplate;
+	VALUE liquidC, liquidCRenderer, liquidCTemplate, liquidCOptimizer;
 	liquidC = rb_define_class("LiquidC", rb_cData);
 	liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cData);
+	liquidCOptimizer = rb_define_class_under(liquidC, "Optimizer", rb_cData);
 	liquidCTemplate = rb_define_class_under(liquidC, "Template", rb_cData);
 
 	rb_define_alloc_func(liquidC, liquidC_alloc);
 	rb_define_method(liquidC, "initialize", liquidC_m_initialize, -1);
-	rb_define_method(liquidC, "registerTag", liquidC_registerTag, 5);
-	rb_define_method(liquidC, "registerFilter", liquidC_registerFilter, 4);
-    rb_define_method(liquidC, "registerOperator", liquidC_registerOperator, 3);
-    rb_define_method(liquidC, "registerDotFilter", liquidC_registerDotFilter, 2);
+	rb_define_method(liquidC, "registerTag", method_liquidC_registerTag, 6);
+	rb_define_method(liquidC, "registerFilter", method_liquidC_registerFilter, 5);
+    rb_define_method(liquidC, "registerOperator", method_liquidC_registerOperator, 4);
+    rb_define_method(liquidC, "registerDotFilter", method_liquidC_registerDotFilter, 3);
 
 	rb_define_alloc_func(liquidCRenderer, liquidCRenderer_alloc);
     rb_define_method(liquidCRenderer, "initialize", liquidCRenderer_m_initialize, 1);
     rb_define_method(liquidCRenderer, "render", method_liquidCTemplateRender, 2);
+
+    rb_define_alloc_func(liquidCOptimizer, liquidCOptimizer_alloc);
+    rb_define_method(liquidCOptimizer, "initialize", liquidCOptimizer_m_initialize, 1);
+    rb_define_method(liquidCOptimizer, "optimize", method_liquidCOptimizer_optimize, 2);
 
 	rb_define_alloc_func(liquidCTemplate, liquidCTemplate_alloc);
 	rb_define_method(liquidCTemplate, "initialize", liquidCTemplate_m_initialize, 2);

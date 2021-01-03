@@ -24,7 +24,7 @@ namespace Liquid {
             };
             Arity arity;
 
-            QualifierNodeType(const string& symbol, Arity arity) : NodeType(NodeType::Type::QUALIFIER, symbol, 1), arity(arity) { }
+            QualifierNodeType(const string& symbol, Arity arity) : NodeType(NodeType::Type::QUALIFIER, symbol, 1, LIQUID_OPTIMIZATION_SCHEME_NONE), arity(arity) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
         };
 

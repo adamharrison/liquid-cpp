@@ -231,17 +231,17 @@ namespace Liquid {
 
     struct ForNode : TagNodeType {
         struct InOperatorNode : OperatorNodeType {
-            InOperatorNode() :  OperatorNodeType("in", Arity::BINARY, 0) { }
+            InOperatorNode() :  OperatorNodeType("in", Arity::BINARY, 0, Fixness::INFIX, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
         };
 
         struct ElseNode : TagNodeType {
-            ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
+            ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
         };
 
         struct BreakNode : TagNodeType {
-            BreakNode() : TagNodeType(Composition::FREE, "break", 0, 0) { }
+            BreakNode() : TagNodeType(Composition::FREE, "break", 0, 0, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const {
                 renderer.control = Renderer::Control::BREAK;
                 return Node();
@@ -249,7 +249,7 @@ namespace Liquid {
         };
 
         struct ContinueNode : TagNodeType {
-            ContinueNode() : TagNodeType(Composition::FREE, "continue", 0, 0) { }
+            ContinueNode() : TagNodeType(Composition::FREE, "continue", 0, 0, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const {
                 renderer.control = Renderer::Control::CONTINUE;
                 return Node();
