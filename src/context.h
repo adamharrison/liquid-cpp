@@ -170,10 +170,18 @@ namespace Liquid {
             VariableNode() : NodeType(Type::VARIABLE) { }
 
             Node render(Renderer& renderer, const Node& node, Variable store) const {
-                Variable storePointer = renderer.getVariable(node, store);
-                if (!storePointer.exists())
-                    return Node();
-                return Node(renderer.parseVariant(storePointer));
+                pair<void*, Renderer::DropFunction> drop = renderer.getInternalDrop(node, store);
+                if (drop.second) {
+                    Node result = drop.second(renderer, node, store, drop.first);
+                    if (result.type || result.variant.type != Variant::Type::VARIABLE)
+                        return result;
+                    return Node(renderer.parseVariant(result.variant.v));
+                } else {
+                    Variable storePointer = renderer.getVariable(node, store);
+                    if (!storePointer.exists())
+                        return Node();
+                    return Node(renderer.parseVariant(storePointer));
+                }
             }
 
             bool optimize(Optimizer& optimizer, Node& node, Variable store) const;

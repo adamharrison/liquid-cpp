@@ -231,7 +231,7 @@ namespace Liquid {
 
     struct ForNode : TagNodeType {
         struct InOperatorNode : OperatorNodeType {
-            InOperatorNode() :  OperatorNodeType("in", Arity::BINARY, 0, Fixness::INFIX, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
+            InOperatorNode() :  OperatorNodeType("in", Arity::BINARY, 0, Fixness::INFIX, LIQUID_OPTIMIZATION_SCHEME_SHIELD) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
         };
 
@@ -266,12 +266,39 @@ namespace Liquid {
             OffsetQualifierNode() : TagNodeType::QualifierNodeType("offset", TagNodeType::QualifierNodeType::Arity::UNARY) { }
         };
 
+        struct ForLoopContext {
+            Renderer& renderer;
+            const Node& node;
+            Variable store;
+            void* variable;
+            bool (*iterator)(ForLoopContext& forloopContext);
+            long long length;
+            string result;
+            long long idx = 0;
+        };
+
+        struct CycleNode : TagNodeType {
+            CycleNode() : TagNodeType(Composition::FREE, "cycle", 2, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
+
+            Node render(Renderer& renderer, const Node& node, Variable store) const {
+                assert(node.children.size() == 1 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
+                auto& arguments = node.children.front();
+                pair<void*, Renderer::DropFunction> internalDrop = renderer.getInternalDrop("forloop");
+
+                if (internalDrop.second)
+                    return renderer.retrieveRenderedNode(*arguments->children[static_cast<ForLoopContext*>(internalDrop.first)->idx % arguments->children.size()].get(), store);
+                return Node();
+            }
+        };
+
         ForNode() : TagNodeType(Composition::ENCLOSED, "for", -1, -1) {
             registerType<ElseNode>();
             registerType<ReverseQualifierNode>();
             registerType<LimitQualifierNode>();
             registerType<OffsetQualifierNode>();
         }
+
+
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
@@ -284,6 +311,10 @@ namespace Liquid {
             assert(arguments->children[0]->children.size() == 2);
 
             auto& variableNode = arguments->children[0]->children[0];
+            // Can only ask for single top-level variables. Nothing nested.
+            if (variableNode->children.size() != 1)
+                return Node();
+            string variableName = variableNode->children[0]->getString();
 
             // TODO: Should have an optimization for when the operand from "in" ia s sequence; so that it doesn't render out to a ridiclous thing, it
             // simply loops through the existing stuff.
@@ -327,34 +358,9 @@ namespace Liquid {
             }
 
 
-            struct ForLoopContext {
-                Renderer& renderer;
-                const Node& node;
-                Variable store;
-                const Node& variableNode;
-                bool (*iterator)(ForLoopContext& forloopContext);
-                long long length;
-                string result;
-                long long idx = 0;
-            };
             auto iterator = +[](ForLoopContext& forLoopContext) {
-                Variable forLoopVariable;
-                auto& resolver = forLoopContext.renderer.variableResolver;
-
-                if (!resolver.getDictionaryVariable(forLoopContext.renderer, forLoopContext.store, "forloop", forLoopVariable))
-                    forLoopVariable = resolver.setDictionaryVariable(forLoopContext.renderer, forLoopContext.store, "forloop", resolver.createHash(forLoopContext.renderer));
-
-                resolver.setDictionaryVariable(forLoopContext.renderer, forLoopVariable, "index0", resolver.createInteger(forLoopContext.renderer, forLoopContext.idx));
-                resolver.setDictionaryVariable(forLoopContext.renderer, forLoopVariable, "index", resolver.createInteger(forLoopContext.renderer, forLoopContext.idx+1));
-                resolver.setDictionaryVariable(forLoopContext.renderer, forLoopVariable, "rindex0", resolver.createInteger(forLoopContext.renderer, forLoopContext.length - forLoopContext.idx));
-                resolver.setDictionaryVariable(forLoopContext.renderer, forLoopVariable, "rindex", resolver.createInteger(forLoopContext.renderer, forLoopContext.length - (forLoopContext.idx+1)));
-                resolver.setDictionaryVariable(forLoopContext.renderer, forLoopVariable, "first", resolver.createBool(forLoopContext.renderer, forLoopContext.idx == 0));
-                resolver.setDictionaryVariable(forLoopContext.renderer, forLoopVariable, "last", resolver.createBool(forLoopContext.renderer, forLoopContext.idx ==  forLoopContext.length-1));
-                resolver.setDictionaryVariable(forLoopContext.renderer, forLoopVariable, "length", resolver.createInteger(forLoopContext.renderer, forLoopContext.length));
-
                 forLoopContext.result.append(forLoopContext.renderer.retrieveRenderedNode(*forLoopContext.node.children[1].get(), forLoopContext.store).getString());
                 ++forLoopContext.idx;
-
                 if (forLoopContext.renderer.control != Renderer::Control::NONE)  {
                     if (forLoopContext.renderer.control == Renderer::Control::BREAK) {
                         forLoopContext.renderer.control = Renderer::Control::NONE;
@@ -366,7 +372,7 @@ namespace Liquid {
             };
 
             auto& resolver = renderer.variableResolver;
-            ForLoopContext forLoopContext = { renderer, node, store, *variableNode.get(), iterator };
+            ForLoopContext forLoopContext = { renderer, node, store, nullptr, iterator };
 
 
             forLoopContext.length = result.variant.type == Variant::Type::ARRAY ? result.variant.a.size() : resolver.getArraySize(renderer, result.variant.p);
@@ -378,56 +384,70 @@ namespace Liquid {
 
             forLoopContext.idx = start;
 
+            renderer.pushInternalDrop("forloop", { &forLoopContext, +[](Renderer& renderer, const Node& node, Variable store, void* data)->Node {
+                ForLoopContext* forLoopContext = (ForLoopContext*)data;
+                string property;
+                if (node.type) {
+                    if (node.children.size() == 2)
+                        property = renderer.retrieveRenderedNode(*node.children[1].get(), store).getString();
+                } else {
+                    property = node.getString();
+                }
+                if (!property.empty()) {
+                    if (property == "index0")
+                        return Variant(forLoopContext->idx);
+                    if (property == "index")
+                        return Variant(forLoopContext->idx+1);
+                    if (property == "rindex")
+                        return Variant(forLoopContext->length - (forLoopContext->idx+1));
+                    if (property == "index0")
+                        return Variant(forLoopContext->length - forLoopContext->idx);
+                    if (property == "first")
+                        return Variant(forLoopContext->idx == 0);
+                    if (property == "last")
+                        return Variant(forLoopContext->idx == forLoopContext->length-1);
+                    if (property == "length")
+                        return Variant(forLoopContext->length);
+                }
+                return Node();
+            } });
             if (result.variant.type == Variant::Type::ARRAY) {
+                renderer.pushInternalDrop(variableName, { &forLoopContext, +[](Renderer& renderer, const Node& node, Variable store, void* data)->Node {
+                    ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
+                    return Variant(*(Variant*)forLoopContext.variable);
+                } });
                 int endIndex = std::min(limit+start-1, (int)forLoopContext.length-1);
                 if (reversed) {
                     for (int i = endIndex; i >= start; --i) {
-                        Variable targetVariable;
-                        renderer.inject(targetVariable, result.variant.a[i]);
-                        renderer.setVariable(*variableNode, store, targetVariable);
+                        forLoopContext.variable = &result.variant.a[i];
                         if (!forLoopContext.iterator(forLoopContext))
                             break;
                     }
                 } else {
                     for (int i = start; i <= endIndex; ++i) {
-                        Variable targetVariable;
-                        renderer.inject(targetVariable, result.variant.a[i]);
-                        renderer.setVariable(*variableNode, store, targetVariable);
+                        forLoopContext.variable = &result.variant.a[i];
                         if (!forLoopContext.iterator(forLoopContext))
                             break;
                     }
                 }
             } else {
+                renderer.pushInternalDrop(variableName, { &forLoopContext, +[](Renderer& renderer, const Node& node, Variable store, void* data)->Node {
+                    ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
+                    return Variant(renderer.getVariable(node, Variable(forLoopContext.variable), 1));
+                } });
                 resolver.iterate(renderer, result.variant.v, +[](void* variable, void* data) {
                     ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
-                    forLoopContext.renderer.setVariable(forLoopContext.variableNode, forLoopContext.store, forLoopContext.renderer.variableResolver.createClone(forLoopContext.renderer, variable));
+                    forLoopContext.variable = variable;
                     return forLoopContext.iterator(forLoopContext);
                 }, const_cast<void*>((void*)&forLoopContext), start, limit, reversed);
             }
+            renderer.popInternalDrop("forloop");
+            renderer.popInternalDrop(variableName);
             if (forLoopContext.idx == 0 && node.children.size() >= 4) {
                 // Run the else statement if there is one.
                 return renderer.retrieveRenderedNode(*node.children[3].get(), store);
             }
             return Node(forLoopContext.result);
-        }
-    };
-
-    struct CycleNode : TagNodeType {
-        CycleNode() : TagNodeType(Composition::FREE, "cycle", 2, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
-
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
-            assert(node.children.size() == 1 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
-            auto& arguments = node.children.front();
-            Variable forloopVariable;
-            if (renderer.variableResolver.getDictionaryVariable(renderer, store, "forloop", forloopVariable)) {
-                Variable index0;
-                if (renderer.variableResolver.getDictionaryVariable(renderer, forloopVariable, "index0", index0)) {
-                    long long i;
-                    if (renderer.variableResolver.getInteger(renderer, index0, &i))
-                        return renderer.retrieveRenderedNode(*arguments->children[i % arguments->children.size()].get(), store);
-                }
-            }
-            return Node();
         }
     };
 
@@ -1564,6 +1584,11 @@ namespace Liquid {
         FirstDotFilterNode() : DotFilterNodeType("first") { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
+            if (node.type && node.children.size() == 1 && node.children[0]->type && node.children[0]->type->type == NodeType::Type::VARIABLE && node.children[0]->children.size() == 1) {
+                pair<void*, Renderer::DropFunction> drop = renderer.getInternalDrop(*node.children[0].get(), store);
+                if (drop.second)
+                    return drop.second(renderer, Variant("first"), store, drop.first);
+            }
             auto operand = getOperand(renderer, node, store);
             switch (operand.variant.type) {
                 case Variant::Type::ARRAY:
@@ -1619,6 +1644,11 @@ namespace Liquid {
         LastDotFilterNode() : DotFilterNodeType("last") { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
+            if (node.type && node.type->type == NodeType::Type::VARIABLE && node.children.size() == 1) {
+                pair<void*, Renderer::DropFunction> drop = renderer.getInternalDrop(*node.children[0].get(), store);
+                if (drop.second)
+                    return drop.second(renderer, Variant("first"), store, drop.first);
+            }
             auto operand = getOperand(renderer, node, store);
             switch (operand.variant.type) {
                 case Variant::Type::ARRAY:
@@ -1707,6 +1737,11 @@ namespace Liquid {
         SizeDotFilterNode() : DotFilterNodeType("size") { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
+            if (node.type && node.type->type == NodeType::Type::VARIABLE && node.children.size() == 1) {
+                pair<void*, Renderer::DropFunction> drop = renderer.getInternalDrop(*node.children[0].get(), store);
+                if (drop.second)
+                    return drop.second(renderer, Variant("size"), store, drop.first);
+            }
             auto operand = getOperand(renderer, node, store);
             switch (operand.variant.type) {
                 case Variant::Type::ARRAY:
@@ -1779,7 +1814,7 @@ namespace Liquid {
 
         // Iteration tags.
         context.registerType<ForNode>();
-        context.registerType<CycleNode>();
+        context.registerType<ForNode::CycleNode>();
         context.registerType<ForNode::InOperatorNode>();
         context.registerType<ForNode::BreakNode>();
         context.registerType<ForNode::ContinueNode>();

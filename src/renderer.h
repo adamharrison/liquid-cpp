@@ -18,6 +18,13 @@ namespace Liquid {
         };
         // The current state of the break. Allows us to have break/continue statements.
         Control control = Control::NONE;
+        // In order to have a more genericized version of forloop drops, that are not affected by assigns.
+        typedef Node (*DropFunction)(Renderer& renderer, const Node& node, Variable store, void* data);
+        std::unordered_map<std::string, std::vector<std::pair<void*, DropFunction>>> internalDrops;
+        std::pair<void*, DropFunction> getInternalDrop(const Node& node, Variable store);
+        std::pair<void*, DropFunction> getInternalDrop(const std::string& str);
+        void pushInternalDrop(const std::string& key, std::pair<void*, DropFunction> func);
+        void popInternalDrop(const std::string& key);
 
         LiquidRenderErrorType error = LiquidRenderErrorType::LIQUID_RENDERER_ERROR_TYPE_NONE;
 
@@ -100,7 +107,11 @@ namespace Liquid {
         string render(const Node& ast, Variable store);
         // Retrieves a rendered node, if possible. If the node in question has a nodetype that is PARTIAL optimized, Has the potential to return node with
         // a type still attached; otherwise, will always be a variant node.
-        Node retrieveRenderedNode(const Node& node, Variable store);
+        Node retrieveRenderedNode(const Node& node, Variable store) {
+            if (node.type)
+                return node.type->render(*this, node, store);
+            return node;
+        }
         std::chrono::duration<unsigned int,std::milli> getRenderedTime() const;
 
         operator LiquidRenderer() { return LiquidRenderer {this}; }
@@ -111,8 +122,8 @@ namespace Liquid {
 
 
 
-        Variable getVariable(const Node& node, Variable store);
-        bool setVariable(const Node& node, Variable store, Variable value);
+        Variable getVariable(const Node& node, Variable store, size_t offset = 0);
+        bool setVariable(const Node& node, Variable store, Variable value, size_t offset = 0);
 
         const LiquidVariableResolver& getVariableResolver() const { return variableResolver; }
         bool resolveVariableString(string& target, void* variable) {

@@ -30,7 +30,6 @@ namespace Liquid {
         return renderer.retrieveRenderedNode(*node.children[0].get(), store);
     }
 
-
     Node NodeType::getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const {
         int offset = node.type->type == NodeType::Type::TAG ? 0 : 1;
         if (idx >= (int)node.children[offset]->children.size())
@@ -55,23 +54,27 @@ namespace Liquid {
 
 
     Node Context::ConcatenationNode::render(Renderer& renderer, const Node& node, Variable store) const {
-        string s;
         if (++renderer.currentRenderingDepth > renderer.maximumRenderingDepth) {
             --renderer.currentRenderingDepth;
             renderer.error = LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_DEPTH;
             return Node();
         }
+        if (node.children.size() == 1) {
+            --renderer.currentRenderingDepth;
+            return renderer.retrieveRenderedNode(*node.children.front().get(), store);
+        }
+        string s;
         for (auto& child : node.children) {
             s.append(renderer.retrieveRenderedNode(*child.get(), store).getString());
             if (renderer.error != LIQUID_RENDERER_ERROR_TYPE_NONE)
                 return Node();
             if (renderer.control != Renderer::Control::NONE) {
                 --renderer.currentRenderingDepth;
-                return Node(s);
+                return Node(move(s));
             }
         }
         --renderer.currentRenderingDepth;
-        return Node(s);
+        return Node(move(s));
     }
     bool Context::ConcatenationNode::optimize(Optimizer& optimizer, Node& node, Variable store) const {
         if (++optimizer.renderer.currentRenderingDepth > optimizer.renderer.maximumRenderingDepth) {

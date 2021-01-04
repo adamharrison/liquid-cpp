@@ -12,7 +12,7 @@ endif()
 
 set(CMAKE_CXX_FLAGS "-Wall -fPIC")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -Wextra")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -s")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2 -g")
 
 FILE(GLOB CPPSources src/*.cpp)
 

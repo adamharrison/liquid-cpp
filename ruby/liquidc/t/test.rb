@@ -19,7 +19,7 @@ start = Time.now
 
 template1 = LiquidC::Template.new(context, templateContent)
 optimizer = LiquidC::Optimizer.new(renderer)
-# optimizer.optimize({ }, template1);
+optimizer.optimize({ }, template1);
 template2 = Liquid::Template.parse(templateContent)
 
 s = nil

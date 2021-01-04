@@ -5,7 +5,7 @@ namespace Liquid {
 
     void Optimizer::optimize(Node& ast, Variable store) {
         bool hasAnyNonRendered = false;
-        if (!ast.type)
+        if (!ast.type || ast.type->optimization == LIQUID_OPTIMIZATION_SCHEME_SHIELD)
             return;
         for (size_t i = 0; i < ast.children.size(); ++i) {
             if (ast.children[i]->type)

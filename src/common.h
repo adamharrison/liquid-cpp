@@ -23,6 +23,7 @@ namespace Liquid {
     using shared_ptr = std::shared_ptr<T>;
     using std::make_unique;
     using std::move;
+    using std::pair;
 
 
     struct Exception : public std::exception {

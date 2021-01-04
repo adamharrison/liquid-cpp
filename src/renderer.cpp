@@ -35,12 +35,31 @@ namespace Liquid {
         return accumulator;
     }
 
-    Node Renderer::retrieveRenderedNode(const Node& node, Variable store) {
-        if (node.type)
-            return node.type->render(*this, node, store);
-        return node;
+    pair<void*, Renderer::DropFunction> Renderer::getInternalDrop(const string& key) {
+        auto it = internalDrops.find(key);
+        if (it == internalDrops.end())
+            return { nullptr, nullptr };
+        return it->second.back();
     }
 
+    pair<void*, Renderer::DropFunction> Renderer::getInternalDrop(const Node& node, Variable store) {
+        assert(node.type && node.children.size() > 0);
+        string key = retrieveRenderedNode(*node.children[0].get(), store).getString();
+        return getInternalDrop(key);
+    }
+
+    void Renderer::pushInternalDrop(const std::string& key, std::pair<void*, DropFunction> func) {
+        internalDrops[key].push_back(func);
+    }
+
+    void Renderer::popInternalDrop(const std::string& key) {
+        auto it = internalDrops.find(key);
+        if (it != internalDrops.end()) {
+            it->second.pop_back();
+            if (it->second.size() == 0)
+                internalDrops.erase(it);
+        }
+    }
 
 
     void Renderer::inject(Variable& variable, const Variant& variant) {
@@ -137,9 +156,10 @@ namespace Liquid {
     }
 
 
-    Variable Renderer::getVariable(const Node& node, Variable store) {
+    Variable Renderer::getVariable(const Node& node, Variable store, size_t offset) {
         Variable storePointer = store;
-        for (auto& link : node.children) {
+        for (size_t i = offset; i < node.children.size(); ++i) {
+            auto& link = node.children[i];
             auto node = retrieveRenderedNode(*link.get(), store);
             switch (node.variant.type) {
                 case Variant::Type::INT:
@@ -161,9 +181,9 @@ namespace Liquid {
         return storePointer;
     }
 
-    bool Renderer::setVariable(const Node& node, Variable store, Variable value) {
+    bool Renderer::setVariable(const Node& node, Variable store, Variable value, size_t offset) {
         Variable storePointer = store;
-        for (size_t i = 0; i < node.children.size(); ++i) {
+        for (size_t i = offset; i < node.children.size(); ++i) {
             auto& link = node.children[i];
             auto part = retrieveRenderedNode(*link.get(), store);
             if (i == node.children.size() - 1) {

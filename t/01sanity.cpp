@@ -270,6 +270,11 @@ TEST(sanity, forloop) {
     Node ast;
     std::string str;
 
+    ast = getParser().parse("{% for i in list %}{% unless forloop.first %},{% endunless%}{{ forloop.index0 }}{% endfor %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "0,1,2,3");
+
+
     ast = getParser().parse("{% for i in (3..5) %}{{ i }}{% endfor %}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "345");
@@ -447,6 +452,29 @@ TEST(sanity, composite) {
     Node ast;
     std::string str;
 
+    CPPVariable lip1, lip2, lip3, lip4;
+    CPPVariable line_item, line_item1, line_item2, product, product_option1, product_option2, product_option3;
+
+    lip1["name"] = "Gift Email";
+    lip1["value"] = "test1@gmail.com";
+    lip2["name"] = "Gift Image";
+    lip2["value"] = 1;
+    line_item1["id"] = 1;
+    line_item1["properties"] = { lip1, lip2 };
+    lip3["name"] = "Gift Email";
+    lip3["value"] = "test2@gmail.com";
+    lip4["name"] = "Gift Image";
+    lip4["value"] = 2;
+    line_item2["id"] = 1;
+    line_item2["properties"] = { lip3, lip4 };
+    order["line_items"] = { line_item1, line_item2 };
+    hash["order"] = order;
+    hash["email"] = "test1@gmail.com";
+
+    ast = getParser().parse("{% for line_item in order.line_items %}{% for property in line_item.properties %}{% if property.name == \"Gift Email\" and property.value == email %}{% assign li = line_item %}{% endif %}{% endfor %}{% endfor %}{{ li.id }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "1");
+
 
     ast = getParser().parse("{{ params.state.order-by.test }}");
     str = getRenderer().render(ast, hash);
@@ -481,7 +509,6 @@ TEST(sanity, composite) {
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "asdfjlsjkhgsjlkhglsdfjkgdfhs1fasdfsdf2fasdfsdf3fasdfsdf4fasdfsdf5fasdfsdf6fasdfsdf7fasdfsdf8fasdfsdf9fasdfsdf10fasdfsdf");
 
-    CPPVariable line_item, line_item1, line_item2, product, product_option1, product_option2, product_option3;
 
     order["id"] = 2;
     hash["order"] = order;
@@ -491,28 +518,6 @@ TEST(sanity, composite) {
     ASSERT_EQ(str, "2");
 
 
-
-    CPPVariable lip1, lip2, lip3, lip4;
-
-    lip1["name"] = "Gift Email";
-    lip1["value"] = "test1@gmail.com";
-    lip2["name"] = "Gift Image";
-    lip2["value"] = 1;
-    line_item1["id"] = 1;
-    line_item1["properties"] = { lip1, lip2 };
-    lip3["name"] = "Gift Email";
-    lip3["value"] = "test2@gmail.com";
-    lip4["name"] = "Gift Image";
-    lip4["value"] = 2;
-    line_item2["id"] = 1;
-    line_item2["properties"] = { lip3, lip4 };
-    order["line_items"] = { line_item1, line_item2 };
-    hash["order"] = order;
-    hash["email"] = "test1@gmail.com";
-
-    ast = getParser().parse("{% for line_item in order.line_items %}{% for property in line_item.properties %}{% if property.name == \"Gift Email\" and property.value == email %}{% assign li = line_item %}{% endif %}{% endfor %}{% endfor %}{{ li.id }}");
-    str = getRenderer().render(ast, hash);
-    ASSERT_EQ(str, "1");
 
 
 
