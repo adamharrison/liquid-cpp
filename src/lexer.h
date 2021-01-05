@@ -25,34 +25,31 @@ namespace Liquid {
 
             Error() {
                 type = Type::LIQUID_LEXER_ERROR_TYPE_NONE;
-                message[0] = 0;
+                details.message[0] = 0;
             }
             Error(const Error& error) = default;
             Error(Error&& error) = default;
+            Error(Lexer& lexer, Type type, const std::string& message = "") {
+                details.row = lexer.row;
+                details.column = lexer.column;
+                this->type = type;
+                strcpy(details.message, message.data());
+            }
 
-            Error(Lexer& lexer, Type type) {
-                this->row = lexer.row;
-                this->column = lexer.column;
-                this->type = type;
-                message[0] = 0;
-            }
-            Error(Lexer& lexer, Type type, const std::string& message) {
-                this->row = lexer.row;
-                this->column = lexer.column;
-                this->type = type;
-                strcpy(this->message, message.data());
-            }
-            Error(Type type) {
-                this->row = 0;
-                this->column = 0;
-                this->type = type;
-                message[0] = 0;
-            }
-            Error(Type type, const std::string& message) {
-                this->row = 0;
-                this->column = 0;
-                this->type = type;
-                strcpy(this->message, message.data());
+            operator bool() const { return type != Type::LIQUID_LEXER_ERROR_TYPE_NONE; }
+
+            static string english(const LiquidLexerError& error) {
+                char buffer[512] = { 0 };
+                switch (error.type) {
+                    case Type::LIQUID_LEXER_ERROR_TYPE_NONE: break;
+                    case Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END:
+                        if (error.details.message[0])
+                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.details.message, error.details.row, error.details.column);
+                        else
+                            sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.details.row, error.details.column);
+                    break;
+                }
+                return std::string(buffer);
             }
         };
 

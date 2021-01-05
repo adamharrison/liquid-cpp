@@ -764,23 +764,45 @@ rendererSetMakeMethodCalls(renderer, value)
         struct RendererCustomData* customData = liquidRendererGetCustomData(*(LiquidRenderer*)&renderer);
         customData->makeMethodCalls = value ? 1 : 0;
 
+void*
+createParser(context)
+    void* context;
+    CODE:
+        LiquidParser parser = liquidCreateParser(*(LiquidContext*)&context);
+        RETVAL = parser.parser;
+    OUTPUT:
+        RETVAL
+
+void
+freeParser(parser)
+    void* parser;
+    CODE:
+        liquidFreeParser(*(LiquidParser*)&parser);
 
 void*
-createTemplate(context, str, treatUnknownFiltersAsErrors, error)
-    void* context;
+parseTemplate(parser, str, error)
+    void* parser;
     char* str;
-    bool treatUnknownFiltersAsErrors;
     SV* error;
     CODE:
+        LiquidLexerError lexerError;
         LiquidParserError parserError;
-        RETVAL = liquidCreateTemplate(*(LiquidContext*)&context, str, strlen(str), treatUnknownFiltersAsErrors, &parserError).ast;
+        RETVAL = liquidParserParseTemplate(*(LiquidParser*)&parser, str, strlen(str), &lexerError, &parserError).ast;
         if (SvROK(error)) {
+            if (lexerError.type) {
+                AV* av = (AV*)SvRV(error);
+                av_push(av, newSVnv(lexerError.type));
+                av_push(av, newSVnv(lexerError.details.row));
+                av_push(av, newSVnv(lexerError.details.column));
+                av_push(av, newSVpvn(lexerError.details.message, strlen(lexerError.details.message)));
+                RETVAL = NULL;
+            }
             if (parserError.type) {
                 AV* av = (AV*)SvRV(error);
                 av_push(av, newSVnv(parserError.type));
-                av_push(av, newSVnv(parserError.row));
-                av_push(av, newSVnv(parserError.column));
-                av_push(av, newSVpvn(parserError.message, strlen(parserError.message)));
+                av_push(av, newSVnv(parserError.details.row));
+                av_push(av, newSVnv(parserError.details.column));
+                av_push(av, newSVpvn(parserError.details.message, strlen(parserError.details.message)));
                 RETVAL = NULL;
             }
         }
@@ -800,30 +822,19 @@ renderTemplate(renderer, store, tmpl, error)
     void* tmpl;
     SV* error;
     CODE:
-        LiquidRenderError renderError;
-        LiquidTemplateRender render = liquidRenderTemplate(*(LiquidRenderer*)&renderer, store, *(LiquidTemplate*)&tmpl, &renderError);
+        LiquidRendererError rendererError;
+        LiquidTemplateRender render = liquidRendererRenderTemplate(*(LiquidRenderer*)&renderer, store, *(LiquidTemplate*)&tmpl, &rendererError);
         if (SvROK(error)) {
-            if (renderError.type) {
+            if (rendererError.type) {
                 AV* av = (AV*)SvRV(error);
-                av_push(av, newSVnv(renderError.type));
-                av_push(av, newSVnv(renderError.row));
-                av_push(av, newSVnv(renderError.column));
-                av_push(av, newSVpvn(renderError.message, strlen(renderError.message)));
+                av_push(av, newSVnv(rendererError.type));
+                av_push(av, newSVnv(rendererError.details.row));
+                av_push(av, newSVnv(rendererError.details.column));
+                av_push(av, newSVpvn(rendererError.details.message, strlen(rendererError.details.message)));
             }
         }
         RETVAL = newSVpvn(liquidTemplateRenderGetBuffer(render), liquidTemplateRenderGetSize(render));
         liquidFreeTemplateRender(render);
-    OUTPUT:
-        RETVAL
-
-SV*
-getError()
-    CODE:
-        const char* error = liquidGetError();
-        if (error)
-            RETVAL = newSVpvn(error, strlen(error));
-        else
-            RETVAL = newSV(0);
     OUTPUT:
         RETVAL
 

@@ -114,6 +114,29 @@ sub make_method_calls {
 }
 sub clone_hash { $_[0]->{clone_hash} = $_[1] if @_ > 1; return $_[0]->{clone_hash}; }
 
+package WWW::Shopify::Liquid::XS::Parser;
+use Encode;
+
+sub new {
+    my ($package, $context) = @_;
+    my $self = bless {
+        parser => WWW::Shopify::Liquid::XS::createParser($context->{context})
+    }, $package;
+    return $self;
+}
+
+sub parse {
+    my ($self, $text, $file) = @_;
+    my $error = [];
+    my $template = WWW::Shopify::Liquid::XS::Template->new(WWW::Shopify::Liquid::XS::parseTemplate($self->{parser}, encode("UTF-8", $text), $error));
+     if (!$template) {
+        $error = WWW::Shopify::Liquid::XS::Exception->new($error);
+        $error->{line}->[3] = $file;
+        die $error;
+    }
+    return $template;
+}
+
 package WWW::Shopify::Liquid::XS::Optimizer;
 
 sub new {
@@ -131,17 +154,9 @@ sub optimize {
 }
 
 package WWW::Shopify::Liquid::XS::Template;
-use Encode;
 
 sub new {
-    my ($package, $context, $text, $file) = @_;
-    my $error = [];
-    my $template = WWW::Shopify::Liquid::XS::createTemplate($context, encode("UTF-8", $text), 1, $error);
-    if (!$template) {
-        $error = WWW::Shopify::Liquid::XS::Exception->new($error);
-        $error->{line}->[3] = $file;
-        die $error;
-    }
+    my ($package, $template) = @_;
     return bless { template => $template }, $package;
 }
 
@@ -375,6 +390,7 @@ sub new {
     WWW::Shopify::Liquid::XS::implementPermissiveStandardDialect($self->{context});
     $self->register_tag('WWW::Shopify::Liquid::XS::Tag::Include');
     $self->{renderer} = WWW::Shopify::Liquid::XS::Renderer->new($self);
+    $self->{parser} = WWW::Shopify::Liquid::XS::Parser->new($self);
     $self->{optimizer} = WWW::Shopify::Liquid::XS::Optimizer->new($self->{renderer});
     $_->apply($self) for (@{$self->{dialects}});
     WWW::Shopify::Liquid::XS::implementWebDialect($self->{context}) if $settings{'implement_web_dialect'};
@@ -384,6 +400,7 @@ sub new {
 }
 
 sub renderer { return $_[0]->{renderer}; }
+sub parser { return $_[0]->{parser}; }
 sub optimizer { return $_[0]->{optimizer}; }
 sub analyzer { return $_[0]->{analyzer} ||= WWW::Shopify::Liquid::XS::Analyzer->new(liquid => $_[0]); }
 
@@ -403,8 +420,7 @@ sub parse_file {
 
 sub parse_text {
     my ($self, $text, $file) = @_;
-    my $template = WWW::Shopify::Liquid::XS::Template->new($self->{context}, $text, $file);
-    return $template;
+    return $self->parser->parse($text, $file);
 }
 
 sub render_text {

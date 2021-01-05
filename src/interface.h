@@ -8,11 +8,10 @@
 extern "C" {
 #endif
 
-
     #define LIQUID_ERROR_MESSAGE_MAX_LENGTH 256
     #define LIQUID_FILE_MAX_LENGTH 256
 
-    enum ELiquidParserErrorType {
+    typedef enum ELiquidParserErrorType {
         LIQUID_PARSER_ERROR_TYPE_NONE,
         LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END,
         // Self-explamatory.
@@ -27,108 +26,76 @@ extern "C" {
         // Was expecting somthing else, i.e. {{ i + }}; was expecting a number there.
         LIQUID_PARSER_ERROR_TYPE_UNBALANCED_GROUP,
         LIQUID_PARSER_ERROR_TYPE_PARSE_DEPTH_EXCEEDED
-    };
-    typedef enum ELiquidParserErrorType LiquidParserErrorType;
+    } LiquidParserErrorType;
 
-    enum ELiquidLexerErrorType {
+    typedef enum ELiquidLexerErrorType {
         LIQUID_LEXER_ERROR_TYPE_NONE,
         LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END
-    };
+    } LiquidLexerErrorType;
 
-    typedef enum ELiquidLexerErrorType LiquidLexerErrorType;
+    typedef struct SLiquidErrorDetails {
+        size_t row;
+        size_t column;
+        char file[LIQUID_FILE_MAX_LENGTH];
+        char message[LIQUID_ERROR_MESSAGE_MAX_LENGTH];
+    } LiquidErrorDetails;
 
-    struct SLiquidLexerError {
+    typedef struct SLiquidLexerError {
         LiquidLexerErrorType type;
-        size_t row;
-        size_t column;
-        char file[LIQUID_FILE_MAX_LENGTH];
-        char message[LIQUID_ERROR_MESSAGE_MAX_LENGTH];
-    };
-    typedef struct SLiquidLexerError LiquidLexerError;
+        LiquidErrorDetails details;
+    } LiquidLexerError;
 
-    struct SLiquidParserError {
+    typedef struct SLiquidParserError {
         LiquidParserErrorType type;
-        size_t row;
-        size_t column;
-        char file[LIQUID_FILE_MAX_LENGTH];
-        char message[LIQUID_ERROR_MESSAGE_MAX_LENGTH];
-    };
-    typedef struct SLiquidParserError LiquidParserError;
+        LiquidErrorDetails details;
+    } LiquidParserError, LiquidParserWarning;
 
-    enum ELiquidRenderErrorType {
+    typedef enum ELiquidRendererErrorType {
         LIQUID_RENDERER_ERROR_TYPE_NONE,
         LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_MEMORY,
         LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_TIME,
         LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_DEPTH
-    };
-    typedef enum ELiquidRenderErrorType LiquidRenderErrorType;
+    } LiquidRendererErrorType;
 
-    struct SLiquidRenderError {
-        LiquidRenderErrorType type;
-        size_t row;
-        size_t column;
-        char file[LIQUID_FILE_MAX_LENGTH];
-        char message[LIQUID_ERROR_MESSAGE_MAX_LENGTH];
-    };
-    typedef struct SLiquidRenderError LiquidRenderError;
+    typedef struct SLiquidRendererError {
+        LiquidRendererErrorType type;
+        LiquidErrorDetails details;
+    } LiquidRendererError, LiquidRendererWarning;
 
-
-    enum ELiquidOptimizationScheme {
+    typedef enum ELiquidOptimizationScheme {
         LIQUID_OPTIMIZATION_SCHEME_SHIELD,
         LIQUID_OPTIMIZATION_SCHEME_NONE,
         LIQUID_OPTIMIZATION_SCHEME_PARTIAL,
         LIQUID_OPTIMIZATION_SCHEME_FULL
-    };
-    typedef enum ELiquidOptimizationScheme LiquidOptimizationScheme;
+    } LiquidOptimizationScheme;
 
-    enum ELiquidTagType {
+    typedef enum ELiquidTagType {
         LIQUID_TAG_TYPE_ENCLOSING,
         LIQUID_TAG_TYPE_FREE
-    };
-    typedef enum ELiquidTagType LiquidTagType;
+    } LiquidTagType;
 
-    enum ELiquidOperatorArity {
+    typedef enum ELiquidOperatorArity {
         LIQUID_OPERATOR_ARITY_NONARY,
         LIQUID_OPERATOR_ARITY_UNARY,
         LIQUID_OPERATOR_ARITY_BINARY,
         LIQUID_OPERATOR_ARITY_NARY
-    };
-    typedef enum ELiquidOperatorArity LiquidOperatorArity;
+    } LiquidOperatorArity;
 
-    enum ELiquidOperatorFixness {
+    typedef enum ELiquidOperatorFixness {
         LIQUID_OPERATOR_FIXNESS_PREFIX,
         LIQUID_OPERATOR_FIXNESS_INFIX,
         LIQUID_OPERATOR_FIXNESS_AFFIX
-    };
-    typedef enum ELiquidOperatorFixness LiquidOperatorFixness;
+    } LiquidOperatorFixness;
 
-    struct SLiquidContext {
-        void* context;
-    };
-    typedef struct SLiquidContext LiquidContext;
-    struct SLiquidRenderer {
-        void* renderer;
-    };
-    typedef struct SLiquidRenderer LiquidRenderer;
-    struct SLiquidTemplate {
-        void* ast;
-    };
-    typedef struct SLiquidTemplate LiquidTemplate;
-    struct SLiquidOptimizer {
-        void* optimizer;
-    };
-    typedef struct SLiquidOptimizer LiquidOptimizer;
-    struct SLiquidNode {
-        void* node;
-    };
-    typedef struct SLiquidNode LiquidNode;
+    typedef struct SLiquidContext { void* context; } LiquidContext;
+    typedef struct SLiquidRenderer { void* renderer; } LiquidRenderer;
+    typedef struct SLiquidParser { void* parser; } LiquidParser;
+    typedef struct SLiquidTemplate { void* ast; } LiquidTemplate;
+    typedef struct SLiquidOptimizer { void* optimizer; } LiquidOptimizer;
+    typedef struct SLiquidNode { void* node; } LiquidNode;
+    typedef struct SLiquidTemplateRender { void* internal; } LiquidTemplateRender;
 
-    struct SLiquidTemplateRender {
-        void* internal;
-    };
-    typedef struct SLiquidTemplateRender LiquidTemplateRender;
-
-    enum ELiquidVariableType {
+    typedef enum ELiquidVariableType {
         LIQUID_VARIABLE_TYPE_NIL,
         LIQUID_VARIABLE_TYPE_FLOAT,
         LIQUID_VARIABLE_TYPE_INT,
@@ -137,8 +104,7 @@ extern "C" {
         LIQUID_VARIABLE_TYPE_BOOL,
         LIQUID_VARIABLE_TYPE_DICTIONARY,
         LIQUID_VARIABLE_TYPE_OTHER
-    };
-    typedef enum ELiquidVariableType LiquidVariableType;
+    } LiquidVariableType;
 
     // Convenience function to register a custom variable type.
     // Ownership model looks thusly:
@@ -147,7 +113,7 @@ extern "C" {
     //  2. It must be freed with freeVariable.
     // For languages where the variables are garbage collected, like perl and ruby; freeVariable will be a no-op.
     // Whenever getArrayVariable or getDictionaryVariable are called, a pointer is given, but no allocaitons are made.
-    struct SLiquidVariableResolver {
+    typedef struct SLiquidVariableResolver {
         LiquidVariableType (*getType)(LiquidRenderer renderer, void* variable);
         bool (*getBool)(LiquidRenderer renderer, void* variable, bool* target);
         bool (*getTruthy)(LiquidRenderer renderer, void* variable);
@@ -172,8 +138,7 @@ extern "C" {
         void* (*createClone)(LiquidRenderer renderer, void* value);
         void (*freeVariable)(LiquidRenderer renderer, void* value);
         int (*compare)(void* a, void* b);
-    };
-    typedef struct SLiquidVariableResolver LiquidVariableResolver;
+    } LiquidVariableResolver;
 
     LiquidContext liquidCreateContext();
     const char* liquidGetContextError(LiquidContext context);
@@ -196,16 +161,23 @@ extern "C" {
     void liquidRendererSetReturnValueInteger(LiquidRenderer renderer, long long i);
     void liquidRendererSetReturnValueFloat(LiquidRenderer renderer, double f);
     void liquidRendererSetReturnValueVariable(LiquidRenderer renderer, void* variable);
+    size_t liquidGetRendererWarningCount(LiquidRenderer renderer);
+    LiquidRendererWarning liquidGetRendererWarning(LiquidRenderer renderer, size_t index);
     void liquidFreeRenderer(LiquidRenderer renderer);
+
+    LiquidParser liquidCreateParser(LiquidContext context);
+    size_t liquidGetParserWarningCount(LiquidParser parser);
+    LiquidParserWarning liquidGetParserWarning(LiquidParser parser, size_t index);
+    void liquidFreeParser(LiquidParser parser);
+
+    LiquidTemplate liquidParserParseTemplate(LiquidParser parser, const char* buffer, size_t size, LiquidLexerError* lexer, LiquidParserError* error);
+    void liquidFreeTemplate(LiquidTemplate tmpl);
 
     LiquidOptimizer liquidCreateOptimizer(LiquidRenderer renderer);
     void liquidOptimizeTemplate(LiquidOptimizer optimizer, LiquidTemplate tmpl, void* variableStore);
     void liquidFreeOptimizer(LiquidOptimizer optimizer);
 
-    LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size, bool treatUnknownFiltersAsErrors, LiquidParserError* error);
-    void liquidFreeTemplate(LiquidTemplate tmpl);
-
-    LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRenderError* error);
+    LiquidTemplateRender liquidRendererRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRendererError* error);
     typedef void (*LiquidWalkTemplateFunction)(LiquidTemplate tmpl, const LiquidNode node, void* data);
     void liquidWalkTemplate(LiquidTemplate tmpl, LiquidWalkTemplateFunction callback, void* data);
     void liquidFreeTemplateRender(LiquidTemplateRender render);
@@ -213,9 +185,9 @@ extern "C" {
     const char* liquidTemplateRenderGetBuffer(LiquidTemplateRender render);
     size_t liquidTemplateRenderGetSize(LiquidTemplateRender render);
 
-    const char* liquidGetError();
-    void liquidClearError();
-    void liquidSetError(const char* message);
+    const char* liquidGetLexerErrorMessage(LiquidLexerError error);
+    const char* liquidGetParserErrorMessage(LiquidParserError error);
+    const char* liquidGetRendererErrorMessage(LiquidRendererError error);
 
     void liquidFilterGetOperand(void** targetVariable, LiquidRenderer renderer, LiquidNode filter, void* variableStore);
     void liquidGetArgument(void** targetVariable, LiquidRenderer renderer, LiquidNode node, void* variableStore, int idx);

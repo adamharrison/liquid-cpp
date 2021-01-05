@@ -6,11 +6,10 @@ namespace Liquid {
     struct Context;
 
     // Standard dialect of liquid, that implements core Liquid as described here:
-    // https://shopify.dev/docs/themes/liquid/reference.
+    // https://shopify.dev/docs/themes/liquid/reference, https://github.com/Shopify/liquid
     // There are a number of non-standard features we can invoke which make life easier if you're actually writing Liquid.
     // As such, you can either enable/disable features one at a time, or call `implementStrict`, or `implementPermissive` for the
     // defaults that are most/least/permissive.
-
     struct Dialect {};
 
     // The only tags missing from the standard set of non-web tags is {% include %}.
@@ -22,8 +21,10 @@ namespace Liquid {
             bool globalAssignsOnly,
             // If true, ignores parentheses, and mostly ignores order of operations.
             bool disallowParentheses,
-            // If true, disables all operators outside of the {% assign %} tag, or the {% if %} and {% unless %} tags as in Shopify.
-            bool assignOperatorsOnly,
+            // If true, disables all operators outside of the {% assign %} tag, or the {% if %} and {% unless %} tags (for comparaison operators) as in Shopify.
+            bool assignConditionalOperatorsOnly,
+            // if true, removes the ablility to use filters anywhere but {% assign %} and output tags {{ }}.
+            bool assignOutputFiltersOnly,
             // If true, removed the ability to specify arrays with [] notation.
             bool disableArrayLiterals,
             // Determines whether something is truthy/falsy.
@@ -39,6 +40,7 @@ namespace Liquid {
                 true,
                 true,
                 true,
+                true,
                 FALSY_NIL
             );
         }
@@ -46,6 +48,7 @@ namespace Liquid {
         static void implementPermissive(Context& context) {
             implement(
                 context,
+                false,
                 false,
                 false,
                 false,

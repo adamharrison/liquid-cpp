@@ -4,21 +4,19 @@ require 'liquid'
 require 'liquidc'
 
 context = LiquidC.new("strict")
+renderer = LiquidC::Renderer.new(context)
+parser = LiquidC::Parser.new(context)
+optimizer = LiquidC::Optimizer.new(renderer)
 
 context.registerFilter("test", -1, -1, 0, Proc.new{ |renderer, node, stash, operand|
     "operand" + operand
 })
 
-renderer = LiquidC::Renderer.new(context)
-
-
 templateContent = "{% if a %}asdfghj {{ a }}{% else %}asdfjlsjkhgsjlkhglsdfjkgdfhs{% for i in (1..10) %}{{ i }}fasdfsdf{% endfor %}{% endif %}"
-
 
 start = Time.now
 
-template1 = LiquidC::Template.new(context, templateContent)
-optimizer = LiquidC::Optimizer.new(renderer)
+template1 = parser.parse(templateContent)
 optimizer.optimize({ }, template1);
 template2 = Liquid::Template.parse(templateContent)
 
@@ -44,7 +42,7 @@ templateContent = '{{ "asdadasdAS" | test }}'
 
 puts "WAT";
 
-templateNew = LiquidC::Template.new(context, templateContent);
+templateNew = parser.parse(templateContent);
 
 puts "TEMPLATE NEW: #{templateNew}";
 

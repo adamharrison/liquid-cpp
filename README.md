@@ -1,7 +1,7 @@
 
 ## Introduction
 
-A fully featured, extensible, modular, and (reasonably) portable C++17 parser, renderer and optimizer for [Liquid](https://shopify.github.io/liquid/); Shopify's templating language. It's designed to provide official support for using liquid in the following languages:
+A fully featured C++17 parser, renderer and optimizer for [Liquid](https://shopify.github.io/liquid/); Shopify's templating language. It's designed to provide official support for using liquid in the following languages:
 
 * C++
 * C
@@ -9,6 +9,48 @@ A fully featured, extensible, modular, and (reasonably) portable C++17 parser, r
 * Perl
 
 Other languages (Javascript, Python, etc..) may come later, but any support for them will be unofficial.
+
+## Goals
+
+Here's the overriding philosophy of what I'm aiming for, for this library.
+
+### Modular
+
+All components of the process should be decoupled, and as much control as possible should be transferred to the programmer; nothing should be a monolith.
+
+### Extensible
+
+You should be able to modify almost everything about the way the language behaves by registering new tags, operators, filters, drops, dialects; very little
+should be in the core.
+
+### General
+
+There should be no special cases; every instance should be part of a generalizable set of classes, and operators. No direct text parsing, unless you absolutely need to.
+
+### Performant
+
+It should be at least an order of magnitude faster than Ruby liquid, preferably more. It should also use at most an order of magnitude less memory.
+
+### Portable
+
+It should be dead-easy to implement a new language for the parser, which means a really robust and easy-to-use C interface that can access most, if not all parts of the system.
+
+It should also compile on Windows, Mac, and Linux easily.
+
+### Independent
+
+It should have basically no dependencies, other than the C++ standard library itself.
+
+### Conformance
+
+It should pass all Shopify's test suites, and act exactly as Shopify liquid, if configured to do so.
+
+### Insanity at the Edges
+
+That being said, the deficiencies of the Shopify implementation shouldn't hold it back. It should be extremely easy to toggle extra feaatures;
+and a single call should permit `permissive` liquid, which allows for things like expression evaluation in all contexts. All things associated
+with the ruby version of Liquid, like global state, and whatnot, should exist purely as a façade pattern in a standalone Ruby module, which
+requires an underlying ruby module that implements the more modular, sane version.
 
 ## Status
 
@@ -136,8 +178,9 @@ There're two ways to get the ruby library working. You can use the OO way, which
 ```ruby
 require 'liquidc'
 context = LiquidC.new()
+parser = LiquidC::Parser.new(context)
 renderer = LiquidC::Renderer.new(context)
-template = LiquidC::Template.new(context, "{% if a %}asdfghj {{ a }}{% endif %}")
+template = parser.parse("{% if a %}asdfghj {{ a }}{% endif %}")
 puts renderer.render({ "a" => 1 }, template)
 ```
 
@@ -203,7 +246,7 @@ This is what I'm aiming for at any rate.
 * Ability to easily specify additions of filters, operators, and tags called `Dialects`, which can be mixed and matched.
 * Small footprint. Aiming for under 5K SLOC, with full standard Liquid as part of the core library.
 * Fully featured `extern "C"` interface for easy linking to most scripting languages. OOB bindings for both Ruby and Perl will be provided, that will act as drop-in replacements for `Liquid` and `WWW::Shopify::Liquid`.
-* Significant speedup over ruby-based liquid. (Need to do benchmarks; but at first glance seems like a minimum of a 6-10x speedup over regular Liquid for both rendering and parsing)
+* Significant speedup over ruby-based liquid. (Need to do benchmarks; but at first glance seems like a minimum of a 10-20x speedup over regular Liquid for both rendering and parsing)
 * Fully compatible with both `Liquid`, Shopify's ruby gem, and `WWW::Shopify::Liquid`, the perl implementation.
 * Use a standard build system; like cmake.
 * Optional compatibilty with rapidjson to allow for easy JSON reading in C++.

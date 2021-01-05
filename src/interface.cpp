@@ -6,8 +6,6 @@
 
 using namespace Liquid;
 
-char* liquidError = nullptr;
-
 LiquidContext liquidCreateContext() {
     return LiquidContext({ new Context() });
 }
@@ -36,6 +34,13 @@ void liquidFreeRenderer(LiquidRenderer renderer) {
     delete (Renderer*)renderer.renderer;
 }
 
+LiquidParser liquidCreateParser(LiquidContext context) {
+    return LiquidParser({ new Parser(*static_cast<Context*>(context.context)) });
+}
+void liquidFreeParser(LiquidParser parser) {
+    delete (Parser*)parser.parser;
+}
+
 LiquidOptimizer liquidCreateOptimizer(LiquidRenderer renderer) {
     return LiquidOptimizer({ new Optimizer(*static_cast<Renderer*>(renderer.renderer)) });
 }
@@ -48,27 +53,35 @@ void liquidFreeOptimizer(LiquidOptimizer optimizer) {
     delete (Optimizer*)optimizer.optimizer;
 }
 
-LiquidTemplate liquidCreateTemplate(LiquidContext context, const char* buffer, size_t size, bool treatUnknownFiltersAsErrors, LiquidParserError* error) {
-    Parser parser(*static_cast<Context*>(context.context));
-    parser.treatUnknownFiltersAsErrors = treatUnknownFiltersAsErrors;
+LiquidTemplate liquidParserParseTemplate(LiquidParser parser, const char* buffer, size_t size, LiquidLexerError* lexerError, LiquidParserError* parserError) {
     Node tmpl;
-    if (error)
-        error->type = LiquidParserErrorType::LIQUID_PARSER_ERROR_TYPE_NONE;
+    if (lexerError)
+        lexerError->type = LiquidLexerErrorType::LIQUID_LEXER_ERROR_TYPE_NONE;
+    if (parserError)
+        parserError->type = LiquidParserErrorType::LIQUID_PARSER_ERROR_TYPE_NONE;
     try {
-        tmpl = parser.parse(buffer, size);
+        tmpl = static_cast<Parser*>(parser.parser)->parse(buffer, size);
     } catch (Parser::Exception& exp) {
-        if (error)
-            *error = exp.parserError;
+        if (parserError)
+            *parserError = exp.parserErrors[0];
         return LiquidTemplate({ NULL });
     }
     return LiquidTemplate({ new Node(std::move(tmpl)) });
+}
+
+size_t liquidGetParserWarningCount(LiquidParser parser) {
+    return static_cast<Parser*>(parser.parser)->errors.size();
+}
+
+LiquidParserWarning liquidGetParserWarning(LiquidParser parser, size_t index) {
+    return static_cast<Parser*>(parser.parser)->errors[index];
 }
 
 void liquidFreeTemplate(LiquidTemplate tmpl) {
     delete (Node*)tmpl.ast;
 }
 
-LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRenderError* error) {
+LiquidTemplateRender liquidRendererRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRendererError* error) {
     if (error)
         error->type = LIQUID_RENDERER_ERROR_TYPE_NONE;
     std::string* str;
@@ -80,6 +93,14 @@ LiquidTemplateRender liquidRenderTemplate(LiquidRenderer renderer, void* variabl
         return LiquidTemplateRender({ NULL });
     }
     return LiquidTemplateRender({ str });
+}
+
+size_t liquidGetRendererWarningCount(LiquidRenderer renderer) {
+    return static_cast<Renderer*>(renderer.renderer)->errors.size();
+}
+
+LiquidRendererWarning liquidGetRendererWarning(LiquidRenderer renderer, size_t idx) {
+    return static_cast<Renderer*>(renderer.renderer)->errors[idx];
 }
 
 void liquidWalkTemplate(LiquidTemplate tmpl, LiquidWalkTemplateFunction callback, void* data) {
@@ -221,17 +242,15 @@ size_t liquidTemplateRenderGetSize(LiquidTemplateRender render) {
     return static_cast<std::string*>(render.internal)->size();
 }
 
-const char* liquidGetError() {
-    return liquidError;
+const char* liquidGetLexerErrorMessage(LiquidLexerError error) {
+    string s = Lexer<Parser>::Error::english(error);
+    return s.c_str();
 }
-
-void liquidClearError() {
-    if (liquidError)
-        delete[] liquidError;
-    liquidError = nullptr;
+const char* liquidGetParserErrorMessage(LiquidParserError error) {
+    string s = Parser::Error::english(error);
+    return s.c_str();
 }
-
-void liquidSetError(const char* message) {
-    liquidError = new char[strlen(message)+1];
-    strcpy(liquidError, message);
+const char* liquidGetRendererErrorMessage(LiquidRendererError error) {
+    string s = Renderer::Error::english(error);
+    return s.c_str();
 }

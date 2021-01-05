@@ -1,12 +1,18 @@
 #include <ruby.h>
 #include <liquid/liquid.h>
 
+// Global definitions.
+
+static VALUE liquidCParserError, liquidCRendererError, liquidCTemplate;
+
 struct SLiquidCRubyContext {
     LiquidContext context;
     // An array where we store registered functions, so they don't get garbage collected.
     VALUE registeredFunctionArray;
 };
 typedef struct SLiquidCRubyContext LiquidCRubyContext;
+
+// Variable types.
 
 static LiquidVariableType liquidCgetType(LiquidRenderer renderer, void* variable) {
     switch (TYPE(variable)) {
@@ -175,20 +181,43 @@ static int liquidCcompare(void* a, void* b) {
     return NUM2INT(result);
 }
 
+// Type boilerplate.
 
 void liquidC_free(void* data) {
     if (((LiquidCRubyContext*)data)->context.context)
         liquidFreeContext(((LiquidCRubyContext*)data)->context);
     free(data);
 }
-
-size_t liquidC_size(const void* data) {
-    return sizeof(LiquidCRubyContext);
+void liquidCParser_free(void* data) {
+    if (((LiquidParser*)data)->parser)
+        liquidFreeParser(*((LiquidParser*)data));
+    free(data);
+}
+void liquidCRenderer_free(void* data) {
+    if (((LiquidRenderer*)data)->renderer)
+        liquidFreeRenderer(*((LiquidRenderer*)data));
+    free(data);
+}
+void liquidCTemplate_free(void* data) {
+    if (((LiquidTemplate*)data)->ast)
+        liquidFreeTemplate(*((LiquidTemplate*)data));
+    free(data);
+}
+void liquidCOptimizer_free(void* data) {
+    if (((LiquidOptimizer*)data)->optimizer)
+        liquidFreeOptimizer(*((LiquidOptimizer*)data));
+    free(data);
 }
 
 void liquidC_mark(void* self) {
     rb_gc_mark(((LiquidCRubyContext*)self)->registeredFunctionArray);
 }
+
+size_t liquidCOptimizer_size(const void* data) { return sizeof(LiquidOptimizer); }
+size_t liquidCTemplate_size(const void* data) { return sizeof(LiquidTemplate); }
+size_t liquidC_size(const void* data) { return sizeof(LiquidCRubyContext); }
+size_t liquidCParser_size(const void* data) { return sizeof(LiquidParser); }
+size_t liquidCRenderer_size(const void* data) { return sizeof(LiquidRenderer); }
 
 
 static const rb_data_type_t liquidC_type = {
@@ -199,49 +228,8 @@ static const rb_data_type_t liquidC_type = {
             .dsize = liquidC_size,
     },
     .data = NULL,
-    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY
 };
-
-
-VALUE liquidC_alloc(VALUE self) {
-    LiquidCRubyContext* data = (LiquidCRubyContext*)malloc(sizeof(LiquidCRubyContext));
-    data->context.context = NULL;
-    data->registeredFunctionArray = rb_ary_new();
-    return TypedData_Wrap_Struct(self, &liquidC_type, data);
-}
-
-VALUE liquidC_m_initialize(int argc, VALUE* argv, VALUE self) {
-        LiquidCRubyContext* context;
-        char* str;
-        TypedData_Get_Struct(self, LiquidCRubyContext, &liquidC_type, context);
-        context->context = liquidCreateContext();
-        if (liquidGetError()) {
-            rb_raise(rb_eTypeError, "LiquidC init failure: %s.", liquidGetError());
-            return self;
-        }
-
-        if (argc > 0) {
-            str = StringValueCStr(argv[0]);
-            if (strcmp(str, "strict") == 0)
-                liquidImplementStrictStandardDialect(context->context);
-            else
-                liquidImplementPermissiveStandardDialect(context->context);
-        }
-        else
-            liquidImplementStrictStandardDialect(context->context);
-        return self;
-}
-
-void liquidCRenderer_free(void* data) {
-    if (((LiquidRenderer*)data)->renderer)
-        liquidFreeRenderer(*((LiquidRenderer*)data));
-    free(data);
-}
-
-size_t liquidCRenderer_size(const void* data) {
-    return sizeof(LiquidRenderer);
-}
-
 
 static const rb_data_type_t liquidCRenderer_type = {
     .wrap_struct_name = "Renderer",
@@ -254,13 +242,82 @@ static const rb_data_type_t liquidCRenderer_type = {
     .flags = RUBY_TYPED_FREE_IMMEDIATELY,
 };
 
+static const rb_data_type_t liquidCParser_type = {
+    .wrap_struct_name = "Parser",
+    .function = {
+            .dmark = NULL,
+            .dfree = liquidCParser_free,
+            .dsize = liquidCParser_size,
+    },
+    .data = NULL,
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
+};
 
+static const rb_data_type_t liquidCTemplate_type = {
+    .wrap_struct_name = "Template",
+    .function = {
+            .dmark = NULL,
+            .dfree = liquidCTemplate_free,
+            .dsize = liquidCTemplate_size,
+    },
+    .data = NULL,
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
+};
+static const rb_data_type_t liquidCOptimizer_type = {
+    .wrap_struct_name = "Optimizer",
+    .function = {
+            .dmark = NULL,
+            .dfree = liquidCOptimizer_free,
+            .dsize = liquidCOptimizer_size,
+    },
+    .data = NULL,
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
+};
+
+VALUE liquidC_alloc(VALUE self) {
+    LiquidCRubyContext* data = (LiquidCRubyContext*)malloc(sizeof(LiquidCRubyContext));
+    data->context.context = NULL;
+    data->registeredFunctionArray = rb_ary_new();
+    return TypedData_Wrap_Struct(self, &liquidC_type, data);
+}
+VALUE liquidCParser_alloc(VALUE self) {
+    LiquidParser* data = (LiquidParser*)malloc(sizeof(LiquidParser));
+    data->parser = NULL;
+    return TypedData_Wrap_Struct(self, &liquidCParser_type, data);
+}
 VALUE liquidCRenderer_alloc(VALUE self) {
     LiquidRenderer* data = (LiquidRenderer*)malloc(sizeof(LiquidRenderer));
     data->renderer = NULL;
     return TypedData_Wrap_Struct(self, &liquidCRenderer_type, data);
 }
+VALUE liquidCTemplate_alloc(VALUE self) {
+    LiquidTemplate* data = (LiquidTemplate*)malloc(sizeof(LiquidTemplate));
+    data->ast = NULL;
+    return TypedData_Wrap_Struct(self, &liquidCTemplate_type, data);
+}
+VALUE liquidCOptimizer_alloc(VALUE self) {
+    LiquidOptimizer* data = (LiquidOptimizer*)malloc(sizeof(LiquidOptimizer));
+    data->optimizer = NULL;
+    return TypedData_Wrap_Struct(self, &liquidCOptimizer_type, data);
+}
 
+// Actual implementations.
+VALUE liquidC_m_initialize(int argc, VALUE* argv, VALUE self) {
+    LiquidCRubyContext* context;
+    char* str;
+    TypedData_Get_Struct(self, LiquidCRubyContext, &liquidC_type, context);
+    context->context = liquidCreateContext();
+    if (argc > 0) {
+        str = StringValueCStr(argv[0]);
+        if (strcmp(str, "strict") == 0)
+            liquidImplementStrictStandardDialect(context->context);
+        else
+            liquidImplementPermissiveStandardDialect(context->context);
+    }
+    else
+        liquidImplementStrictStandardDialect(context->context);
+    return self;
+}
 
 VALUE liquidCRenderer_m_initialize(VALUE self, VALUE contextValue) {
     LiquidRenderer* renderer;
@@ -298,156 +355,13 @@ VALUE liquidCRenderer_m_initialize(VALUE self, VALUE contextValue) {
     return self;
 }
 
-
-
-void liquidCTemplate_free(void* data) {
-    if (((LiquidTemplate*)data)->ast)
-        liquidFreeTemplate(*((LiquidTemplate*)data));
-    free(data);
-}
-
-size_t liquidCTemplate_size(const void* data) {
-    return sizeof(LiquidTemplate);
-}
-
-
-static const rb_data_type_t liquidCTemplate_type = {
-    .wrap_struct_name = "Template",
-    .function = {
-            .dmark = NULL,
-            .dfree = liquidCTemplate_free,
-            .dsize = liquidCTemplate_size,
-    },
-    .data = NULL,
-    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
-};
-
-
-VALUE liquidCTemplate_alloc(VALUE self) {
-    LiquidTemplate* data = (LiquidTemplate*)malloc(sizeof(LiquidTemplate));
-    data->ast = NULL;
-    return TypedData_Wrap_Struct(self, &liquidCTemplate_type, data);
-}
-
-VALUE liquidCTemplate_m_initialize(int argc, VALUE* argv, VALUE self) {
-    char* tmplBody;
-    size_t length;
-    LiquidTemplate* tmpl;
+VALUE liquidCParser_m_initialize(VALUE self, VALUE incomingContext) {
+    LiquidParser* parser;
     LiquidCRubyContext* context;
-    LiquidParserError error;
-    VALUE errorMode;
-    bool treatUnknownFiltersAsErrors;
-    bool treatUnknownVariablesAsErrors;
-
-    VALUE contextValue, tmplContents, attrs;
-    if (argc < 2) {
-        rb_raise(rb_eArgError, "wrong number of arguments (given %d, expected at least 2)", argc);
-        return self;
-    }
-    contextValue = argv[0];
-    tmplContents = argv[1];
-    if (argc > 2)
-        attrs = argv[2];
-    else
-        attrs = Qnil;
-
-    TypedData_Get_Struct(self, LiquidTemplate, &liquidCTemplate_type, tmpl);
-    TypedData_Get_Struct(contextValue, LiquidCRubyContext, &liquidC_type, context);
-
-    Check_Type(tmplContents, T_STRING);
-    tmplBody = StringValueCStr(tmplContents);
-    length = RSTRING_LEN(tmplContents);
-
-    treatUnknownFiltersAsErrors = false;
-    treatUnknownVariablesAsErrors = false;
-    if (attrs != Qnil) {
-        Check_Type(attrs, T_HASH);
-        errorMode = rb_hash_aref(attrs, rb_str_new2("error_mode"));
-        if (rb_to_id(errorMode) == rb_intern("strict")) {
-            treatUnknownFiltersAsErrors = true;
-        } else if (rb_to_id(errorMode) == rb_intern("warn")) {
-
-        }
-    }
-
-    *tmpl = liquidCreateTemplate(context->context, tmplBody, length, false, &error);
-
-    if (error.type != LIQUID_PARSER_ERROR_TYPE_NONE) {
-        rb_raise(rb_eTypeError, "LiquidC Template init failure: %d, %s.", error.type, error.message);
-        return self;
-    }
+    TypedData_Get_Struct(self, LiquidParser, &liquidCParser_type, parser);
+    TypedData_Get_Struct(incomingContext, LiquidCRubyContext, &liquidC_type, context);
+    *parser = liquidCreateParser(context->context);
     return self;
-}
-
-
-VALUE method_liquidCTemplateRender(int argc, VALUE* argv, VALUE self) {
-    VALUE str, stash, tmpl, attrs;
-    LiquidTemplate* liquidTemplate;
-    LiquidRenderer* liquidRenderer;
-    LiquidRenderError error;
-    LiquidTemplateRender result;
-    bool strictVariables, strictFilters;
-
-    TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, liquidRenderer);
-    if (argc < 2) {
-        rb_raise(rb_eArgError, "wrong number of arguments (given %d, expected at least 2)", argc);
-        return self;
-    }
-    stash = argv[0];
-    tmpl = argv[1];
-    Check_Type(stash, T_HASH);
-    TypedData_Get_Struct(tmpl, LiquidTemplate, &liquidCTemplate_type, liquidTemplate);
-    if (argc > 2)
-        attrs = argv[2];
-    else
-        attrs = Qnil;
-
-    strictVariables = false;
-    strictFilters = true;
-    if (attrs != Qnil) {
-        Check_Type(attrs, T_HASH);
-        strictVariables = RTEST(rb_hash_aref(attrs, rb_str_new2("strict_variables")));
-        strictFilters = RTEST(rb_hash_aref(attrs, rb_str_new2("strict_filters")));
-    }
-
-    result = liquidRenderTemplate(*liquidRenderer, (void*)stash, *liquidTemplate, &error);
-
-    if (error.type != LIQUID_RENDERER_ERROR_TYPE_NONE) {
-        rb_raise(rb_eArgError, "LiquidC Template render failure: %d, %s.", error.type, error.message);
-        return self;
-    }
-
-    str = rb_str_new(liquidTemplateRenderGetBuffer(result), liquidTemplateRenderGetSize(result));
-    liquidFreeTemplateRender(result);
-    return str;
-}
-
-void liquidCOptimizer_free(void* data) {
-    if (((LiquidOptimizer*)data)->optimizer)
-        liquidFreeOptimizer(*((LiquidOptimizer*)data));
-    free(data);
-}
-
-size_t liquidCOptimizer_size(const void* data) {
-    return sizeof(LiquidOptimizer);
-}
-
-static const rb_data_type_t liquidCOptimizer_type = {
-    .wrap_struct_name = "Optimizer",
-    .function = {
-            .dmark = NULL,
-            .dfree = liquidCOptimizer_free,
-            .dsize = liquidCOptimizer_size,
-    },
-    .data = NULL,
-    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
-};
-
-
-VALUE liquidCOptimizer_alloc(VALUE self) {
-    LiquidOptimizer* data = (LiquidOptimizer*)malloc(sizeof(LiquidOptimizer));
-    data->optimizer = NULL;
-    return TypedData_Wrap_Struct(self, &liquidCOptimizer_type, data);
 }
 
 VALUE liquidCOptimizer_m_initialize(VALUE self, VALUE incomingRenderer) {
@@ -456,6 +370,68 @@ VALUE liquidCOptimizer_m_initialize(VALUE self, VALUE incomingRenderer) {
     TypedData_Get_Struct(self, LiquidOptimizer, &liquidCOptimizer_type, optimizer);
     TypedData_Get_Struct(incomingRenderer, LiquidRenderer, &liquidCRenderer_type, renderer);
     *optimizer = liquidCreateOptimizer(*renderer);
+    return self;
+}
+
+
+VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
+    VALUE str;
+    LiquidTemplate* liquidTemplate;
+    LiquidRenderer* liquidRenderer;
+    LiquidRendererError error;
+    LiquidTemplateRender result;
+
+    TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, liquidRenderer);
+    TypedData_Get_Struct(tmpl, LiquidTemplate, &liquidCTemplate_type, liquidTemplate);
+    Check_Type(stash, T_HASH);
+    result = liquidRendererRenderTemplate(*liquidRenderer, (void*)stash, *liquidTemplate, &error);
+    if (error.type != LIQUID_RENDERER_ERROR_TYPE_NONE) {
+        VALUE exception = rb_funcall(liquidCRendererError, rb_intern("new"), 0);
+        rb_raise(exception, "%s", liquidGetRendererErrorMessage(error));
+        return self;
+    }
+    str = rb_str_new(liquidTemplateRenderGetBuffer(result), liquidTemplateRenderGetSize(result));
+    liquidFreeTemplateRender(result);
+    return str;
+}
+
+VALUE method_liquidCParserParse(VALUE self, VALUE text) {
+    LiquidParser* parser;
+    LiquidTemplate tmpl;
+    char* textBody;
+    int textLength;
+    LiquidLexerError lexerError;
+    LiquidParserError parserError;
+    VALUE result, arg;
+
+    TypedData_Get_Struct(self, LiquidParser, &liquidCParser_type, parser);
+
+    Check_Type(text, T_STRING);
+    textBody = StringValueCStr(text);
+    textLength = RSTRING_LEN(text);
+
+    tmpl = liquidParserParseTemplate(*parser, textBody, textLength, &lexerError, &parserError);
+    if (lexerError.type) {
+        VALUE exception = rb_funcall(liquidCParserError, rb_intern("new"), 0);
+        rb_raise(exception, "%s", liquidGetLexerErrorMessage(lexerError));
+        return self;
+    }
+    if (parserError.type) {
+        VALUE exception = rb_funcall(liquidCParserError, rb_intern("new"), 0);
+        rb_raise(exception, "%s", liquidGetParserErrorMessage(parserError));
+        return self;
+    }
+    result = rb_obj_alloc(liquidCTemplate);
+    arg = LL2NUM((long long)tmpl.ast);
+    rb_obj_call_init(result, 1, &arg);
+    return result;
+}
+
+VALUE liquidCTemplate_m_initialize(VALUE self, VALUE incomingTemplate) {
+    LiquidTemplate* tmpl;
+    Check_Type(incomingTemplate, T_FIXNUM);
+    TypedData_Get_Struct(self, LiquidTemplate, &liquidCTemplate_type, tmpl);
+    tmpl->ast = (void*)NUM2LL(incomingTemplate);
     return self;
 }
 
@@ -593,11 +569,16 @@ VALUE method_liquidC_registerDotFilter(VALUE self, VALUE symbol, VALUE optimizat
 
 
 void Init_liquidc() {
-	VALUE liquidC, liquidCRenderer, liquidCTemplate, liquidCOptimizer;
+	VALUE liquidC, liquidCRenderer, liquidCOptimizer, liquidCParser, liquidCError;
 	liquidC = rb_define_class("LiquidC", rb_cData);
 	liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cData);
 	liquidCOptimizer = rb_define_class_under(liquidC, "Optimizer", rb_cData);
 	liquidCTemplate = rb_define_class_under(liquidC, "Template", rb_cData);
+	liquidCParser = rb_define_class_under(liquidC, "Parser", rb_cData);
+
+	liquidCError = rb_define_class_under(liquidC, "Error", rb_eStandardError);
+	liquidCParserError = rb_define_class_under(liquidCParser, "Error", liquidCError);
+	liquidCRendererError = rb_define_class_under(liquidCRenderer, "Error", rb_eStandardError);
 
 	rb_define_alloc_func(liquidC, liquidC_alloc);
 	rb_define_method(liquidC, "initialize", liquidC_m_initialize, -1);
@@ -606,14 +587,18 @@ void Init_liquidc() {
     rb_define_method(liquidC, "registerOperator", method_liquidC_registerOperator, 4);
     rb_define_method(liquidC, "registerDotFilter", method_liquidC_registerDotFilter, 3);
 
+	rb_define_alloc_func(liquidCParser, liquidCParser_alloc);
+    rb_define_method(liquidCParser, "initialize", liquidCParser_m_initialize, 1);
+    rb_define_method(liquidCParser, "parse", method_liquidCParserParse, 1);
+
 	rb_define_alloc_func(liquidCRenderer, liquidCRenderer_alloc);
     rb_define_method(liquidCRenderer, "initialize", liquidCRenderer_m_initialize, 1);
-    rb_define_method(liquidCRenderer, "render", method_liquidCTemplateRender, -1);
+    rb_define_method(liquidCRenderer, "render", method_liquidCTemplateRender, 2);
 
     rb_define_alloc_func(liquidCOptimizer, liquidCOptimizer_alloc);
     rb_define_method(liquidCOptimizer, "initialize", liquidCOptimizer_m_initialize, 1);
     rb_define_method(liquidCOptimizer, "optimize", method_liquidCOptimizer_optimize, 2);
 
 	rb_define_alloc_func(liquidCTemplate, liquidCTemplate_alloc);
-	rb_define_method(liquidCTemplate, "initialize", liquidCTemplate_m_initialize, -1);
+	rb_define_method(liquidCTemplate, "initialize", liquidCTemplate_m_initialize, 1);
 }

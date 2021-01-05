@@ -26,39 +26,28 @@ namespace Liquid {
         void pushInternalDrop(const std::string& key, std::pair<void*, DropFunction> func);
         void popInternalDrop(const std::string& key);
 
-        LiquidRenderErrorType error = LiquidRenderErrorType::LIQUID_RENDERER_ERROR_TYPE_NONE;
+        LiquidRendererErrorType error = LiquidRendererErrorType::LIQUID_RENDERER_ERROR_TYPE_NONE;
 
-        struct Error : LiquidRenderError {
-            typedef LiquidRenderErrorType Type;
+        struct Error : LiquidRendererError {
+            typedef LiquidRendererErrorType Type;
 
             Error() {
-                column = 0;
-                row = 0;
                 type = Type::LIQUID_RENDERER_ERROR_TYPE_NONE;
-                message[0] = 0;
+                details.column = 0;
+                details.row = 0;
+                details.message[0] = 0;
             }
             Error(const Error& error) = default;
             Error(Error&& error) = default;
 
-            Error(Type type) {
-                column = 0;
-                row = 0;
+            Error(Type type, const std::string& message = "") {
+                details.column = 0;
+                details.row = 0;
                 this->type = type;
-                message[0] = 0;
+                strcpy(details.message, message.data());
             }
 
-            Error(Type type, const std::string& message) {
-                column = 0;
-                row = 0;
-                this->type = type;
-                strcpy(this->message, message.data());
-            }
-        };
-
-        struct Exception : Liquid::Exception {
-            Renderer::Error rendererError;
-            std::string message;
-            Exception(const Renderer::Error& error) : rendererError(error) {
+            static string english(const LiquidRendererError& rendererError) {
                 char buffer[512];
                 switch (rendererError.type) {
                     case Renderer::Error::Type::LIQUID_RENDERER_ERROR_TYPE_NONE: break;
@@ -72,7 +61,15 @@ namespace Liquid {
                         sprintf(buffer, "Exceeded stack depth.");
                     break;
                 }
-                message = buffer;
+                return string(buffer);
+            }
+        };
+
+        struct Exception : Liquid::Exception {
+            Renderer::Error rendererError;
+            std::string message;
+            Exception(const Renderer::Error& error) : rendererError(error) {
+                message = Error::english(error);
             }
 
             const char* what() const noexcept {
@@ -103,7 +100,8 @@ namespace Liquid {
         Renderer(const Context& context);
         Renderer(const Context& context, LiquidVariableResolver variableResolver);
 
-        LiquidRenderErrorType render(const Node& ast, Variable store, void (*)(const char* chunk, size_t size, void* data), void* data);
+        vector<Error> errors;
+        LiquidRendererErrorType render(const Node& ast, Variable store, void (*)(const char* chunk, size_t size, void* data), void* data);
         string render(const Node& ast, Variable store);
         // Retrieves a rendered node, if possible. If the node in question has a nodetype that is PARTIAL optimized, Has the potential to return node with
         // a type still attached; otherwise, will always be a variant node.

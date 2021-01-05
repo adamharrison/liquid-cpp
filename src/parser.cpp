@@ -460,12 +460,13 @@ namespace Liquid {
 
         nodes.push_back(std::make_unique<Node>(context.getConcatenationNodeType()));
         Lexer::Error error = lexer.parse(buffer, len);
-        if (errors.size() > 0)
-            throw Exception(errors[0]);
         if (error.type != Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_NONE)
             throw Exception(error);
-        if (nodes.size() > 1)
-            throw Exception(Liquid::Parser::Error(lexer, LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END));
+        if (nodes.size() > 1) {
+            if (errors.size() > 0)
+                throw Exception(errors);
+            throw Exception({ Liquid::Parser::Error(lexer, LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END) });
+        }
         assert(nodes.size() == 1);
         Node node = move(*nodes.back().get());
         nodes.clear();

@@ -1802,8 +1802,7 @@ namespace Liquid {
     };
 
 
-    void StandardDialect::implement(Context& context, bool globalAssignsOnly, bool disallowParentheses, bool assignOperatorsOnly, bool disableArrayLiterals, EFalsiness falsiness) {
-
+    void StandardDialect::implement(Context& context, bool globalAssignsOnly, bool disallowParentheses, bool assignConditionalOperatorsOnly, bool assignOutputFiltersOnly, bool disableArrayLiterals, EFalsiness falsiness) {
         context.falsiness = falsiness;
         context.allowArrayLiterals = !disableArrayLiterals;
 

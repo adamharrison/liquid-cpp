@@ -12,7 +12,8 @@ namespace Liquid {
 
     }
 
-    LiquidRenderErrorType Renderer::render(const Node& ast, Variable store, void (*callback)(const char* chunk, size_t size, void* data), void* data) {
+    LiquidRendererErrorType Renderer::render(const Node& ast, Variable store, void (*callback)(const char* chunk, size_t size, void* data), void* data) {
+        errors.clear();
         renderStartTime = std::chrono::system_clock::now();
         currentMemoryUsage = 0;
         currentRenderingDepth = 0;
@@ -26,7 +27,7 @@ namespace Liquid {
 
     string Renderer::render(const Node& ast, Variable store) {
         string accumulator;
-        LiquidRenderErrorType error = render(ast, store, +[](const char* chunk, size_t size, void* data){
+        LiquidRendererErrorType error = render(ast, store, +[](const char* chunk, size_t size, void* data){
             string* accumulator = (string*)data;
             accumulator->append(chunk, size);
         }, &accumulator);
