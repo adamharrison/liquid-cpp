@@ -792,7 +792,7 @@ parseTemplate(parser, str, error)
             if (lexerError.type) {
                 AV* av = (AV*)SvRV(error);
                 av_push(av, newSVnv(lexerError.type));
-                av_push(av, newSVnv(lexerError.details.row));
+                av_push(av, newSVnv(lexerError.details.line));
                 av_push(av, newSVnv(lexerError.details.column));
                 av_push(av, newSVpvn(lexerError.details.message, strlen(lexerError.details.message)));
                 RETVAL = NULL;
@@ -800,7 +800,7 @@ parseTemplate(parser, str, error)
             if (parserError.type) {
                 AV* av = (AV*)SvRV(error);
                 av_push(av, newSVnv(parserError.type));
-                av_push(av, newSVnv(parserError.details.row));
+                av_push(av, newSVnv(parserError.details.line));
                 av_push(av, newSVnv(parserError.details.column));
                 av_push(av, newSVpvn(parserError.details.message, strlen(parserError.details.message)));
                 RETVAL = NULL;
@@ -828,7 +828,7 @@ renderTemplate(renderer, store, tmpl, error)
             if (rendererError.type) {
                 AV* av = (AV*)SvRV(error);
                 av_push(av, newSVnv(rendererError.type));
-                av_push(av, newSVnv(rendererError.details.row));
+                av_push(av, newSVnv(rendererError.details.line));
                 av_push(av, newSVnv(rendererError.details.column));
                 av_push(av, newSVpvn(rendererError.details.message, strlen(rendererError.details.message)));
             }

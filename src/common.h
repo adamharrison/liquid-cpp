@@ -2,6 +2,7 @@
 #define LIQUIDCOMMON_H
 
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <vector>
 #include <memory>
@@ -14,6 +15,8 @@
 namespace Liquid {
     template<typename T>
     using vector = std::vector<T>;
+    template<typename T>
+    using unordered_set = std::unordered_set<T>;
     using string = std::string;
     template<typename S, typename T>
     using unordered_map = std::unordered_map<S,T>;
@@ -340,9 +343,9 @@ namespace Liquid {
             vector<unique_ptr<Node>> children;
         };
 
-        Node() : type(nullptr), variant() { }
-        Node(const NodeType* type) : type(type), children() { }
-        Node(const Node& node) :type(node.type) {
+        Node() : type(nullptr), line(0), column(0), variant() { }
+        Node(const NodeType* type) : type(type), line(0), column(0), children() { }
+        Node(const Node& node) :type(node.type), line(node.line), column(node.column) {
             if (type) {
                 new(&children) vector<unique_ptr<Node>>();
                 children.reserve(node.children.size());
@@ -352,9 +355,9 @@ namespace Liquid {
                 new(&variant) Variant(node.variant);
             }
         }
-        Node(const Variant& v) : type(nullptr), variant(v) { }
-        Node(Variant&& v) : type(nullptr), variant(std::move(v)) { }
-        Node(Node&& node) :type(node.type) {
+        Node(const Variant& v) : type(nullptr), line(0), column(0), variant(v) { }
+        Node(Variant&& v) : type(nullptr), line(0), column(0), variant(std::move(v)) { }
+        Node(Node&& node) :type(node.type), line(node.line), column(node.column) {
             if (type) {
                 new(&children) vector<unique_ptr<Node>>(std::move(node.children));
             } else {
@@ -428,7 +431,8 @@ namespace Liquid {
             QUALIFIER,
             OPERATOR,
             FILTER,
-            DOT_FILTER
+            DOT_FILTER,
+            CONTEXTUAL
         };
 
         Type type;
@@ -444,7 +448,7 @@ namespace Liquid {
         ~NodeType() { }
 
         virtual Node render(Renderer& renderer, const Node& node, Variable store) const;
-        virtual LiquidParserError validate(const Context& context, const Node& node) const { return LiquidParserError { LIQUID_PARSER_ERROR_TYPE_NONE }; }
+        virtual bool validate(Parser& parser, const Node& node) const { return true; }
         virtual bool optimize(Optimizer& optimizer, Node& node, Variable store) const;
 
         Node getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const;

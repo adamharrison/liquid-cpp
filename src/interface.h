@@ -8,8 +8,14 @@
 extern "C" {
 #endif
 
-    #define LIQUID_ERROR_MESSAGE_MAX_LENGTH 256
-    #define LIQUID_FILE_MAX_LENGTH 256
+    #define LIQUID_ERROR_MESSAGE_MAX_LENGTH 64
+    #define LIQUID_ERROR_FILE_MAX_LENGTH 256
+    #define LIQUID_ERROR_ARGS_MAX 5
+
+    typedef enum ELiquidLexerErrorType {
+        LIQUID_LEXER_ERROR_TYPE_NONE,
+        LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END
+    } LiquidLexerErrorType;
 
     typedef enum ELiquidParserErrorType {
         LIQUID_PARSER_ERROR_TYPE_NONE,
@@ -28,16 +34,13 @@ extern "C" {
         LIQUID_PARSER_ERROR_TYPE_PARSE_DEPTH_EXCEEDED
     } LiquidParserErrorType;
 
-    typedef enum ELiquidLexerErrorType {
-        LIQUID_LEXER_ERROR_TYPE_NONE,
-        LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END
-    } LiquidLexerErrorType;
 
     typedef struct SLiquidErrorDetails {
-        size_t row;
+        size_t line;
         size_t column;
-        char file[LIQUID_FILE_MAX_LENGTH];
+        char file[LIQUID_ERROR_FILE_MAX_LENGTH];
         char message[LIQUID_ERROR_MESSAGE_MAX_LENGTH];
+        int args[LIQUID_ERROR_ARGS_MAX];
     } LiquidErrorDetails;
 
     typedef struct SLiquidLexerError {
@@ -54,7 +57,9 @@ extern "C" {
         LIQUID_RENDERER_ERROR_TYPE_NONE,
         LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_MEMORY,
         LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_TIME,
-        LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_DEPTH
+        LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_DEPTH,
+        LIQUID_RENDERER_ERROR_TYPE_UNKNOWN_VARIABLE,
+        LIQUID_RENDERER_ERROR_TYPE_UNKNOWN_FILTER
     } LiquidRendererErrorType;
 
     typedef struct SLiquidRendererError {
@@ -153,6 +158,8 @@ extern "C" {
     #endif
 
     LiquidRenderer liquidCreateRenderer(LiquidContext context);
+    void liquidRendererSetStrictVariables(LiquidRenderer renderer, bool strict);
+    void liquidRendererSetStrictFilters(LiquidRenderer renderer, bool strict);
     void liquidRendererSetCustomData(LiquidRenderer renderer, void* data);
     void* liquidRendererGetCustomData(LiquidRenderer renderer);
     void liquidRendererSetReturnValueNil(LiquidRenderer renderer);
@@ -170,7 +177,7 @@ extern "C" {
     LiquidParserWarning liquidGetParserWarning(LiquidParser parser, size_t index);
     void liquidFreeParser(LiquidParser parser);
 
-    LiquidTemplate liquidParserParseTemplate(LiquidParser parser, const char* buffer, size_t size, LiquidLexerError* lexer, LiquidParserError* error);
+    LiquidTemplate liquidParserParseTemplate(LiquidParser parser, const char* buffer, size_t size, const char* file, LiquidLexerError* lexer, LiquidParserError* error);
     void liquidFreeTemplate(LiquidTemplate tmpl);
 
     LiquidOptimizer liquidCreateOptimizer(LiquidRenderer renderer);
@@ -185,9 +192,9 @@ extern "C" {
     const char* liquidTemplateRenderGetBuffer(LiquidTemplateRender render);
     size_t liquidTemplateRenderGetSize(LiquidTemplateRender render);
 
-    const char* liquidGetLexerErrorMessage(LiquidLexerError error);
-    const char* liquidGetParserErrorMessage(LiquidParserError error);
-    const char* liquidGetRendererErrorMessage(LiquidRendererError error);
+    void liquidGetLexerErrorMessage(LiquidLexerError error, char* buffer, size_t maxSize);
+    void liquidGetParserErrorMessage(LiquidParserError error, char* buffer, size_t maxSize);
+    void liquidGetRendererErrorMessage(LiquidRendererError error, char* buffer, size_t maxSize);
 
     void liquidFilterGetOperand(void** targetVariable, LiquidRenderer renderer, LiquidNode filter, void* variableStore);
     void liquidGetArgument(void** targetVariable, LiquidRenderer renderer, LiquidNode node, void* variableStore, int idx);

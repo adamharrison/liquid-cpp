@@ -72,8 +72,6 @@
 		<Unit filename="perl/t/WWW-Shopify-Liquid-XS.t" />
 		<Unit filename="perl/test.pl" />
 		<Unit filename="ruby/Rakefile" />
-		<Unit filename="ruby/ext/liquidc/extconf.rb" />
-		<Unit filename="ruby/lib/liquidc.rb" />
 		<Unit filename="ruby/liquidc-dir/lib/liquidc-dir.rb" />
 		<Unit filename="ruby/liquidc-dir/liquidc-dir.gemspec" />
 		<Unit filename="ruby/liquidc-dir/t/test.rb" />
@@ -83,7 +81,6 @@
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="ruby/liquidc/t/test.rb" />
-		<Unit filename="ruby/t/test.rb" />
 		<Unit filename="src/common.h" />
 		<Unit filename="src/context.cpp" />
 		<Unit filename="src/context.h" />

@@ -605,8 +605,23 @@ TEST(sanity, malicious) {
     std::string str;
 
     ASSERT_ANY_THROW(ast = getParser().parse("{% assign a = (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((( %}"));
+}
 
+TEST(sanity, strict) {
+    CPPVariable hash;
+    Context context;
+    StandardDialect::implementStrict(context);
+    WebDialect::implement(context);
+    Parser parser(context);
+    Renderer renderer(context, CPPVariableResolver());
+    Node ast;
+    string result;
 
+    hash["a"] = -1;
+
+    ast = parser.parse("{% if a + 2 > 1 %}a{% endif %}");
+    result = renderer.render(ast, hash);
+    ASSERT_TRUE(parser.errors.size() > 0);
 }
 
 TEST(sanity, error) {
@@ -615,13 +630,26 @@ TEST(sanity, error) {
     Node ast;
     std::string str;
 
+    ASSERT_NO_THROW({
+        ast = getParser().parse("{% for %}{% endfor %}");
+    });
+    ASSERT_TRUE(getParser().errors.size() > 0);
+
+    ASSERT_NO_THROW({
+        ast = getParser().parse("{% endif %}");
+    });
+    ASSERT_EQ(getParser().errors.size(), 1);
+
+
     ASSERT_THROW({
         ast = getParser().parse("{% assign a = a | plus: 5");
     }, Parser::Exception);
 
-    ASSERT_THROW({
+    ASSERT_NO_THROW({
         ast = getParser().parse("{% assign a a | plus: 5 %}");
-    }, Parser::Exception);
+    });
+    ASSERT_EQ(getParser().errors.size(), 1);
+
 
 }
 

@@ -13,15 +13,26 @@ namespace Liquid {
     }
 
     LiquidRendererErrorType Renderer::render(const Node& ast, Variable store, void (*callback)(const char* chunk, size_t size, void* data), void* data) {
-        errors.clear();
-        renderStartTime = std::chrono::system_clock::now();
-        currentMemoryUsage = 0;
-        currentRenderingDepth = 0;
-        error = Error::Type::LIQUID_RENDERER_ERROR_TYPE_NONE;
-        Node node = retrieveRenderedNode(ast, store);
-        assert(node.type == nullptr);
-        auto s = node.getString();
-        callback(s.data(), s.size(), data);
+        if (internalRender) {
+            Node node = retrieveRenderedNode(ast, store);
+            assert(node.type == nullptr);
+            auto s = node.getString();
+            callback(s.data(), s.size(), data);
+        } else {
+            nodeContext = nullptr;
+            errors.clear();
+            unknownErrors.clear();
+            renderStartTime = std::chrono::system_clock::now();
+            currentMemoryUsage = 0;
+            currentRenderingDepth = 0;
+            error = Error::Type::LIQUID_RENDERER_ERROR_TYPE_NONE;
+            internalRender = true;
+            Node node = retrieveRenderedNode(ast, store);
+            internalRender = false;
+            assert(node.type == nullptr);
+            auto s = node.getString();
+            callback(s.data(), s.size(), data);
+        }
         return error;
     }
 
@@ -32,7 +43,7 @@ namespace Liquid {
             accumulator->append(chunk, size);
         }, &accumulator);
         if (error != LIQUID_RENDERER_ERROR_TYPE_NONE)
-            throw Error(error);
+            throw Error(error, Node());
         return accumulator;
     }
 
@@ -156,6 +167,32 @@ namespace Liquid {
         return string();
     }
 
+    void Renderer::pushUnknownFilterWarning(const Node& node, Variable stash) {
+        assert(node.type);
+        if (unknownErrors.find(&node) == unknownErrors.end()) {
+            unknownErrors.insert(&node);
+            errors.push_back(Error(LIQUID_RENDERER_ERROR_TYPE_UNKNOWN_FILTER, node, node.type->symbol));
+        }
+    }
+    void Renderer::pushUnknownVariableWarning(const Node& node, int offset, Variable store) {
+        if (unknownErrors.find(&node) == unknownErrors.end()) {
+            unknownErrors.insert(&node);
+            string variableName;
+            for (size_t i = offset; i < node.children.size(); ++i) {
+                auto result = retrieveRenderedNode(*node.children[i].get(), store);
+                if (!variableName.empty()) {
+                    if (result.variant.type == Variant::Type::INT) {
+                        variableName.push_back('[');
+                        variableName.append(std::to_string(result.variant.i));
+                        variableName.push_back(']');
+                    } else
+                        variableName.append(".");
+                    variableName.append(result.getString());
+                }
+            }
+            errors.push_back(Error(LIQUID_RENDERER_ERROR_TYPE_UNKNOWN_VARIABLE, node, variableName));
+        }
+    }
 
     Variable Renderer::getVariable(const Node& node, Variable store, size_t offset) {
         Variable storePointer = store;
@@ -164,21 +201,22 @@ namespace Liquid {
             auto node = retrieveRenderedNode(*link.get(), store);
             switch (node.variant.type) {
                 case Variant::Type::INT:
-                    if (!variableResolver.getArrayVariable(*this, storePointer, node.variant.i, storePointer)) {
+                    if (!variableResolver.getArrayVariable(*this, storePointer, node.variant.i, storePointer))
                         storePointer = Variable({ nullptr });
-                    }
                 break;
-                case Variant::Type::STRING:
+                case Variant::Type::STRING: {
                     if (!variableResolver.getDictionaryVariable(*this, storePointer, node.variant.s.data(), storePointer))
                         storePointer = Variable({ nullptr });
-                break;
+                } break;
                 default:
                     storePointer = Variable({ nullptr });
                 break;
             }
             if (!storePointer.pointer)
-                return Variable({ nullptr });
+                break;
         }
+        if (logUnknownVariables && !storePointer.exists())
+            pushUnknownVariableWarning(node, offset, store);
         return storePointer;
     }
 

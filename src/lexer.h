@@ -30,7 +30,7 @@ namespace Liquid {
             Error(const Error& error) = default;
             Error(Error&& error) = default;
             Error(Lexer& lexer, Type type, const std::string& message = "") {
-                details.row = lexer.row;
+                details.line = lexer.line;
                 details.column = lexer.column;
                 this->type = type;
                 strcpy(details.message, message.data());
@@ -44,9 +44,9 @@ namespace Liquid {
                     case Type::LIQUID_LEXER_ERROR_TYPE_NONE: break;
                     case Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END:
                         if (error.details.message[0])
-                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.details.message, error.details.row, error.details.column);
+                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.details.message, error.details.line, error.details.column);
                         else
-                            sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.details.row, error.details.column);
+                            sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.details.line, error.details.column);
                     break;
                 }
                 return std::string(buffer);
@@ -55,7 +55,7 @@ namespace Liquid {
 
 
         size_t column;
-        size_t row;
+        size_t line;
         State state;
 
         bool startOutputBlock(bool suppress) { return true; }
@@ -99,7 +99,7 @@ namespace Liquid {
             size_t lastInitial = 0;
             size_t i;
             bool ongoing = true;
-            row = 1;
+            line = 1;
             column = 0;
             state = State::INITIAL;
             while (ongoing && offset < size) {
@@ -108,7 +108,7 @@ namespace Liquid {
                     case State::INITIAL:
                         switch (str[offset]) {
                             case '\n': {
-                                ++row;
+                                ++line;
                                 column = 0;
                             } break;
                             case '{': {

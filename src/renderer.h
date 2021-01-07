@@ -5,6 +5,7 @@
 
 namespace Liquid {
     struct Context;
+    struct ContextBoundaryNode;
 
     // One renderer per thread; though many renderers can be instantiated.
     struct Renderer {
@@ -34,15 +35,15 @@ namespace Liquid {
             Error() {
                 type = Type::LIQUID_RENDERER_ERROR_TYPE_NONE;
                 details.column = 0;
-                details.row = 0;
+                details.line = 0;
                 details.message[0] = 0;
             }
             Error(const Error& error) = default;
             Error(Error&& error) = default;
 
-            Error(Type type, const std::string& message = "") {
-                details.column = 0;
-                details.row = 0;
+            Error(Type type, const Node& node, const std::string& message = "") {
+                details.column = node.column;
+                details.line = node.line;
                 this->type = type;
                 strcpy(details.message, message.data());
             }
@@ -59,6 +60,12 @@ namespace Liquid {
                     break;
                     case Renderer::Error::Type::LIQUID_RENDERER_ERROR_TYPE_EXCEEDED_DEPTH:
                         sprintf(buffer, "Exceeded stack depth.");
+                    break;
+                    case Renderer::Error::Type::LIQUID_RENDERER_ERROR_TYPE_UNKNOWN_VARIABLE:
+                        sprintf(buffer, "Unknown variable '%s'.", rendererError.details.message);
+                    break;
+                    case Renderer::Error::Type::LIQUID_RENDERER_ERROR_TYPE_UNKNOWN_FILTER:
+                        sprintf(buffer, "Unknown filter '%s'.", rendererError.details.message);
                     break;
                 }
                 return string(buffer);
@@ -91,6 +98,19 @@ namespace Liquid {
         unsigned int currentMemoryUsage;
         std::chrono::system_clock::time_point renderStartTime;
         unsigned int currentRenderingDepth;
+
+        bool logUnknownFilters = false;
+        bool logUnknownVariables = false;
+
+        bool internalRender = false;
+
+        ContextBoundaryNode* nodeContext = nullptr;
+
+        // Done so we don't repeat unknown errors if they're inloops.
+        unordered_set<const Node*> unknownErrors;
+        void pushUnknownVariableWarning(const Node& node, int offset, Variable store);
+        void pushUnknownFilterWarning(const Node& node, Variable store);
+
 
         // Used for the C interface.
         Node returnValue;

@@ -9,8 +9,33 @@ namespace Liquid {
 
     struct Renderer;
 
+    struct ContextualNodeType : NodeType {
+        ContextualNodeType(NodeType::Type type, const std::string& symbol = "", int maxChildren = -1, LiquidOptimizationScheme scheme = LIQUID_OPTIMIZATION_SCHEME_NONE) : NodeType(type, symbol, maxChildren, scheme) { }
 
-    struct TagNodeType : NodeType {
+        // For operators that are internal to this tag.
+        unordered_map<string, unique_ptr<NodeType>> operators;
+        // For filters specific to this tag.
+        unordered_map<string, unique_ptr<NodeType>> filters;
+
+        // Used for registering intermedaites and qualiifers.
+        template <class T>
+        void registerType() {
+            auto nodeType = make_unique<T>();
+            switch (nodeType->type) {
+                case NodeType::Type::FILTER:
+                    filters[nodeType->symbol] = std::move(nodeType);
+                break;
+                case NodeType::Type::OPERATOR:
+                    operators[nodeType->symbol] = std::move(nodeType);
+                break;
+                default:
+                    assert(false);
+                break;
+            }
+        }
+    };
+
+    struct TagNodeType : ContextualNodeType {
         enum class Composition {
             ENCLOSED,
             FREE
@@ -37,7 +62,7 @@ namespace Liquid {
         int minArguments;
         int maxArguments;
 
-        TagNodeType(Composition composition, string symbol, int minArguments = -1, int maxArguments = -1, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : NodeType(NodeType::Type::TAG, symbol, -1, optimization), composition(composition), minArguments(minArguments), maxArguments(maxArguments) { }
+        TagNodeType(Composition composition, string symbol, int minArguments = -1, int maxArguments = -1, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : ContextualNodeType(NodeType::Type::TAG, symbol, -1, optimization), composition(composition), minArguments(minArguments), maxArguments(maxArguments) { }
 
         // Used for registering intermedaites and qualiifers.
         template <class T>
@@ -49,6 +74,12 @@ namespace Liquid {
                 break;
                 case NodeType::Type::QUALIFIER:
                     qualifiers[nodeType->symbol] = std::move(nodeType);
+                break;
+                case NodeType::Type::OPERATOR:
+                    operators[nodeType->symbol] = std::move(nodeType);
+                break;
+                case NodeType::Type::FILTER:
+                    filters[nodeType->symbol] = std::move(nodeType);
                 break;
                 default:
                     assert(false);
@@ -112,6 +143,15 @@ namespace Liquid {
         Node getOperand(Renderer& renderer, const Node& node, Variable store) const;
     };
 
+    // Represents something a file, or whatnot. Allows the filling in of
+    struct ContextBoundaryNode : NodeType {
+        ContextBoundaryNode() : NodeType(NodeType::Type::CONTEXTUAL) { }
+        Node render(Renderer& renderer, const Node& node, Variable store) {
+            renderer.nodeContext = this;
+            return renderer.retrieveRenderedNode(*node.children[1].get(), store);
+        }
+    };
+
     struct Context {
         struct ConcatenationNode : NodeType {
             ConcatenationNode() : NodeType(Type::OPERATOR, "", -1, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
@@ -120,8 +160,8 @@ namespace Liquid {
             bool optimize(Optimizer& optimizer, Node& node, Variable store) const;
         };
 
-        struct OutputNode : NodeType {
-            OutputNode() : NodeType(Type::OUTPUT) { }
+        struct OutputNode : ContextualNodeType {
+            OutputNode() : ContextualNodeType(Type::OUTPUT) { }
 
             Node render(Renderer& renderer, const Node& node, Variable store) const {
                 assert(node.children.size() == 1);
@@ -161,10 +201,19 @@ namespace Liquid {
             }
         };
 
-        struct UnknownFilterNode : FilterNodeType { UnknownFilterNode() : FilterNodeType("", -1, -1) { } };
+        struct UnknownFilterNode : FilterNodeType {
+            UnknownFilterNode() : FilterNodeType("", -1, -1) { }
+
+            Node render(Renderer& renderer, const Node& node, Variable store) const {
+                if (renderer.logUnknownFilters)
+                    renderer.pushUnknownFilterWarning(node, store);
+                return Node();
+            }
+        };
 
         EFalsiness falsiness = FALSY_FALSE;
-        bool allowArrayLiterals = true;
+        bool disallowArrayLiterals = false;
+        bool disallowGroupingOutsideAssign = false;
 
         struct VariableNode : NodeType {
             VariableNode() : NodeType(Type::VARIABLE) { }
@@ -201,8 +250,10 @@ namespace Liquid {
         const NodeType* getArgumentsNodeType() const { static ArgumentNode argumentNodeType; return &argumentNodeType; }
         const NodeType* getUnknownFilterNodeType() const { static UnknownFilterNode filterNodeType; return &filterNodeType; }
         const NodeType* getArrayLiteralNodeType() const { static ArrayLiteralNode arrayLiteralNode; return &arrayLiteralNode; }
+        const NodeType* getContextBoundaryNodeType() const { static ContextBoundaryNode contextBoundaryNode; return &contextBoundaryNode; }
 
         NodeType* registerType(unique_ptr<NodeType> type) {
+            NodeType* value = type.get();
             switch (type->type) {
                 case NodeType::Type::TAG:
                     tagTypes[type->symbol] = move(type);
@@ -232,7 +283,7 @@ namespace Liquid {
                     assert(false);
                 break;
             }
-            return type.get();
+            return value;
         }
         template <class T> NodeType* registerType() { return registerType(make_unique<T>()); }
 

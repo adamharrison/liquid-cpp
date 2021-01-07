@@ -53,14 +53,14 @@ void liquidFreeOptimizer(LiquidOptimizer optimizer) {
     delete (Optimizer*)optimizer.optimizer;
 }
 
-LiquidTemplate liquidParserParseTemplate(LiquidParser parser, const char* buffer, size_t size, LiquidLexerError* lexerError, LiquidParserError* parserError) {
+LiquidTemplate liquidParserParseTemplate(LiquidParser parser, const char* buffer, size_t size, const char* file, LiquidLexerError* lexerError, LiquidParserError* parserError) {
     Node tmpl;
     if (lexerError)
         lexerError->type = LiquidLexerErrorType::LIQUID_LEXER_ERROR_TYPE_NONE;
     if (parserError)
         parserError->type = LiquidParserErrorType::LIQUID_PARSER_ERROR_TYPE_NONE;
     try {
-        tmpl = static_cast<Parser*>(parser.parser)->parse(buffer, size);
+        tmpl = static_cast<Parser*>(parser.parser)->parse(buffer, size, file);
     } catch (Parser::Exception& exp) {
         if (parserError)
             *parserError = exp.parserErrors[0];
@@ -201,6 +201,13 @@ void* liquidRendererGetCustomData(LiquidRenderer renderer) {
 }
 
 
+void liquidRendererSetStrictVariables(LiquidRenderer renderer, bool strict) {
+    static_cast<Renderer*>(renderer.renderer)->logUnknownVariables = strict;
+}
+void liquidRendererSetStrictFilters(LiquidRenderer renderer, bool strict) {
+    static_cast<Renderer*>(renderer.renderer)->logUnknownFilters = strict;
+}
+
 void liquidRendererSetReturnValueString(LiquidRenderer renderer, const char* s, int length) {
     static_cast<Renderer*>(renderer.renderer)->returnValue = move(Variant(string(s, length)));
 }
@@ -242,15 +249,18 @@ size_t liquidTemplateRenderGetSize(LiquidTemplateRender render) {
     return static_cast<std::string*>(render.internal)->size();
 }
 
-const char* liquidGetLexerErrorMessage(LiquidLexerError error) {
+void liquidGetLexerErrorMessage(LiquidLexerError error, char* buffer, size_t maxSize) {
     string s = Lexer<Parser>::Error::english(error);
-    return s.c_str();
+    strncpy(buffer, s.c_str(), maxSize);
+    buffer[maxSize] = 0;
 }
-const char* liquidGetParserErrorMessage(LiquidParserError error) {
+void liquidGetParserErrorMessage(LiquidParserError error, char* buffer, size_t maxSize) {
     string s = Parser::Error::english(error);
-    return s.c_str();
+    strncpy(buffer, s.c_str(), maxSize);
+    buffer[maxSize] = 0;
 }
-const char* liquidGetRendererErrorMessage(LiquidRendererError error) {
+void liquidGetRendererErrorMessage(LiquidRendererError error, char* buffer, size_t maxSize) {
     string s = Renderer::Error::english(error);
-    return s.c_str();
+    strncpy(buffer, s.c_str(), maxSize);
+    buffer[maxSize] = 0;
 }

@@ -97,7 +97,8 @@ int(int argc, char* argv[]) {
     Liquid::Parser parser(context);
 
     const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
-    // Throws an exception if there's a parsing error.
+    // Throws an exception if there's a fatal parsing error. Liquid accepts quite a lot by default, so normally this'll be fine.
+    // You can query a vector of errors under `parser.errors`.
     Liquid::Node ast = parser.parseFile(exampleFile, sizeof(exampleFile)-1);
     // Initialize a renderer. These should be thread-local. One renderer can render many templates.
     // Register the standard, out of the box variable implementation that lets us pass a type union'd variant that can hold either a long long, double, pointer, string, vector, or unordered_map<string, ...> .

@@ -9,8 +9,17 @@
 
 namespace Liquid {
 
+    template <bool allowGlobals>
     struct AssignNode : TagNodeType {
-        AssignNode() : TagNodeType(Composition::FREE, "assign", 1, 1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
+
+        struct AssignOperator : OperatorNodeType {
+            AssignOperator() : OperatorNodeType("=", Arity::BINARY, 0) { }
+            Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
+        };
+
+        AssignNode() : TagNodeType(Composition::FREE, "assign", 1, 1, LIQUID_OPTIMIZATION_SCHEME_NONE) {
+            registerType<AssignOperator>();
+        }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto& argumentNode = node.children.front();
@@ -22,17 +31,31 @@ namespace Liquid {
                 Node node = renderer.retrieveRenderedNode(*operandNode.get(), store);
                 assert(!node.type);
                 renderer.inject(targetVariable, node.variant);
-
                 renderer.setVariable(*variableNode.get(), store, targetVariable);
             }
             return Node();
         }
+
+        bool validate(Parser& parser, const Node& node) {
+            auto& argumentNode = node.children.front();
+            auto& assignmentNode = argumentNode->children.front();
+            if (assignmentNode->type != parser.context.getBinaryOperatorType("=")) {
+                parser.pushError(Parser::Error(parser.lexer, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS, assignmentNode->getString()));
+                return false;
+            }
+            auto& variableNode = assignmentNode->children.front();
+            if (variableNode->type != parser.context.getVariableNodeType()) {
+                parser.pushError(Parser::Error(parser.lexer, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS, variableNode->getString()));
+                return false;
+            }
+            if (!allowGlobals && variableNode->children.size() > 1) {
+                parser.pushError(Parser::Error(parser.lexer, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS, variableNode->getString()));
+                return false;
+            }
+            return true;
+        }
     };
 
-    struct AssignOperator : OperatorNodeType {
-        AssignOperator() : OperatorNodeType("=", Arity::BINARY, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
-    };
 
     struct CaptureNode : TagNodeType {
         CaptureNode() : TagNodeType(Composition::ENCLOSED, "capture", 1, 1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
@@ -278,7 +301,7 @@ namespace Liquid {
         };
 
         struct CycleNode : TagNodeType {
-            CycleNode() : TagNodeType(Composition::FREE, "cycle", 2, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
+            CycleNode() : TagNodeType(Composition::FREE, "cycle", 1, -1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
 
             Node render(Renderer& renderer, const Node& node, Variable store) const {
                 assert(node.children.size() == 1 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
@@ -291,7 +314,7 @@ namespace Liquid {
             }
         };
 
-        ForNode() : TagNodeType(Composition::ENCLOSED, "for", -1, -1) {
+        ForNode() : TagNodeType(Composition::ENCLOSED, "for", 1, -1) {
             registerType<ElseNode>();
             registerType<ReverseQualifierNode>();
             registerType<LimitQualifierNode>();
@@ -1801,14 +1824,72 @@ namespace Liquid {
         }
     };
 
+    template <class T>
+    void registerStandardDialectFilters(T& context) {
+
+        // Math filters.
+        context.template registerType<PlusFilterNode>();
+        context.template registerType<MinusFilterNode>();
+        context.template registerType<MultiplyFilterNode>();
+        context.template registerType<DivideFilterNode>();
+        context.template registerType<AbsFilterNode>();
+        context.template registerType<AtMostFilterNode>();
+        context.template registerType<AtLeastFilterNode>();
+        context.template registerType<CeilFilterNode>();
+        context.template registerType<FloorFilterNode>();
+        context.template registerType<RoundFilterNode>();
+        context.template registerType<ModuloFilterNode>();
+
+        // String filters. Those that are HTML speciifc, or would require minor external libraries
+        // are left off for now.
+        context.template registerType<AppendFilterNode>();
+        context.template registerType<camelCaseFilterNode>();
+        context.template registerType<CapitalizeFilterNode>();
+        context.template registerType<DowncaseFilterNode>();
+        context.template registerType<HandleFilterNode>();
+        context.template registerType<HandleizeFilterNode>();
+        context.template registerType<PluralizeFilterNode>();
+        context.template registerType<PrependFilterNode>();
+        context.template registerType<RemoveFilterNode>();
+        context.template registerType<RemoveFirstFilterNode>();
+        context.template registerType<ReplaceFilterNode>();
+        context.template registerType<ReplaceFirstFilterNode>();
+        context.template registerType<SliceFilterNode>();
+        context.template registerType<SplitFilterNode>();
+        context.template registerType<StripFilterNode>();
+        context.template registerType<LStripFilterNode>();
+        context.template registerType<RStripFilterNode>();
+        context.template registerType<StripNewlinesFilterNode>();
+        context.template registerType<TruncateFilterNode>();
+        context.template registerType<TruncateWordsFilterNode>();
+        context.template registerType<UpcaseFilterNode>();
+
+        // Array filters.
+        context.template registerType<JoinFilterNode>();
+        context.template registerType<FirstFilterNode>();
+        context.template registerType<LastFilterNode>();
+        context.template registerType<ConcatFilterNode>();
+        context.template registerType<IndexFilterNode>();
+        context.template registerType<MapFilterNode>();
+        context.template registerType<ReverseFilterNode>();
+        context.template registerType<SizeFilterNode>();
+        context.template registerType<SortFilterNode>();
+        context.template registerType<WhereFilterNode>();
+        context.template registerType<UniqFilterNode>();
+
+        // Other filters.
+        context.template registerType<DefaultFilterNode>();
+        context.template registerType<DateFilterNode>();
+    }
 
     void StandardDialect::implement(Context& context, bool globalAssignsOnly, bool disallowParentheses, bool assignConditionalOperatorsOnly, bool assignOutputFiltersOnly, bool disableArrayLiterals, EFalsiness falsiness) {
         context.falsiness = falsiness;
-        context.allowArrayLiterals = !disableArrayLiterals;
+        context.disallowArrayLiterals = disableArrayLiterals;
+        context.disallowGroupingOutsideAssign = disallowParentheses;
 
         // Control flow tags.
-        context.registerType<IfNode>();
-        context.registerType<UnlessNode>();
+        TagNodeType* ifNode = static_cast<TagNodeType*>(context.registerType<IfNode>());
+        TagNodeType* unlessNode = static_cast<TagNodeType*>(context.registerType<UnlessNode>());
         context.registerType<CaseNode>();
 
         // Iteration tags.
@@ -1819,7 +1900,8 @@ namespace Liquid {
         context.registerType<ForNode::ContinueNode>();
 
         // Variable tags.
-        context.registerType<AssignNode>();
+        TagNodeType* assignNode = static_cast<TagNodeType*>(globalAssignsOnly ? context.registerType<AssignNode<false>>() : context.registerType<AssignNode<true>>());
+
         context.registerType<CaptureNode>();
         context.registerType<IncrementNode>();
         context.registerType<DecrementNode>();
@@ -1828,80 +1910,55 @@ namespace Liquid {
         context.registerType<CommentNode>();
 
         // Standard set of operators.
-        context.registerType<AssignOperator>();
-        context.registerType<PlusOperatorNode>();
-        context.registerType<MinusOperatorNode>();
-        context.registerType<UnaryMinusOperatorNode>();
-        context.registerType<UnaryNegationOperatorNode>();
-        context.registerType<MultiplyOperatorNode>();
-        context.registerType<DivideOperatorNode>();
-        context.registerType<ModuloOperatorNode>();
-        context.registerType<LessThanOperatorNode>();
-        context.registerType<LessThanEqualOperatorNode>();
-        context.registerType<GreaterThanOperatorNode>();
-        context.registerType<GreaterThanEqualOperatorNode>();
-        context.registerType<EqualOperatorNode>();
-        context.registerType<NotEqualOperatorNode>();
-        context.registerType<AndOperatorNode>();
-        context.registerType<OrOperatorNode>();
+        if (assignConditionalOperatorsOnly) {
+            assignNode->registerType<PlusOperatorNode>();
+            assignNode->registerType<MinusOperatorNode>();
+            assignNode->registerType<UnaryMinusOperatorNode>();
+            assignNode->registerType<UnaryNegationOperatorNode>();
+            assignNode->registerType<MultiplyOperatorNode>();
+            assignNode->registerType<DivideOperatorNode>();
+            assignNode->registerType<ModuloOperatorNode>();
+            for (TagNodeType* type : { ifNode, unlessNode }) {
+                type->registerType<LessThanOperatorNode>();
+                type->registerType<LessThanEqualOperatorNode>();
+                type->registerType<GreaterThanOperatorNode>();
+                type->registerType<GreaterThanEqualOperatorNode>();
+                type->registerType<EqualOperatorNode>();
+                type->registerType<NotEqualOperatorNode>();
+                type->registerType<AndOperatorNode>();
+                type->registerType<OrOperatorNode>();
+                type->registerType<ContainsOperatorNode>();
+            }
+        } else {
+            context.registerType<PlusOperatorNode>();
+            context.registerType<MinusOperatorNode>();
+            context.registerType<UnaryMinusOperatorNode>();
+            context.registerType<UnaryNegationOperatorNode>();
+            context.registerType<MultiplyOperatorNode>();
+            context.registerType<DivideOperatorNode>();
+            context.registerType<ModuloOperatorNode>();
+            context.registerType<LessThanOperatorNode>();
+            context.registerType<LessThanEqualOperatorNode>();
+            context.registerType<GreaterThanOperatorNode>();
+            context.registerType<GreaterThanEqualOperatorNode>();
+            context.registerType<EqualOperatorNode>();
+            context.registerType<NotEqualOperatorNode>();
+            context.registerType<AndOperatorNode>();
+            context.registerType<OrOperatorNode>();
+            context.registerType<ContainsOperatorNode>();
+        }
+
         context.registerType<RangeOperatorNode>();
-        context.registerType<ContainsOperatorNode>();
 
-        // Math filters.
-        context.registerType<PlusFilterNode>();
-        context.registerType<MinusFilterNode>();
-        context.registerType<MultiplyFilterNode>();
-        context.registerType<DivideFilterNode>();
-        context.registerType<AbsFilterNode>();
-        context.registerType<AtMostFilterNode>();
-        context.registerType<AtLeastFilterNode>();
-        context.registerType<CeilFilterNode>();
-        context.registerType<FloorFilterNode>();
-        context.registerType<RoundFilterNode>();
-        context.registerType<ModuloFilterNode>();
+        if (assignOutputFiltersOnly) {
+            registerStandardDialectFilters<TagNodeType>(*assignNode);
+            registerStandardDialectFilters(*static_cast<ContextualNodeType*>(const_cast<NodeType*>(context.getOutputNodeType())));
+        } else {
+            registerStandardDialectFilters<Context>(context);
+        }
 
-        // String filters. Those that are HTML speciifc, or would require minor external libraries
-        // are left off for now.
-        context.registerType<AppendFilterNode>();
-        context.registerType<camelCaseFilterNode>();
-        context.registerType<CapitalizeFilterNode>();
-        context.registerType<DowncaseFilterNode>();
-        context.registerType<HandleFilterNode>();
-        context.registerType<HandleizeFilterNode>();
-        context.registerType<PluralizeFilterNode>();
-        context.registerType<PrependFilterNode>();
-        context.registerType<RemoveFilterNode>();
-        context.registerType<RemoveFirstFilterNode>();
-        context.registerType<ReplaceFilterNode>();
-        context.registerType<ReplaceFirstFilterNode>();
-        context.registerType<SliceFilterNode>();
-        context.registerType<SplitFilterNode>();
-        context.registerType<StripFilterNode>();
-        context.registerType<LStripFilterNode>();
-        context.registerType<RStripFilterNode>();
-        context.registerType<StripNewlinesFilterNode>();
-        context.registerType<TruncateFilterNode>();
-        context.registerType<TruncateWordsFilterNode>();
-        context.registerType<UpcaseFilterNode>();
-
-        // Array filters.
-        context.registerType<JoinFilterNode>();
-        context.registerType<FirstFilterNode>();
-        context.registerType<LastFilterNode>();
-        context.registerType<ConcatFilterNode>();
-        context.registerType<IndexFilterNode>();
-        context.registerType<MapFilterNode>();
-        context.registerType<ReverseFilterNode>();
-        context.registerType<SizeFilterNode>();
         context.registerType<SizeDotFilterNode>();
         context.registerType<FirstDotFilterNode>();
         context.registerType<LastDotFilterNode>();
-        context.registerType<SortFilterNode>();
-        context.registerType<WhereFilterNode>();
-        context.registerType<UniqFilterNode>();
-
-        // Other filters.
-        context.registerType<DefaultFilterNode>();
-        context.registerType<DateFilterNode>();
     }
 }

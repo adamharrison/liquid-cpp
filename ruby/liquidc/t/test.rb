@@ -7,10 +7,13 @@ context = LiquidC.new("strict")
 renderer = LiquidC::Renderer.new(context)
 parser = LiquidC::Parser.new(context)
 optimizer = LiquidC::Optimizer.new(renderer)
-
 context.registerFilter("test", -1, -1, 0, Proc.new{ |renderer, node, stash, operand|
     "operand" + operand
 })
+
+puts renderer.render({ }, parser.parse("{% endif %}"))
+puts parser.warnings
+puts renderer.warnings
 
 templateContent = "{% if a %}asdfghj {{ a }}{% else %}asdfjlsjkhgsjlkhglsdfjkgdfhs{% for i in (1..10) %}{{ i }}fasdfsdf{% endfor %}{% endif %}"
 
