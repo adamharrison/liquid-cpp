@@ -780,14 +780,19 @@ freeParser(parser)
         liquidFreeParser(*(LiquidParser*)&parser);
 
 void*
-parseTemplate(parser, str, error)
+parseTemplate(parser, str, fileSV, error)
     void* parser;
     char* str;
+    SV* fileSV;
     SV* error;
     CODE:
         LiquidLexerError lexerError;
         LiquidParserError parserError;
-        RETVAL = liquidParserParseTemplate(*(LiquidParser*)&parser, str, strlen(str), &lexerError, &parserError).ast;
+        STRLEN len;
+        const char* file = NULL;
+        if (fileSV && SvOK(fileSV))
+            file = SvPV(fileSV, len);
+        RETVAL = liquidParserParseTemplate(*(LiquidParser*)&parser, str, strlen(str), file ? file : "", &lexerError, &parserError).ast;
         if (SvROK(error)) {
             if (lexerError.type) {
                 AV* av = (AV*)SvRV(error);

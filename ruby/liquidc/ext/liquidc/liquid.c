@@ -425,9 +425,10 @@ VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
     return str;
 }
 
-VALUE method_liquidCParserParse(VALUE self, VALUE text) {
+VALUE method_liquidCParserParse(int argc, VALUE* argv, VALUE self) {
     LiquidParser* parser;
     LiquidTemplate tmpl;
+    char* fileBody;
     char* textBody;
     int textLength;
     LiquidLexerError lexerError;
@@ -438,11 +439,17 @@ VALUE method_liquidCParserParse(VALUE self, VALUE text) {
 
     TypedData_Get_Struct(self, LiquidParser, &liquidCParser_type, parser);
 
-    Check_Type(text, T_STRING);
-    textBody = StringValueCStr(text);
-    textLength = RSTRING_LEN(text);
+    Check_Type(argv[0], T_STRING);
+    textBody = StringValueCStr(argv[0]);
+    textLength = RSTRING_LEN(argv[0]);
+    if (argc > 1) {
+        Check_Type(argv[1], T_STRING);
+        fileBody = StringValueCStr(argv[1]);
+    } else
+        fileBody = NULL;
 
-    tmpl = liquidParserParseTemplate(*parser, textBody, textLength, &lexerError, &parserError);
+
+    tmpl = liquidParserParseTemplate(*parser, textBody, textLength, fileBody ? fileBody : "", &lexerError, &parserError);
     if (lexerError.type) {
         liquidGetLexerErrorMessage(lexerError, buffer, sizeof(buffer));
         PACK_EXCEPTION(liquidCParserError, lexerError, exceptionInit, buffer, exception);
@@ -684,7 +691,7 @@ void Init_liquidc() {
 
 	rb_define_alloc_func(liquidCParser, liquidCParser_alloc);
     rb_define_method(liquidCParser, "initialize", liquidCParser_m_initialize, 1);
-    rb_define_method(liquidCParser, "parse", method_liquidCParserParse, 1);
+    rb_define_method(liquidCParser, "parse", method_liquidCParserParse, -1);
     rb_define_method(liquidCParser, "warnings", method_liquidCParserWarnings, 0);
 
 	rb_define_alloc_func(liquidCRenderer, liquidCRenderer_alloc);

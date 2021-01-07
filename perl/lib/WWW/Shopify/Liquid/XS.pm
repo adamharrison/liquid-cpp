@@ -128,10 +128,9 @@ sub new {
 sub parse {
     my ($self, $text, $file) = @_;
     my $error = [];
-    my $template = WWW::Shopify::Liquid::XS::Template->new(WWW::Shopify::Liquid::XS::parseTemplate($self->{parser}, encode("UTF-8", $text), $error));
+    my $template = WWW::Shopify::Liquid::XS::Template->new(WWW::Shopify::Liquid::XS::parseTemplate($self->{parser}, encode("UTF-8", $text), $file, $error));
      if (!$template) {
         $error = WWW::Shopify::Liquid::XS::Exception->new($error);
-        $error->{line}->[3] = $file;
         die $error;
     }
     return $template;
