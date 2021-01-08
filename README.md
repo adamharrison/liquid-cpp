@@ -66,7 +66,7 @@ Building the library is easy; so long as you have the appropriate build-system; 
 
 It can be built and installed like so, from the main directory:
 
-```mkdir -p build && cd build && cmake .. && make && sudo make install```
+```mkdir -p build && cd build && cmake .. && make && sudo make install/strip```
 
 Eventually, I'll have a .deb that can be downloaded from somewhere for Ubuntu distros, but that's not quite up yet.
 
