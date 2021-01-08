@@ -25,7 +25,6 @@ namespace Liquid {
 
             Error() {
                 type = Type::LIQUID_LEXER_ERROR_TYPE_NONE;
-                details.message[0] = 0;
             }
             Error(const Error& error) = default;
             Error(Error&& error) = default;
@@ -33,7 +32,8 @@ namespace Liquid {
                 details.line = lexer.line;
                 details.column = lexer.column;
                 this->type = type;
-                strcpy(details.message, message.data());
+                strncpy(details.args[0], message.data(), LIQUID_ERROR_ARG_MAX_LENGTH);
+                details.args[0][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
             }
 
             operator bool() const { return type != Type::LIQUID_LEXER_ERROR_TYPE_NONE; }
@@ -43,8 +43,8 @@ namespace Liquid {
                 switch (error.type) {
                     case Type::LIQUID_LEXER_ERROR_TYPE_NONE: break;
                     case Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END:
-                        if (error.details.message[0])
-                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.details.message, error.details.line, error.details.column);
+                        if (error.details.args[0])
+                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.details.args[0], error.details.line, error.details.column);
                         else
                             sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.details.line, error.details.column);
                     break;

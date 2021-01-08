@@ -486,11 +486,11 @@ namespace Liquid {
         auto& arguments = controlBlock->children[0];
         const TagNodeType* controlType = static_cast<const TagNodeType*>(controlBlock->type);
         if (controlType->minArguments != -1 && (int)arguments->children.size() < controlType->minArguments) {
-            parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS, controlType->symbol, controlType->minArguments, arguments->children.size()));
+            parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS, controlType->symbol, std::to_string(controlType->minArguments), std::to_string(arguments->children.size())));
             return true;
         }
         if (controlType->maxArguments != -1 && (int)arguments->children.size() > controlType->maxArguments) {
-            parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS, controlType->symbol, controlType->minArguments, arguments->children.size()));
+            parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS, controlType->symbol, std::to_string(controlType->minArguments), std::to_string(arguments->children.size())));
             return true;
         }
         if (parser.blockType != Parser::EBlockType::NONE || static_cast<const TagNodeType*>(controlBlock->type)->composition == TagNodeType::Composition::FREE) {

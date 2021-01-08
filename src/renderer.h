@@ -36,7 +36,7 @@ namespace Liquid {
                 type = Type::LIQUID_RENDERER_ERROR_TYPE_NONE;
                 details.column = 0;
                 details.line = 0;
-                details.message[0] = 0;
+                details.args[0][0] = 0;
             }
             Error(const Error& error) = default;
             Error(Error&& error) = default;
@@ -45,7 +45,8 @@ namespace Liquid {
                 details.column = node.column;
                 details.line = node.line;
                 this->type = type;
-                strcpy(details.message, message.data());
+                strncpy(details.args[0], message.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH);
+                details.args[0][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
             }
 
             static string english(const LiquidRendererError& rendererError) {
@@ -62,10 +63,10 @@ namespace Liquid {
                         sprintf(buffer, "Exceeded stack depth.");
                     break;
                     case Renderer::Error::Type::LIQUID_RENDERER_ERROR_TYPE_UNKNOWN_VARIABLE:
-                        sprintf(buffer, "Unknown variable '%s'.", rendererError.details.message);
+                        sprintf(buffer, "Unknown variable '%s'.", rendererError.details.args[0]);
                     break;
                     case Renderer::Error::Type::LIQUID_RENDERER_ERROR_TYPE_UNKNOWN_FILTER:
-                        sprintf(buffer, "Unknown filter '%s'.", rendererError.details.message);
+                        sprintf(buffer, "Unknown filter '%s'.", rendererError.details.args[0]);
                     break;
                 }
                 return string(buffer);

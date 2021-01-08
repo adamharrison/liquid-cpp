@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-    #define LIQUID_ERROR_MESSAGE_MAX_LENGTH 64
+    #define LIQUID_ERROR_ARG_MAX_LENGTH 32
     #define LIQUID_ERROR_FILE_MAX_LENGTH 256
     #define LIQUID_ERROR_ARGS_MAX 5
 
@@ -39,8 +39,7 @@ extern "C" {
         size_t line;
         size_t column;
         char file[LIQUID_ERROR_FILE_MAX_LENGTH];
-        char message[LIQUID_ERROR_MESSAGE_MAX_LENGTH];
-        int args[LIQUID_ERROR_ARGS_MAX];
+        char args[LIQUID_ERROR_ARGS_MAX][LIQUID_ERROR_ARG_MAX_LENGTH];
     } LiquidErrorDetails;
 
     typedef struct SLiquidLexerError {

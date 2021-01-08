@@ -19,21 +19,27 @@ namespace Liquid {
                 this->type = Type::LIQUID_PARSER_ERROR_TYPE_NONE;
                 details.column = 0;
                 details.line = 0;
-                details.message[0] = 0;
+                details.args[0][0] = 0;
             }
             Error(const Error& error) = default;
             Error(Error&& error) = default;
             operator bool() const { return type != Type::LIQUID_PARSER_ERROR_TYPE_NONE; }
 
             template <class T>
-            Error(T& lexer, Type type, const std::string& message = "", int arg0 = 0, int arg1 = 0, int arg2 = 0) {
+            Error(T& lexer, Type type, const std::string& arg0 = "", const std::string& arg1 = "", const std::string& arg2 = "", const std::string& arg3 = "", const std::string& arg4 = "") {
                 this->type = type;
                 details.column = lexer.column;
                 details.line = lexer.line;
-                details.args[0] = arg0;
-                details.args[1] = arg1;
-                details.args[2] = arg2;
-                strcpy(details.message, message.data());
+                strncpy(details.args[0], arg0.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH);
+                details.args[0][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
+                strncpy(details.args[1], arg1.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH);
+                details.args[1][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
+                strncpy(details.args[2], arg2.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH);
+                details.args[2][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
+                strncpy(details.args[3], arg3.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH);
+                details.args[3][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
+                strncpy(details.args[4], arg4.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH);
+                details.args[4][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
             }
 
             static string english(LiquidParserError error) {
@@ -41,29 +47,29 @@ namespace Liquid {
                 switch (error.type) {
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_NONE: break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_TAG:
-                        sprintf(buffer, "Unknown tag '%s' on line %lu, column %lu.", error.details.message, error.details.line, error.details.column);
+                        sprintf(buffer, "Unknown tag '%s' on line %lu, column %lu.", error.details.args[0], error.details.line, error.details.column);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_OPERATOR:
-                        sprintf(buffer, "Unknown operator '%s' on line %lu, column %lu.", error.details.message, error.details.line, error.details.column);
+                        sprintf(buffer, "Unknown operator '%s' on line %lu, column %lu.", error.details.args[0], error.details.line, error.details.column);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_OPERATOR_OR_QUALIFIER:
-                        sprintf(buffer, "Unknown operator, or qualifier '%s' on line %lu, column %lu.", error.details.message, error.details.line, error.details.column);
+                        sprintf(buffer, "Unknown operator, or qualifier '%s' on line %lu, column %lu.", error.details.args[0], error.details.line, error.details.column);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_OPERAND:
-                        sprintf(buffer, "Unexpected operand for qualifier '%s' on line %lu, column %lu.", error.details.message, error.details.line, error.details.column);
+                        sprintf(buffer, "Unexpected operand for qualifier '%s' on line %lu, column %lu.", error.details.args[0], error.details.line, error.details.column);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS:
-                        sprintf(buffer, "Invalid arguments for '%s' on line %lu, column %lu; expected %d, got %d.", error.details.message, error.details.line, error.details.column, error.details.args[0], error.details.args[1]);
+                        sprintf(buffer, "Invalid arguments for '%s' on line %lu, column %lu; expected %s, got %s.", error.details.args[0], error.details.line, error.details.column, error.details.args[0], error.details.args[1]);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_FILTER:
-                        sprintf(buffer, "Unknown filter '%s' on line %lu, column %lu.", error.details.message, error.details.line, error.details.column);
+                        sprintf(buffer, "Unknown filter '%s' on line %lu, column %lu.", error.details.args[0], error.details.line, error.details.column);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL:
-                        sprintf(buffer, "Invalid symbol '%s' on line %lu, column %lu.", error.details.message, error.details.line, error.details.column);
+                        sprintf(buffer, "Invalid symbol '%s' on line %lu, column %lu.", error.details.args[0], error.details.line, error.details.column);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END: {
-                        if (error.details.message[0])
-                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.details.message, error.details.line, error.details.column);
+                        if (error.details.args[0])
+                            sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.details.args[0], error.details.line, error.details.column);
                         else
                             sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.details.line, error.details.column);
                     } break;

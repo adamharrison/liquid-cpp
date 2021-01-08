@@ -8,7 +8,7 @@ module Liquid
                 when 2
                     error = SyntaxError.new("Unknown tag '" + e.message + "'", e.line, e.file)
                 when 7
-                    error = SyntaxError.new("Invalid arguments for '" + e.message + "', expected " + e.args[0].to_s + ", got " +  + ", e.line, e.file)
+                    error = SyntaxError.new("Invalid arguments for '" + e.message + "', expected " + e.args[0].to_s + ", got", e.line, e.file)
                 else
                     error = SyntaxError.new(e.message, e.line, e.file)
                 end
@@ -79,14 +79,24 @@ module Liquid
         # I don't know wtf they were thinking.
         def self.register_filter(mod)
             mod.public_instance_methods.each { |x|
-                @@globalContext.registerFilter(x.to_s, -1, -1, 0, Proc.new{ |renderer, node, stash, operand|
+                @@globalContext.registerFilter(x.to_s, -1, -1, LiquidC::OPTIMIZATION_SCHEME_FULL, Proc.new{ |renderer, node, stash, operand|
                     mod[x].call(operand)
                 })
             }
         end
 
         def self.register_tag(name, klass)
-
+            if klass.is_a?(Liquid::Block)
+                @@globalContext.registerTag(name, LiquidC::TAG_TYPE_ENCLOSING, -1, -1, LiquidC::OPTIMIZATION_SCHEME_FULL, Proc.new { |renderer, node, stash, child, arguments|
+                    klass.new(name, *arguments).render(stash)
+                })
+            else
+                @@globalContext.registerTag(name, LiquidC::TAG_TYPE_FREE, -1, -1, LiquidC::OPTIMIZATION_SCHEME_FULL, Proc.new { |renderer, node, stash, child, arguments|
+                    tag = klass.new(name, *arguments)
+                    tag.instance_variable_set(:body, child)
+                    tag.render(stash)
+                })
+            end
         end
     end
 end

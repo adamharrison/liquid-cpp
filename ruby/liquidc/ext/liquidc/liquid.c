@@ -351,6 +351,7 @@ VALUE liquidCRenderer_m_initialize(VALUE self, VALUE contextValue) {
     TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, renderer);
     TypedData_Get_Struct(contextValue, LiquidCRubyContext, &liquidC_type, context);
     *renderer = liquidCreateRenderer(context->context);
+    liquidRendererSetCustomData(*renderer, (void*)self);
     liquidRegisterVariableResolver(*renderer, resolver);
     return self;
 }
@@ -538,41 +539,45 @@ VALUE method_liquidCOptimizer_optimize(VALUE self, VALUE stash, VALUE incomingTe
 
 static void liquidCRenderTag(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
     VALUE result, renderProc;
-    VALUE* arguments;
+    VALUE arguments[5];
     int argMax, i;
     renderProc = (VALUE)data;
 
     argMax = liquidGetArgumentCount(node);
-    arguments = malloc(sizeof(VALUE)*(argMax+4));
-    arguments[0] = LL2NUM((long long)renderer.renderer);
+    arguments[0] = (VALUE)liquidRendererGetCustomData(renderer);
     arguments[1] = LL2NUM((long long)node.node);
     arguments[2] = (VALUE)variableStore;
     liquidGetChild((void**)&arguments[3], renderer, node, variableStore, 1);
-    for (i = 0; i < argMax; ++i)
-        liquidGetArgument((void**)&arguments[i+4], renderer, node, variableStore, i);
+    arguments[4] = rb_ary_new2(argMax);
+    for (i = 0; i < argMax; ++i) {
+        VALUE argument;
+        liquidGetArgument((void**)&argument, renderer, node, variableStore, i);
+        rb_ary_push(arguments[4], argument);
+    }
     result = rb_funcallv(renderProc, rb_intern("call"), 4+argMax, arguments);
-    liquidRendererSetReturnValueVariable(renderer, (void*)result);
-    free(arguments);
+    StringValue(result);
+    liquidRendererSetReturnValueString(renderer, RSTRING_PTR(result), RSTRING_LEN(result));
 }
 
 static void liquidCRenderFilter(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
     VALUE result, renderProc;
-    VALUE arguments, operand;
+    VALUE arguments, operand, arry, argument;
     int argMax, i;
     renderProc = (VALUE)data;
 
     argMax = liquidGetArgumentCount(node);
     arguments = rb_ary_new2(argMax+4);
-    rb_ary_push(arguments, LL2NUM((long long)renderer.renderer));
+    rb_ary_push(arguments, (VALUE)liquidRendererGetCustomData(renderer));
     rb_ary_push(arguments, LL2NUM((long long)node.node));
     rb_ary_push(arguments, (VALUE)variableStore);
     liquidFilterGetOperand((void**)&operand, renderer, node, variableStore);
     rb_ary_push(arguments, operand);
+    arry = rb_ary_new2(argMax);
     for (i = 0; i < argMax; ++i) {
-        VALUE argument;
         liquidGetArgument((void**)&argument, renderer, node, variableStore, i);
-        rb_ary_push(arguments, argument);
+        rb_ary_push(arry, argument);
     }
+    rb_ary_push(arguments, arry);
     result = rb_proc_call(renderProc, arguments);
     liquidRendererSetReturnValueVariable(renderer, (void*)result);
 }
@@ -580,19 +585,21 @@ static void liquidCRenderFilter(LiquidRenderer renderer, LiquidNode node, void* 
 
 static void liquidCRenderBinaryInfixOperator(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
     VALUE result, renderProc;
-    VALUE arguments, argument;
+    VALUE arguments, argument, arry;
     int argMax, i;
     renderProc = (VALUE)data;
 
     argMax = liquidGetArgumentCount(node);
     arguments = rb_ary_new2(argMax+3);
-    rb_ary_push(arguments, LL2NUM((long long)renderer.renderer));
+    rb_ary_push(arguments, (VALUE)liquidRendererGetCustomData(renderer));
     rb_ary_push(arguments, LL2NUM((long long)node.node));
     rb_ary_push(arguments, (VALUE)variableStore);
+    arry = rb_ary_new2(argMax);
     for (i = 0; i < argMax; ++i) {
         liquidGetArgument((void**)&argument, renderer, node, variableStore, i);
-        rb_ary_push(arguments, argument);
+        rb_ary_push(arry, argument);
     }
+    rb_ary_push(arguments, arry);
     result = rb_proc_call(renderProc, arguments);
     liquidRendererSetReturnValueVariable(renderer, (void*)result);
 }
@@ -605,7 +612,7 @@ static void liquidCRenderDotFilter(LiquidRenderer renderer, LiquidNode node, voi
     liquidFilterGetOperand((void**)&operand, renderer, node, variableStore);
 
     arguments = rb_ary_new2(4);
-    rb_ary_push(arguments, LL2NUM((long long)renderer.renderer));
+    rb_ary_push(arguments, (VALUE)liquidRendererGetCustomData(renderer));
     rb_ary_push(arguments, LL2NUM((long long)node.node));
     rb_ary_push(arguments, (VALUE)variableStore);
     rb_ary_push(arguments, operand);
@@ -683,7 +690,11 @@ void Init_liquidc() {
 
 	rb_define_alloc_func(liquidC, liquidC_alloc);
 	rb_define_method(liquidC, "initialize", liquidC_m_initialize, -1);
+	rb_define_const(liquidC, "OPTIMIZATION_SCHEME_NONE", LL2NUM(LIQUID_OPTIMIZATION_SCHEME_NONE));
+	rb_define_const(liquidC, "OPTIMIZATION_SCHEME_FULL", LL2NUM(LIQUID_OPTIMIZATION_SCHEME_FULL));
 	rb_define_method(liquidC, "registerTag", method_liquidC_registerTag, 6);
+	rb_define_const(liquidC, "TAG_TYPE_ENCLOSING", LL2NUM(LIQUID_TAG_TYPE_ENCLOSING));
+	rb_define_const(liquidC, "TAG_TYPE_FREE", LL2NUM(LIQUID_TAG_TYPE_FREE));
 	rb_define_method(liquidC, "registerFilter", method_liquidC_registerFilter, 5);
     rb_define_method(liquidC, "registerOperator", method_liquidC_registerOperator, 4);
     rb_define_method(liquidC, "registerDotFilter", method_liquidC_registerDotFilter, 3);
