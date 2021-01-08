@@ -26,6 +26,7 @@ sub operate {
 
 
 package WWW::Shopify::Liquid::XS::Exception;
+use Scalar::Util qw(looks_like_number);
 use overload
 	fallback => 1,
 	'""' => sub { return $_[0]->english . ($_[0]->line ? " on line " . $_[0]->line . ", character " . $_[0]->{line}->[1] .  ($_[0]->{line}->[3] ? ", file " . $_[0]->{line}->[3] : '') : ''); };
@@ -36,11 +37,19 @@ sub error { return $_[0]->{error}; }
 
 sub new {
     my ($package, $error) = @_;
-    return bless {
-        error => $error->[0],
-        data => $error->[3],
-        line => [$error->[1], $error->[2]]
-    }, $package;
+    if (ref($error)) {
+        return bless {
+            error => $error->[0],
+            data => $error->[3],
+            line => [$error->[1], $error->[2]]
+        }, $package;
+    } else {
+        return bless {
+            error => $error,
+            data => undef,
+            line => []
+        }, $package;
+    }
 }
 sub english {
     my ($self) = @_;
@@ -59,10 +68,15 @@ sub english {
         "Unbalanced end to group",
         "Parse depth exceeded"
     );
-
-    if (defined $self->{error} && $self->{error} < int(@codes)) {
-        $message = $codes[$self->{error}];
-        $message .= " '" . $self->{data} . "'" if defined $self->{data};
+    if (defined $self->{error}) {
+        if (looks_like_number($self->{error})) {
+            if ($self->{error} < int(@codes)) {
+                $message = $codes[$self->{error}];
+                $message .= " '" . $self->{data} . "'" if defined $self->{data};
+            }
+        } else {
+            $message = $self->{error};
+        }
     }
     $message = "Unknown error" if !$message;
 
@@ -129,10 +143,12 @@ sub parse {
     my ($self, $text, $file) = @_;
     my $error = [];
     my $template = WWW::Shopify::Liquid::XS::Template->new(WWW::Shopify::Liquid::XS::parseTemplate($self->{parser}, encode("UTF-8", $text), $file, $error));
-     if (!$template) {
+    if (!$template) {
         $error = WWW::Shopify::Liquid::XS::Exception->new($error);
         die $error;
     }
+    my @warnings = @{WWW::Shopify::Liquid::XS::getParserWarnings($self->{parser})};
+    die WWW::Shopify::Liquid::XS::Exception->new($warnings[0]) if int(@warnings) > 0;
     return $template;
 }
 
@@ -412,7 +428,7 @@ use Encode;
 
 sub parse_file {
     my ($self, $file) = @_;
-    open(my $fh, "<", $file);
+    open(my $fh, "<", $file) or die WWW::Shopify::Liquid::XS::Exception->new("Can't open file $file: $!");
     my $text = decode("UTF-8", do { local $/; <$fh> });
     return $self->parse_text($text, $file);
 }

@@ -452,6 +452,12 @@ TEST(sanity, composite) {
     Node ast;
     std::string str;
 
+
+    hash["B"] = "D";
+    ast = getParser().parse("A {{ B }} C", sizeof("A {{ B }} C")-1, "testfile");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "A D C");
+
     CPPVariable lip1, lip2, lip3, lip4;
     CPPVariable line_item, line_item1, line_item2, product, product_option1, product_option2, product_option3;
 

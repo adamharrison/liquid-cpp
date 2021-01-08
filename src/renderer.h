@@ -105,7 +105,7 @@ namespace Liquid {
 
         bool internalRender = false;
 
-        ContextBoundaryNode* nodeContext = nullptr;
+        const ContextBoundaryNode* nodeContext = nullptr;
 
         // Done so we don't repeat unknown errors if they're inloops.
         unordered_set<const Node*> unknownErrors;

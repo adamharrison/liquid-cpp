@@ -66,6 +66,7 @@
 			<Option target="library" />
 		</Unit>
 		<Unit filename="README.md" />
+		<Unit filename="configure" />
 		<Unit filename="perl/Makefile.PL" />
 		<Unit filename="perl/XS.xs" />
 		<Unit filename="perl/lib/WWW/Shopify/Liquid/XS.pm" />

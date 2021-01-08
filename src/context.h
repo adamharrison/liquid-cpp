@@ -145,8 +145,8 @@ namespace Liquid {
 
     // Represents something a file, or whatnot. Allows the filling in of
     struct ContextBoundaryNode : NodeType {
-        ContextBoundaryNode() : NodeType(NodeType::Type::CONTEXTUAL) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) {
+        ContextBoundaryNode() : NodeType(NodeType::Type::CONTEXTUAL, "", -1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
+        Node render(Renderer& renderer, const Node& node, Variable store) const {
             renderer.nodeContext = this;
             return renderer.retrieveRenderedNode(*node.children[1].get(), store);
         }

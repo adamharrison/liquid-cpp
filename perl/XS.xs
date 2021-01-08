@@ -817,6 +817,29 @@ parseTemplate(parser, str, fileSV, error)
     OUTPUT:
         RETVAL
 
+AV*
+getParserWarnings(parser)
+    void* parser;
+    CODE:
+        LiquidParserWarning parserWarning;
+        int warningCount, i;
+        AV* warning, *warnings;
+        warningCount = liquidGetParserWarningCount(*(LiquidParser*)&parser);
+        warnings = newAV();
+        for (i = 0; i < warningCount; ++i) {
+            warning = newAV();
+            parserWarning = liquidGetParserWarning(*(LiquidParser*)&parser, i);
+            av_push(warning, newSVnv(parserWarning.type));
+            av_push(warning, newSVnv(parserWarning.details.line));
+            av_push(warning, newSVnv(parserWarning.details.column));
+            for (i = 0; i < LIQUID_ERROR_ARGS_MAX; ++i)
+                av_push(warning, newSVpvn(parserWarning.details.args[i], strlen(parserWarning.details.args[i])));
+            av_push(warnings, newRV_inc((SV*)warning));
+        }
+        RETVAL = warnings;
+    OUTPUT:
+        RETVAL
+
 void
 freeTemplate(tmpl)
     void* tmpl;
