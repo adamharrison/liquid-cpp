@@ -371,10 +371,18 @@ TEST(sanity, arrayLiterals) {
 
 TEST(sanity, filters) {
     CPPVariable hash = { };
-    hash["a"] = 1;
     Node ast;
     std::string str;
 
+    hash["a"] = CPPVariable({ 1, 2, 3, 4, 10 });
+    ast = getParser().parse("{{ a.first.size }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "1");
+    ast = getParser().parse("{{ a.last.size }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "2");
+
+    hash["a"] = 1;
     ast = getParser().parse("{% assign a = a | plus: 5 %}{{ a }}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "6");
@@ -404,6 +412,13 @@ TEST(sanity, filters) {
     ast = getParser().parse("{{ a.size }}");
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "4");
+
+
+    hash["a"] = CPPVariable({ 1, 2, 3, 4 });
+    ast = getParser().parse("{{ a.first }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "1");
+
 }
 
 

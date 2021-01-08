@@ -107,8 +107,22 @@ namespace Liquid {
                     new(&a) std::vector<Variant>();
                     a = v.a;
                 break;
-                default:
+                case Type::BOOL:
+                    b = v.b;
+                break;
+                case Type::FLOAT:
                     f = v.f;
+                break;
+                case Type::INT:
+                    i = v.i;
+                break;
+                case Type::POINTER:
+                    p = v.p;
+                break;
+                case Type::VARIABLE:
+                    this->v = v.v;
+                break;
+                case Type::NIL:
                 break;
             }
         }
@@ -122,8 +136,22 @@ namespace Liquid {
                     new(&a) vector<Variant>();
                     a = std::move(v.a);
                 break;
-                default:
+                case Type::BOOL:
+                    b = v.b;
+                break;
+                case Type::FLOAT:
                     f = v.f;
+                break;
+                case Type::INT:
+                    i = v.i;
+                break;
+                case Type::POINTER:
+                    p = v.p;
+                break;
+                case Type::VARIABLE:
+                    this->v = v.v;
+                break;
+                case Type::NIL:
                 break;
             }
         }
@@ -153,14 +181,23 @@ namespace Liquid {
         }
 
         bool isTruthy(EFalsiness falsiness) const {
-            return !(
-                (type == Variant::Type::BOOL && !b) ||
-                ((falsiness & FALSY_0) && type == Variant::Type::INT && !i) ||
-                ((falsiness & FALSY_0) && type == Variant::Type::FLOAT && !f) ||
-                ((falsiness & FALSY_NIL) && type == Variant::Type::POINTER && !p) ||
-                ((falsiness & FALSY_NIL) && type == Variant::Type::NIL) ||
-                ((falsiness & FALSY_EMPTY_STRING) && type == Variant::Type::STRING && s.size() == 0)
-            );
+            switch (type) {
+                case Variant::Type::BOOL:
+                    return b;
+                case Variant::Type::INT:
+                    return !((falsiness & FALSY_0) && !i);
+                case Variant::Type::FLOAT:
+                    return !((falsiness & FALSY_0) && !f);
+                case Variant::Type::POINTER:
+                    return !((falsiness & FALSY_NIL) && !p);
+                case Variant::Type::NIL:
+                    return !(falsiness & FALSY_NIL);
+                case Variant::Type::STRING:
+                    return !((falsiness & FALSY_EMPTY_STRING) && s.size() == 0);
+                default:
+                    return true;
+            }
+            return true;
         }
 
         Variant& operator = (const Variant& v) {

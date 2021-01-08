@@ -61,7 +61,7 @@ namespace Liquid {
                 return false;
             break;
             case Parser::State::ARGUMENT:
-                if (!parser.nodes.back()->type || parser.nodes.back()->type->type != NodeType::Type::VARIABLE) {
+                if (!parser.nodes.back()->type || (parser.nodes.back()->type->type != NodeType::Type::VARIABLE && parser.nodes.back()->type->type != NodeType::Type::DOT_FILTER)) {
                     parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL, "."));
                     return false;
                 }
@@ -241,7 +241,7 @@ namespace Liquid {
                 else if (strncmp(str, "null", len) == 0)
                     return parser.pushNode(move(make_unique<Node>(Variant(nullptr))));
                 auto& lastNode = parser.nodes.back();
-                if (lastNode->type && lastNode->type->type == NodeType::Type::VARIABLE && !lastNode->children.back().get()) {
+                if (lastNode->type && (lastNode->type->type == NodeType::Type::VARIABLE || lastNode->type->type == NodeType::Type::DOT_FILTER) && !lastNode->children.back().get()) {
                     // Check for dot filters.
                     std::string opName = std::string(str, len);
                     const DotFilterNodeType* op = context.getDotFilterType(opName);

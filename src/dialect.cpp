@@ -632,8 +632,6 @@ namespace Liquid {
             switch (op1.variant.type) {
                 case Variant::Type::NIL:
                     return Node(Variant(operate(op1.variant.p, op2.variant.p)));
-                case Variant::Type::POINTER:
-                    return Node(Variant(operate(op1.variant.p, op2.variant.p)));
                 case Variant::Type::BOOL:
                     return Node(Variant(operate(op1.variant.b, op2.variant.isTruthy(renderer.context.falsiness))));
                 case Variant::Type::INT:
@@ -662,8 +660,16 @@ namespace Liquid {
                 break;
                 case Variant::Type::STRING:
                     if (op2.variant.type != Variant::Type::STRING)
-                        return Node(Variant(operate(op1.variant.s, op2.variant.getString())));
-                    return Node(Variant(operate(op1.variant.s, op2.variant.s)));
+                        return Variant(operate(op1.variant.s, op2.variant.getString()));
+                    return Variant(operate(op1.variant.s, op2.variant.s));
+                case Variant::Type::POINTER:
+                    if (op2.variant.type != Variant::Type::POINTER)
+                        return Variant(false);
+                    return Variant(operate(op1.variant.p, op2.variant.p));
+                case Variant::Type::VARIABLE:
+                    if (op2.variant.type != Variant::Type::VARIABLE)
+                        return Variant(false);
+                    return Variant(operate(op1.variant.v.pointer, op2.variant.v.pointer));
                 default:
                 break;
             }
@@ -1593,7 +1599,7 @@ namespace Liquid {
             Variable v;
             if (!renderer.variableResolver.getArrayVariable(renderer, operand, 0, v))
                 return Node();
-            return Node(v);
+            return renderer.parseVariant(v);
         }
 
         Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) const {
@@ -1629,11 +1635,11 @@ namespace Liquid {
             if (type == LiquidVariableType::LIQUID_VARIABLE_TYPE_DICTIONARY) {
                 if (!renderer.variableResolver.getDictionaryVariable(renderer, operand, "first", v))
                     return Node();
-                return Node(v);
+                return renderer.parseVariant(v);
             }
             if (!renderer.variableResolver.getArrayVariable(renderer, operand, 0, v))
                 return Node();
-            return Node(v);
+            return renderer.parseVariant(v);
         }
 
         Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) const {
@@ -1652,7 +1658,7 @@ namespace Liquid {
             long long size = renderer.variableResolver.getArraySize(renderer, operand);
             if (size == -1 || !renderer.variableResolver.getArrayVariable(renderer, operand, size - 1, v))
                 return Node();
-            return Node(v);
+            return renderer.parseVariant(v);
         }
 
         Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) const {
@@ -1689,11 +1695,11 @@ namespace Liquid {
             if (type == LiquidVariableType::LIQUID_VARIABLE_TYPE_DICTIONARY) {
                 if (!renderer.variableResolver.getDictionaryVariable(renderer, operand, "last", v))
                     return Node();
-                return Node(v);
+                return renderer.parseVariant(v);
             }
             if (!renderer.variableResolver.getArrayVariable(renderer, operand, -1, v))
                 return Node();
-            return Node(v);
+            return renderer.parseVariant(v);
         }
 
         Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) const {
@@ -1774,20 +1780,28 @@ namespace Liquid {
                 case Variant::Type::STRING:
                     return Variant((long long)operand.variant.s.size());
                 default:
-                    return Node();
+                    return Variant((long long)operand.variant.getString().size());
             }
         }
 
         Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             LiquidVariableType type = renderer.variableResolver.getType(renderer, operand);
-            if (type == LiquidVariableType::LIQUID_VARIABLE_TYPE_DICTIONARY) {
-                Variable v;
-                if (!renderer.variableResolver.getDictionaryVariable(renderer, operand, "size", v))
-                    return Node();
-                return Node(v);
+            switch (type) {
+                case LiquidVariableType::LIQUID_VARIABLE_TYPE_DICTIONARY: {
+                    Variable v;
+                    if (!renderer.variableResolver.getDictionaryVariable(renderer, operand, "size", v))
+                        return Node();
+                    return Node(v);
+                } break;
+                case LiquidVariableType::LIQUID_VARIABLE_TYPE_ARRAY: {
+                    long long size = renderer.variableResolver.getArraySize(renderer, operand);
+                    return size != -1 ? Node(size) : Node();
+                } break;
+                default:
+                    return Variant(renderer.variableResolver.getStringLength(renderer, operand));
+                break;
             }
-            long long size = renderer.variableResolver.getArraySize(renderer, operand);
-            return size != -1 ? Node(size) : Node();
+
         }
 
         Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant& operand) const {
