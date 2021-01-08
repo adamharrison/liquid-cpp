@@ -128,10 +128,21 @@ int(int argc, char* argv[]) {
     LiquidContext context = liquidCreateContext();
     liquidImplementPermissiveStandardDialect(context);
 
+    LiquidParser parser = liquidCreateParser(context);
     const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
-    LiquidTemplate tmpl = liquidCreateTemplate(context, exampleFile, sizeof(exampleFile)-1);
-    if (liquidGetError()) {
-        fprintf(stderr, "Error parsing template: %s", liquidGetError());
+    LiquidLexerError lexerError;
+    LiquidParserError parserError;
+    LiquidTemplate tmpl = liquidParserParseTemplate(parser, examplesFile, sizeof(exampleFile)-1, NULL, &lexerError, &parserError);
+    if (lexerError.type) {
+        char buffer[512];
+        liquidGetLexerErrorMessage(lexerError, buffer, sizeof(buffer));
+        fprintf(stderr, "Lexer Error: %s\n", buffer);
+        exit(-1);
+    }
+    if (parserError.type) {
+        char buffer[512];
+        liquidGetParserErrorMessage(parserError, buffer, sizeof(buffer));
+        fprintf(stderr, "Parser Error: %s\n", buffer);
         exit(-1);
     }
     // This object should be thread-local.
@@ -253,18 +264,18 @@ This is what I'm aiming for at any rate.
 * Optional compatibilty with rapidjson to allow for easy JSON reading in C++.
 * Line accurate, and helpful error messages.
 * Ability to step through and examine the liquid AST.
+* In ruby integration, allow for all types of strict/lax modes.
+* Allow for tag registration in the drop in replacement module for Ruby.
+* Built-in optimizer that will do things like loop unrolling, conditional elimiation, etc..
+* Togglable extra features, such as real operators, parentheses, etc..
+* Ability to set limits on memory consumed, and time spent rendering.
 
 ### Partial
 
-* Togglable extra features, such as real operators, parentheses, etc.. (This is in, but not togglable).
 * Full test suite that runs all major examples from Shopify's doucmentation. (Test suite runs some examples, but not all).
-* Ability to set limits on memory consumed, and time spent rendering. (Partially implemented).
-* Built-in optimizer that will do things like loop unrolling, conditional elimiation, etc..
 
 ### TODO
 
-* In ruby integration, allow for all types of strict/lax modes.
-* Allow for tag registration in the drop in replacement module for Ruby.
 * Ability to partially render content, then spit back out the remaining liquid that genreated it.
 * General polish pass to clean up reundant code, and ensure consistency across the C, C++, Perl and Ruby APIs.
 
