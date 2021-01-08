@@ -193,7 +193,7 @@ namespace Liquid {
         struct ArrayLiteralNode : NodeType {
             ArrayLiteralNode() : NodeType(Type::ARRAY_LITERAL) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const {
-                Variant var({ });
+                Variant var { std::vector<Variant>() };
                 var.a.reserve(node.children.size());
                 for (size_t i = 0; i < node.children.size(); ++i)
                     var.a.push_back(move(renderer.retrieveRenderedNode(*node.children[i].get(), store).variant));

@@ -100,11 +100,11 @@ namespace Liquid {
         Variant(const Variant& v) : type(v.type) {
             switch (type) {
                 case Type::STRING:
-                    new(&s) string;
+                    new(&s) std::string;
                     s = v.s;
                 break;
                 case Type::ARRAY:
-                    new(&a) vector<Variant>();
+                    new(&a) std::vector<Variant>();
                     a = v.a;
                 break;
                 default:
@@ -115,7 +115,7 @@ namespace Liquid {
         Variant(Variant&& v) : type(v.type) {
             switch (type) {
                 case Type::STRING:
-                    new(&s) string;
+                    new(&s) std::string;
                     s = std::move(v.s);
                 break;
                 case Type::ARRAY:
@@ -130,15 +130,15 @@ namespace Liquid {
         Variant(bool b) : b(b), type(Type::BOOL) {  }
         Variant(double f) : f(f), type(Type::FLOAT) {  }
         Variant(long long i) : i(i), type(Type::INT) { }
-        Variant(const string& s) : s(s), type(Type::STRING) { }
-        Variant(string&& s) : s(std::move(s)), type(Type::STRING) { }
+        Variant(const std::string& s) : s(s), type(Type::STRING) { }
+        Variant(std::string&& s) : s(std::move(s)), type(Type::STRING) { }
         Variant(const char* s) : s(s), type(Type::STRING) { }
         Variant(Variable v) : v(v), type(Type::VARIABLE) { }
         Variant(void* p) : p(p), type(p ? Type::POINTER : Type::NIL) { }
         Variant(std::nullptr_t) : p(nullptr), type(Type::NIL) { }
-        Variant(const vector<Variant>& a) : a(a), type(Type::ARRAY) { }
+        Variant(const std::vector<Variant>& a) : a(a), type(Type::ARRAY) { }
         Variant(vector<Variant>&& a) : a(std::move(a)), type(Type::ARRAY) { }
-        Variant(std::initializer_list<Variant> list) : a(list), type(Type::ARRAY) { }
+
         ~Variant() {
             switch (type) {
                 case Type::STRING:

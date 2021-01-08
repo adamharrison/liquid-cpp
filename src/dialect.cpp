@@ -1129,7 +1129,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            Variant result({ });
+            Variant result { vector<Variant>() };
             string str = operand.getString();
             string splitter = argument.getString();
             size_t start = 0, idx;
