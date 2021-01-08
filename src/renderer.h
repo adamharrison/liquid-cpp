@@ -45,8 +45,8 @@ namespace Liquid {
                 details.column = node.column;
                 details.line = node.line;
                 this->type = type;
-                strncpy(details.args[0], message.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH);
-                details.args[0][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
+                strncpy(details.args[0], message.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH-1);
+                details.args[0][LIQUID_ERROR_ARG_MAX_LENGTH-1] = 0;
             }
 
             static string english(const LiquidRendererError& rendererError) {

@@ -32,8 +32,8 @@ namespace Liquid {
                 details.line = lexer.line;
                 details.column = lexer.column;
                 this->type = type;
-                strncpy(details.args[0], message.data(), LIQUID_ERROR_ARG_MAX_LENGTH);
-                details.args[0][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
+                strncpy(details.args[0], message.data(), LIQUID_ERROR_ARG_MAX_LENGTH-1);
+                details.args[0][LIQUID_ERROR_ARG_MAX_LENGTH-1] = 0;
             }
 
             operator bool() const { return type != Type::LIQUID_LEXER_ERROR_TYPE_NONE; }

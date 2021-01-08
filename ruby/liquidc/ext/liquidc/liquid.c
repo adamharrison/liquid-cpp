@@ -387,29 +387,27 @@ VALUE liquidCOptimizer_m_initialize(VALUE self, VALUE incomingRenderer) {
     return self;
 }
 
+#define PACK_EXCEPTION_LENGTH 6
 #define PACK_EXCEPTION(rubytype, error, package, english, exception) \
     exception = rb_obj_alloc(rubytype);\
     package[0] = LL2NUM(error.type);\
-    package[1] = rb_str_new2(error.details.message);\
-    package[2] = rb_ary_new2(5);\
-    rb_ary_push(package[2], error.details.args[0]);\
-    rb_ary_push(package[2], error.details.args[1]);\
-    rb_ary_push(package[2], error.details.args[2]);\
-    rb_ary_push(package[2], error.details.args[3]);\
-    rb_ary_push(package[2], error.details.args[4]);\
-    package[3] = LL2NUM(error.details.line);\
-    package[4] = LL2NUM(error.details.column);\
-    package[5] = rb_str_new2(error.details.file);\
-    package[6] = rb_str_new2(english);\
-    rb_obj_call_init(exception, 7, package);
+    package[1] = rb_ary_new2(LIQUID_ERROR_ARGS_MAX);\
+    for (j = 0; j < LIQUID_ERROR_ARGS_MAX; ++j)\
+        rb_ary_push(package[1], rb_str_new2(error.details.args[j]));\
+    package[2] = LL2NUM(error.details.line);\
+    package[3] = LL2NUM(error.details.column);\
+    package[4] = rb_str_new2(error.details.file);\
+    package[5] = rb_str_new2(english);\
+    rb_obj_call_init(exception, 6, package);
 
 VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
-    VALUE str, exceptionInit[7], exception;
+    VALUE str, exceptionInit[PACK_EXCEPTION_LENGTH], exception;
     LiquidTemplate* liquidTemplate;
     LiquidRenderer* liquidRenderer;
     LiquidRendererError error;
     LiquidTemplateRender result;
     char buffer[512];
+    int j;
 
     TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, liquidRenderer);
     TypedData_Get_Struct(tmpl, LiquidTemplate, &liquidCTemplate_type, liquidTemplate);
@@ -435,8 +433,9 @@ VALUE method_liquidCParserParse(int argc, VALUE* argv, VALUE self) {
     LiquidLexerError lexerError;
     LiquidParserError parserError;
     VALUE result, arg, exception;
-    VALUE exceptionInit[7];
+    VALUE exceptionInit[PACK_EXCEPTION_LENGTH];
     char buffer[512];
+    int j;
 
     TypedData_Get_Struct(self, LiquidParser, &liquidCParser_type, parser);
 
@@ -472,9 +471,10 @@ VALUE method_liquidCParserParse(int argc, VALUE* argv, VALUE self) {
 VALUE method_liquidCParserWarnings(VALUE self) {
     LiquidParser* parser;
     LiquidParserWarning warning;
-    VALUE warnings, exception, exceptionInit[7];
+    VALUE warnings, exception, exceptionInit[PACK_EXCEPTION_LENGTH];
     size_t warningCount, i;
     char buffer[512];
+    int j;
 
     TypedData_Get_Struct(self, LiquidParser, &liquidCParser_type, parser);
     warningCount = liquidGetParserWarningCount(*parser);
@@ -492,9 +492,10 @@ VALUE method_liquidCParserWarnings(VALUE self) {
 VALUE method_liquidCRendererWarnings(VALUE self) {
     LiquidRenderer* renderer;
     LiquidRendererWarning warning;
-    VALUE warnings, exception, exceptionInit[7];
+    VALUE warnings, exception, exceptionInit[PACK_EXCEPTION_LENGTH];
     size_t warningCount, i;
     char buffer[512];
+    int j;
 
     TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, renderer);
     warningCount = liquidGetRendererWarningCount(*renderer);
@@ -516,9 +517,8 @@ VALUE liquidCTemplate_m_initialize(VALUE self, VALUE incomingTemplate) {
     return self;
 }
 
-VALUE liquidCError_m_initialize(VALUE self, VALUE type, VALUE message, VALUE args, VALUE line, VALUE column, VALUE file, VALUE english) {
+VALUE liquidCError_m_initialize(VALUE self, VALUE type, VALUE args, VALUE line, VALUE column, VALUE file, VALUE english) {
     rb_iv_set(self, "@type", type);
-    rb_iv_set(self, "@message", message);
     rb_iv_set(self, "@line", line);
     rb_iv_set(self, "@column", column);
     rb_iv_set(self, "@args", args);
@@ -679,11 +679,10 @@ void Init_liquidc() {
     rb_define_attr(liquidCError, "type", 1, 0);
     rb_define_attr(liquidCError, "line", 1, 0);
     rb_define_attr(liquidCError, "column", 1, 0);
-    rb_define_attr(liquidCError, "message", 1, 0);
     rb_define_attr(liquidCError, "args", 1, 0);
     rb_define_attr(liquidCError, "english", 1, 0);
     rb_define_attr(liquidCError, "file", 1, 0);
-    rb_define_method(liquidCError, "initialize", liquidCError_m_initialize, 7);
+    rb_define_method(liquidCError, "initialize", liquidCError_m_initialize, 6);
 
 	liquidCParserError = rb_define_class_under(liquidCParser, "Error", liquidCError);
 	liquidCRendererError = rb_define_class_under(liquidCRenderer, "Error", rb_eStandardError);

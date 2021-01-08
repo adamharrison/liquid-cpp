@@ -30,16 +30,16 @@ namespace Liquid {
                 this->type = type;
                 details.column = lexer.column;
                 details.line = lexer.line;
-                strncpy(details.args[0], arg0.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH);
-                details.args[0][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
-                strncpy(details.args[1], arg1.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH);
-                details.args[1][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
-                strncpy(details.args[2], arg2.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH);
-                details.args[2][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
-                strncpy(details.args[3], arg3.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH);
-                details.args[3][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
-                strncpy(details.args[4], arg4.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH);
-                details.args[4][LIQUID_ERROR_ARG_MAX_LENGTH] = 0;
+                strncpy(details.args[0], arg0.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH-1);
+                details.args[0][LIQUID_ERROR_ARG_MAX_LENGTH-1] = 0;
+                strncpy(details.args[1], arg1.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH-1);
+                details.args[1][LIQUID_ERROR_ARG_MAX_LENGTH-1] = 0;
+                strncpy(details.args[2], arg2.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH-1);
+                details.args[2][LIQUID_ERROR_ARG_MAX_LENGTH-1] = 0;
+                strncpy(details.args[3], arg3.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH-1);
+                details.args[3][LIQUID_ERROR_ARG_MAX_LENGTH-1] = 0;
+                strncpy(details.args[4], arg4.c_str(), LIQUID_ERROR_ARG_MAX_LENGTH-1);
+                details.args[4][LIQUID_ERROR_ARG_MAX_LENGTH-1] = 0;
             }
 
             static string english(LiquidParserError error) {

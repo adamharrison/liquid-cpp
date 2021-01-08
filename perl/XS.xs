@@ -789,6 +789,7 @@ parseTemplate(parser, str, fileSV, error)
         LiquidLexerError lexerError;
         LiquidParserError parserError;
         STRLEN len;
+        int i;
         const char* file = NULL;
         if (fileSV && SvOK(fileSV))
             file = SvPV(fileSV, len);
@@ -799,7 +800,8 @@ parseTemplate(parser, str, fileSV, error)
                 av_push(av, newSVnv(lexerError.type));
                 av_push(av, newSVnv(lexerError.details.line));
                 av_push(av, newSVnv(lexerError.details.column));
-                av_push(av, newSVpvn(lexerError.details.message, strlen(lexerError.details.message)));
+                for (i = 0; i < LIQUID_ERROR_ARGS_MAX; ++i)
+                    av_push(av, newSVpvn(lexerError.details.args[i], strlen(lexerError.details.args[i])));
                 RETVAL = NULL;
             }
             if (parserError.type) {
@@ -807,7 +809,8 @@ parseTemplate(parser, str, fileSV, error)
                 av_push(av, newSVnv(parserError.type));
                 av_push(av, newSVnv(parserError.details.line));
                 av_push(av, newSVnv(parserError.details.column));
-                av_push(av, newSVpvn(parserError.details.message, strlen(parserError.details.message)));
+                for (i = 0; i < LIQUID_ERROR_ARGS_MAX; ++i)
+                    av_push(av, newSVpvn(parserError.details.args[i], strlen(parserError.details.args[i])));
                 RETVAL = NULL;
             }
         }
@@ -828,6 +831,7 @@ renderTemplate(renderer, store, tmpl, error)
     SV* error;
     CODE:
         LiquidRendererError rendererError;
+        int i;
         LiquidTemplateRender render = liquidRendererRenderTemplate(*(LiquidRenderer*)&renderer, store, *(LiquidTemplate*)&tmpl, &rendererError);
         if (SvROK(error)) {
             if (rendererError.type) {
@@ -835,7 +839,8 @@ renderTemplate(renderer, store, tmpl, error)
                 av_push(av, newSVnv(rendererError.type));
                 av_push(av, newSVnv(rendererError.details.line));
                 av_push(av, newSVnv(rendererError.details.column));
-                av_push(av, newSVpvn(rendererError.details.message, strlen(rendererError.details.message)));
+                for (i = 0; i < LIQUID_ERROR_ARGS_MAX; ++i)
+                    av_push(av, newSVpvn(rendererError.details.args[0], strlen(rendererError.details.args[i])));
             }
         }
         RETVAL = newSVpvn(liquidTemplateRenderGetBuffer(render), liquidTemplateRenderGetSize(render));
