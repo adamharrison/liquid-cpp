@@ -127,8 +127,11 @@ namespace Liquid {
         // Retrieves a rendered node, if possible. If the node in question has a nodetype that is PARTIAL optimized, Has the potential to return node with
         // a type still attached; otherwise, will always be a variant node.
         Node retrieveRenderedNode(const Node& node, Variable store) {
-            if (node.type)
-                return node.type->render(*this, node, store);
+            if (node.type) {
+                Node value = node.type->render(*this, node, store);
+                assert(!value.type);
+                return value;
+            }
             return node;
         }
         std::chrono::duration<unsigned int,std::milli> getRenderedTime() const;
