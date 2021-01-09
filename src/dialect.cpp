@@ -631,7 +631,9 @@ namespace Liquid {
                 return Node(operate(op1.variant.type, Variant::Type::NIL));
             switch (op1.variant.type) {
                 case Variant::Type::NIL:
-                    return Node(Variant(operate(op1.variant.p, op2.variant.p)));
+                    if (op2.variant.type == Variant::Type::NIL)
+                        return Variant(operate(nullptr, nullptr));
+                    return Variant(!operate(nullptr, nullptr));
                 case Variant::Type::BOOL:
                     return Node(Variant(operate(op1.variant.b, op2.variant.isTruthy(renderer.context.falsiness))));
                 case Variant::Type::INT:

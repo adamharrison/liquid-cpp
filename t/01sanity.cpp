@@ -374,6 +374,11 @@ TEST(sanity, filters) {
     Node ast;
     std::string str;
 
+    hash["a"] = "A B C";
+    ast = getParser().parse("{% assign a = a | split: \" \" %}{{ a | size }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "3");
+
     hash["a"] = CPPVariable({ 1, 2, 3, 4, 10 });
     ast = getParser().parse("{{ a.first.size }}");
     str = getRenderer().render(ast, hash);
@@ -402,10 +407,6 @@ TEST(sanity, filters) {
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "5");
 
-    hash["a"] = "A B C";
-    ast = getParser().parse("{% assign a = a | split: \" \" %}{{ a | size }}");
-    str = getRenderer().render(ast, hash);
-    ASSERT_EQ(str, "3");
 
 
     hash["a"] = CPPVariable({ 1, 2, 3, 4 });

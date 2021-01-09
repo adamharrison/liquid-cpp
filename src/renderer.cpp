@@ -101,6 +101,7 @@ namespace Liquid {
                     inject(target, variant.a[i]);
                     if (!variableResolver.setArrayVariable(*this, variable, i, target))
                         break;
+                    variableResolver.freeVariable(*this, target);
                 }
             } break;
             default:

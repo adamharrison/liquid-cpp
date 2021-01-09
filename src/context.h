@@ -242,15 +242,25 @@ namespace Liquid {
         unordered_map<string, unique_ptr<NodeType>> filterTypes;
         unordered_map<string, unique_ptr<NodeType>> dotFilterTypes;
 
-        const NodeType* getConcatenationNodeType() const { static ConcatenationNode concatenationNodeType; return &concatenationNodeType; }
-        const NodeType* getOutputNodeType() const { static OutputNode outputNodeType; return &outputNodeType; }
-        const VariableNode* getVariableNodeType() const { static VariableNode variableNodeType; return &variableNodeType; }
-        const NodeType* getGroupNodeType() const { static GroupNode groupNodeType; return &groupNodeType; }
-        const NodeType* getGroupDereferenceNodeType() const { static GroupDereferenceNode groupDereferenceNodeType; return &groupDereferenceNodeType; }
-        const NodeType* getArgumentsNodeType() const { static ArgumentNode argumentNodeType; return &argumentNodeType; }
-        const NodeType* getUnknownFilterNodeType() const { static UnknownFilterNode filterNodeType; return &filterNodeType; }
-        const NodeType* getArrayLiteralNodeType() const { static ArrayLiteralNode arrayLiteralNode; return &arrayLiteralNode; }
-        const NodeType* getContextBoundaryNodeType() const { static ContextBoundaryNode contextBoundaryNode; return &contextBoundaryNode; }
+        ConcatenationNode concatenationNodeType;
+        OutputNode outputNodeType;
+        VariableNode variableNodeType;
+        GroupNode groupNodeType;
+        GroupDereferenceNode groupDereferenceNodeType;
+        ArgumentNode argumentNodeType;
+        UnknownFilterNode unknownFilterNodeType;
+        ArrayLiteralNode arrayLiteralNodeType;
+        ContextBoundaryNode contextBoundaryNodeType;
+
+        const NodeType* getConcatenationNodeType() const { return &concatenationNodeType; }
+        const NodeType* getOutputNodeType() const { return &outputNodeType; }
+        const VariableNode* getVariableNodeType() const { return &variableNodeType; }
+        const NodeType* getGroupNodeType() const { return &groupNodeType; }
+        const NodeType* getGroupDereferenceNodeType() const { return &groupDereferenceNodeType; }
+        const NodeType* getArgumentsNodeType() const { return &argumentNodeType; }
+        const NodeType* getUnknownFilterNodeType() const { return &unknownFilterNodeType; }
+        const NodeType* getArrayLiteralNodeType() const { return &arrayLiteralNodeType; }
+        const NodeType* getContextBoundaryNodeType() const { return &contextBoundaryNodeType; }
 
         NodeType* registerType(unique_ptr<NodeType> type) {
             NodeType* value = type.get();
