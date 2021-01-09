@@ -54,9 +54,9 @@ requires an underlying ruby module that implements the more modular, sane versio
 
 ## Status
 
-In development. **Do not use in production code, as this has not been vetted for memory bugs, or anything beyond general performance and features.**
+In development. **Do not use in production code, yet.**
 
-A memory audit of both the core, and the C interface will be forthcoming shortly.
+Basic memory audits of the core have been done, and leaks have been closed. A more extensive battery of tests is required to determine if there's actually any UB or
 
 ### Quick Start
 

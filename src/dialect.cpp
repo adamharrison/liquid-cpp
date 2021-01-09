@@ -14,14 +14,14 @@ namespace Liquid {
 
         struct AssignOperator : OperatorNodeType {
             AssignOperator() : OperatorNodeType("=", Arity::BINARY, 0) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
+            Node render(Renderer& renderer, const Node& node, Variable store) const override { return Node(); }
         };
 
         AssignNode() : TagNodeType(Composition::FREE, "assign", 1, 1, LIQUID_OPTIMIZATION_SCHEME_NONE) {
             registerType<AssignOperator>();
         }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto& argumentNode = node.children.front();
             auto& assignmentNode = argumentNode->children.front();
             auto& variableNode = assignmentNode->children.front();
@@ -36,7 +36,7 @@ namespace Liquid {
             return Node();
         }
 
-        bool validate(Parser& parser, const Node& node) {
+        bool validate(Parser& parser, const Node& node) const override {
             auto& argumentNode = node.children.front();
             auto& assignmentNode = argumentNode->children.front();
             if (assignmentNode->type != parser.context.getBinaryOperatorType("=")) {
@@ -60,7 +60,7 @@ namespace Liquid {
     struct CaptureNode : TagNodeType {
         CaptureNode() : TagNodeType(Composition::ENCLOSED, "capture", 1, 1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto& argumentNode = node.children.front();
             auto& variableNode = argumentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
@@ -74,7 +74,7 @@ namespace Liquid {
     struct IncrementNode : TagNodeType {
         IncrementNode() : TagNodeType(Composition::FREE, "increment", 1, 1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto& argumentNode = node.children.front();
             auto& variableNode = argumentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
@@ -92,7 +92,7 @@ namespace Liquid {
      struct DecrementNode : TagNodeType {
         DecrementNode() : TagNodeType(Composition::FREE, "decrement", 1, 1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto& argumentNode = node.children.front();
             auto& variableNode = argumentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
@@ -109,7 +109,7 @@ namespace Liquid {
 
     struct CommentNode : EnclosedNodeType {
         CommentNode() : EnclosedNodeType("comment", 0, 0, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
+        Node render(Renderer& renderer, const Node& node, Variable store) const override { return Node(); }
     };
 
     template <bool INVERSE>
@@ -160,7 +160,7 @@ namespace Liquid {
 
         struct ElsifNode : TagNodeType {
             ElsifNode() : TagNodeType(Composition::FREE, "elsif", 1, 1) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 auto& arguments = node.children.front();
                 return renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
             }
@@ -168,7 +168,7 @@ namespace Liquid {
 
         struct ElseNode : TagNodeType {
             ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 return Node(Variant(true));
             }
         };
@@ -179,7 +179,7 @@ namespace Liquid {
         }
 
 
-        LiquidParserError validate(const Context& context, const Node& node) const {
+        bool validate(Parser& parser, const Node& node) const override {
             /*auto elseNode = intermediates.find("else")->second.get();
             auto elsifNode = intermediates.find("elsif")->second.get();
             for (size_t i = 1; i < node.children.size(); ++i) {
@@ -187,17 +187,16 @@ namespace Liquid {
                     if (node.children[i]->type != elseNode && node.children[i]->type != elsifNode)
                         return Parser::Error(Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL);
                 }
-            }
-            return Parser::Error();*/
-            return LiquidParserError { };
+            }*/
+            return true;
         }
 
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             return BranchNode<INVERSE>::internalRender(renderer, node, store);
         }
 
-        bool optimize(Optimizer& optimizer, Node& node, Variable store) const {
+        bool optimize(Optimizer& optimizer, Node& node, Variable store) const override {
             return BranchNode<INVERSE>::internalOptimize(optimizer, node, store);
         }
 
@@ -217,13 +216,13 @@ namespace Liquid {
         struct WhenNode : TagNodeType {
             WhenNode() : TagNodeType(Composition::FREE, "when", 1, 1) { }
 
-            Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 return renderer.retrieveRenderedNode(*node.children[0]->children[0].get(), store);
             }
         };
         struct ElseNode : TagNodeType {
             ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
+            Node render(Renderer& renderer, const Node& node, Variable store) const override { return Node(); }
         };
 
         CaseNode() : TagNodeType(Composition::ENCLOSED, "case", 1, 1, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) {
@@ -231,7 +230,7 @@ namespace Liquid {
             intermediates["else"] = make_unique<ElseNode>();
         }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
             auto result = renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
@@ -255,17 +254,17 @@ namespace Liquid {
     struct ForNode : TagNodeType {
         struct InOperatorNode : OperatorNodeType {
             InOperatorNode() :  OperatorNodeType("in", Arity::BINARY, 0, Fixness::INFIX, LIQUID_OPTIMIZATION_SCHEME_SHIELD) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
+            Node render(Renderer& renderer, const Node& node, Variable store) const override { return Node(); }
         };
 
         struct ElseNode : TagNodeType {
             ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
+            Node render(Renderer& renderer, const Node& node, Variable store) const override { return Node(); }
         };
 
         struct BreakNode : TagNodeType {
             BreakNode() : TagNodeType(Composition::FREE, "break", 0, 0, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 renderer.control = Renderer::Control::BREAK;
                 return Node();
             }
@@ -273,7 +272,7 @@ namespace Liquid {
 
         struct ContinueNode : TagNodeType {
             ContinueNode() : TagNodeType(Composition::FREE, "continue", 0, 0, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 renderer.control = Renderer::Control::CONTINUE;
                 return Node();
             }
@@ -297,13 +296,13 @@ namespace Liquid {
             bool (*iterator)(ForLoopContext& forloopContext);
             long long length;
             string result;
-            long long idx = 0;
+            long long idx;
         };
 
         struct CycleNode : TagNodeType {
             CycleNode() : TagNodeType(Composition::FREE, "cycle", 1, -1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
 
-            Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 assert(node.children.size() == 1 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
                 auto& arguments = node.children.front();
                 pair<void*, Renderer::DropFunction> internalDrop = renderer.getInternalDrop("forloop");
@@ -323,7 +322,7 @@ namespace Liquid {
 
 
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
             auto& arguments = node.children.front();
             assert(arguments->children.size() >= 1);
@@ -395,7 +394,7 @@ namespace Liquid {
             };
 
             auto& resolver = renderer.variableResolver;
-            ForLoopContext forLoopContext = { renderer, node, store, nullptr, iterator };
+            ForLoopContext forLoopContext = { renderer, node, store, nullptr, iterator,  0, "", 0 };
 
 
             forLoopContext.length = result.variant.type == Variant::Type::ARRAY ? result.variant.a.size() : resolver.getArraySize(renderer, result.variant.p);
@@ -484,7 +483,7 @@ namespace Liquid {
         double operate(long long v1, double v2) const { return Function()(v1, v2); }
         long long operate(long long v1, long long v2) const { return Function()(v1, v2); }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             switch (op1.variant.type) {
@@ -541,7 +540,7 @@ namespace Liquid {
     struct ModuloOperatorNode : OperatorNodeType {
         ModuloOperatorNode() : OperatorNodeType("%", Arity::BINARY, 10) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             long long divisor = op2.variant.getInt();
@@ -554,7 +553,7 @@ namespace Liquid {
     struct UnaryMinusOperatorNode : OperatorNodeType {
         UnaryMinusOperatorNode() : OperatorNodeType("-", Arity::UNARY, 10, Fixness::PREFIX) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             if (op1.variant.type == Variant::Type::INT)
                 return Variant(op1.variant.i * -1);
@@ -567,7 +566,7 @@ namespace Liquid {
     struct UnaryNegationOperatorNode : OperatorNodeType {
         UnaryNegationOperatorNode() : OperatorNodeType("!", Arity::UNARY, 15, Fixness::PREFIX) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             return Variant(!op1.variant.isTruthy(renderer.context.falsiness));
         }
@@ -581,7 +580,7 @@ namespace Liquid {
         template <class A, class B>
         bool operate(A a, B b) const { return Function()(a, b); }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             switch (op1.variant.type) {
@@ -623,7 +622,7 @@ namespace Liquid {
         template <class A, class B>
         bool operate(A a, B b) const { return Function()(a, b); }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
 
@@ -689,7 +688,7 @@ namespace Liquid {
     struct AndOperatorNode : OperatorNodeType {
         AndOperatorNode() : OperatorNodeType("and", Arity::BINARY, 1, Fixness::INFIX, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             if (!op1.variant.isTruthy(renderer.context.falsiness))
                 return Variant(false);
@@ -711,7 +710,7 @@ namespace Liquid {
     struct OrOperatorNode : OperatorNodeType {
         OrOperatorNode() : OperatorNodeType("or", Arity::BINARY, 1, Fixness::INFIX, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             if (op1.variant.isTruthy(renderer.context.falsiness))
                 return Variant(true);
@@ -735,7 +734,7 @@ namespace Liquid {
     struct ContainsOperatorNode : OperatorNodeType {
         ContainsOperatorNode() : OperatorNodeType("contains", Arity::BINARY, 2) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
 
@@ -759,7 +758,7 @@ namespace Liquid {
     struct RangeOperatorNode : OperatorNodeType {
         RangeOperatorNode() : OperatorNodeType("..", Arity::BINARY, 10) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
             Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
             // Requires integers.
@@ -786,7 +785,7 @@ namespace Liquid {
         double operate(long long v1, double v2) const { return Function()(v1, v2); }
         long long operate(long long v1, long long v2) const { return Function()(v1, v2); }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             assert(node.children[1]->type && node.children[1]->type->type == NodeType::Type::ARGUMENTS);
             Node op1 = getOperand(renderer, node, store);
             Node op2 = getArgument(renderer, node, store, 0);
@@ -829,7 +828,7 @@ namespace Liquid {
     struct ModuloFilterNode : FilterNodeType {
         ModuloFilterNode() : FilterNodeType("modulo", 1, 1) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             long long divisor = argument.variant.getInt();
@@ -841,7 +840,7 @@ namespace Liquid {
 
     struct AbsFilterNode : FilterNodeType {
         AbsFilterNode() : FilterNodeType("abs", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             if (operand.type) {
                 switch (operand.variant.type) {
@@ -859,7 +858,7 @@ namespace Liquid {
 
     struct CeilFilterNode : FilterNodeType {
         CeilFilterNode() : FilterNodeType("ceil", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             if (operand.type) {
                 switch (operand.variant.type) {
@@ -877,7 +876,7 @@ namespace Liquid {
 
     struct FloorFilterNode : FilterNodeType {
         FloorFilterNode() : FilterNodeType("floor", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             if (operand.type) {
                 switch (operand.variant.type) {
@@ -896,7 +895,7 @@ namespace Liquid {
 
     struct RoundFilterNode : FilterNodeType {
         RoundFilterNode() : FilterNodeType("round", 0, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type) {
@@ -923,7 +922,7 @@ namespace Liquid {
 
     struct AtMostFilterNode : FilterNodeType {
         AtMostFilterNode() : FilterNodeType("at_most", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type) {
@@ -942,7 +941,7 @@ namespace Liquid {
 
     struct AtLeastFilterNode : FilterNodeType {
         AtLeastFilterNode() : FilterNodeType("at_least", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.type) {
@@ -961,7 +960,7 @@ namespace Liquid {
 
     struct AppendFilterNode : FilterNodeType {
         AppendFilterNode() : FilterNodeType("append", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             return Variant(operand.getString() + argument.getString());
@@ -970,7 +969,7 @@ namespace Liquid {
 
     struct camelCaseFilterNode : FilterNodeType {
         camelCaseFilterNode() : FilterNodeType("camelcase", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             // TODO
             return Node();
         }
@@ -978,7 +977,7 @@ namespace Liquid {
 
     struct CapitalizeFilterNode : FilterNodeType {
         CapitalizeFilterNode() : FilterNodeType("capitalize", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             string str = operand.getString();
             str[0] = toupper(str[0]);
@@ -987,7 +986,7 @@ namespace Liquid {
     };
     struct DowncaseFilterNode : FilterNodeType {
         DowncaseFilterNode() : FilterNodeType("downcase", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             string str = operand.getString();
             std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::tolower(c); });
@@ -996,7 +995,7 @@ namespace Liquid {
     };
     struct HandleGenericFilterNode : FilterNodeType {
         HandleGenericFilterNode(const string& symbol) : FilterNodeType(symbol, 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             string str = getOperand(renderer, node, store).getString();
             string accumulator;
             accumulator.reserve(str.size());
@@ -1021,7 +1020,7 @@ namespace Liquid {
 
     struct PluralizeFilterNode : FilterNodeType {
         PluralizeFilterNode() : FilterNodeType("pluralize", 2, 2) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument1 = getArgument(renderer, node, store, 1);
             auto argument2 = getArgument(renderer, node, store, 2);
@@ -1031,7 +1030,7 @@ namespace Liquid {
 
     struct PrependFilterNode : FilterNodeType {
         PrependFilterNode() : FilterNodeType("prepend", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             return Variant(argument.getString() + operand.getString());
@@ -1039,7 +1038,7 @@ namespace Liquid {
     };
     struct RemoveFilterNode : FilterNodeType {
         RemoveFilterNode() : FilterNodeType("remove", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             string accumulator;
@@ -1057,7 +1056,7 @@ namespace Liquid {
     };
     struct RemoveFirstFilterNode : FilterNodeType {
         RemoveFirstFilterNode() : FilterNodeType("removefirst", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             string accumulator;
@@ -1076,7 +1075,7 @@ namespace Liquid {
     };
     struct ReplaceFilterNode : FilterNodeType {
         ReplaceFilterNode() : FilterNodeType("replace", 2, 2) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argumentPattern = getArgument(renderer, node, store, 0);
             auto argumentReplacement = getArgument(renderer, node, store, 1);
@@ -1097,7 +1096,7 @@ namespace Liquid {
     };
     struct ReplaceFirstFilterNode : FilterNodeType {
         ReplaceFirstFilterNode() : FilterNodeType("replacefirst", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argumentPattern = getArgument(renderer, node, store, 0);
             auto argumentReplacement = getArgument(renderer, node, store, 1);
@@ -1119,7 +1118,7 @@ namespace Liquid {
     };
     struct SliceFilterNode : FilterNodeType {
         SliceFilterNode() : FilterNodeType("slice", 1, 2) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto arg1 = getArgument(renderer, node, store, 0);
             auto arg2 = getArgument(renderer, node, store, 0);
@@ -1134,7 +1133,7 @@ namespace Liquid {
     };
     struct SplitFilterNode : FilterNodeType {
         SplitFilterNode() : FilterNodeType("split", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             Variant result { vector<Variant>() };
@@ -1152,7 +1151,7 @@ namespace Liquid {
     };
     struct StripFilterNode : FilterNodeType {
         StripFilterNode() : FilterNodeType("strip", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             string str = operand.getString();
             size_t start, end;
@@ -1163,7 +1162,7 @@ namespace Liquid {
     };
     struct LStripFilterNode : FilterNodeType {
         LStripFilterNode() : FilterNodeType("lstrip", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             string str = operand.getString();
             size_t start;
@@ -1173,7 +1172,7 @@ namespace Liquid {
     };
     struct RStripFilterNode : FilterNodeType {
         RStripFilterNode() : FilterNodeType("rstrip", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             string str = operand.getString();
             size_t end;
@@ -1183,7 +1182,7 @@ namespace Liquid {
     };
     struct StripNewlinesFilterNode : FilterNodeType {
         StripNewlinesFilterNode() : FilterNodeType("strip_newlines", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             string str = operand.getString();
             string accumulator;
@@ -1197,7 +1196,7 @@ namespace Liquid {
     };
     struct TruncateFilterNode : FilterNodeType {
         TruncateFilterNode() : FilterNodeType("truncate", 1, 2) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto characterCount = getArgument(renderer, node, store, 0);
             auto customEllipsis = getArgument(renderer, node, store, 1);
@@ -1214,7 +1213,7 @@ namespace Liquid {
     };
     struct TruncateWordsFilterNode : FilterNodeType {
         TruncateWordsFilterNode() : FilterNodeType("truncatewords", 1, 2) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto wordCount = getArgument(renderer, node, store, 0);
             auto customEllipsis = getArgument(renderer, node, store, 1);
@@ -1240,7 +1239,7 @@ namespace Liquid {
     };
     struct UpcaseFilterNode : FilterNodeType {
         UpcaseFilterNode() : FilterNodeType("upcase", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             string str = operand.getString();
@@ -1260,11 +1259,11 @@ namespace Liquid {
             struct JoinStruct {
                 Renderer& renderer;
                 string accumulator;
-                string joiner = "";
-                int idx = 0;
+                string joiner;
+                int idx;
             };
 
-            JoinStruct joinStruct({ renderer });
+            JoinStruct joinStruct({ renderer, "", "", 0 });
             auto argument = getArgument(renderer, node, store, 0);
             if (!argument.type)
                 joinStruct.joiner = argument.getString();
@@ -1298,7 +1297,7 @@ namespace Liquid {
             return operand.a[operand.a.size()-1];
         }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             if (operand.variant.type == Variant::Type::ARRAY)
                 return variantOperate(renderer, node, store, operand.variant);
@@ -1323,7 +1322,7 @@ namespace Liquid {
                 accumulator.a.push_back(*it);
         }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Variant accumulator;
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
@@ -1388,10 +1387,10 @@ namespace Liquid {
             }
         }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            MapStruct mapStruct = { renderer, argument.getString() };
+            MapStruct mapStruct = { renderer, argument.getString(), nullptr };
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
                     accumulate(renderer, mapStruct, operand.variant.v);
@@ -1409,7 +1408,7 @@ namespace Liquid {
     struct ReverseFilterNode : ArrayFilterNodeType {
         ReverseFilterNode() : ArrayFilterNodeType("reverse", 0, 0) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Variant accumulator;
             auto operand = getOperand(renderer, node, store);
             auto& v = operand.variant;
@@ -1435,7 +1434,7 @@ namespace Liquid {
     struct SortFilterNode : ArrayFilterNodeType {
         SortFilterNode() : ArrayFilterNodeType("sort", 0, 1) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Variant accumulator;
             string property;
             auto operand = getOperand(renderer, node, store);
@@ -1528,11 +1527,11 @@ namespace Liquid {
             }
         }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto arg1 = getArgument(renderer, node, store, 0);
             auto arg2 = getArgument(renderer, node, store, 1);
-            WhereStruct whereStruct = { renderer, arg1.getString(), arg2.variant };
+            WhereStruct whereStruct = { renderer, arg1.getString(), arg2.variant, nullptr };
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
                     accumulate(whereStruct, operand.variant.v);
@@ -1573,11 +1572,11 @@ namespace Liquid {
             }
         }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto arg1 = getArgument(renderer, node, store, 0);
             auto arg2 = getArgument(renderer, node, store, 1);
-            UniqStruct uniqStruct = { renderer };
+            UniqStruct uniqStruct = { renderer, {}, nullptr };
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
                     accumulate(uniqStruct, operand.variant.v);
@@ -1614,7 +1613,7 @@ namespace Liquid {
     struct FirstDotFilterNode : DotFilterNodeType {
         FirstDotFilterNode() : DotFilterNodeType("first") { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             if (node.type && node.children.size() == 1 && node.children[0]->type && node.children[0]->type->type == NodeType::Type::VARIABLE && node.children[0]->children.size() == 1) {
                 pair<void*, Renderer::DropFunction> drop = renderer.getInternalDrop(*node.children[0].get(), store);
                 if (drop.second)
@@ -1674,7 +1673,7 @@ namespace Liquid {
     struct LastDotFilterNode : DotFilterNodeType {
         LastDotFilterNode() : DotFilterNodeType("last") { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             if (node.type && node.type->type == NodeType::Type::VARIABLE && node.children.size() == 1) {
                 pair<void*, Renderer::DropFunction> drop = renderer.getInternalDrop(*node.children[0].get(), store);
                 if (drop.second)
@@ -1737,7 +1736,7 @@ namespace Liquid {
     struct SizeFilterNode : FilterNodeType {
         SizeFilterNode() : FilterNodeType("size", 0, 0) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             switch (operand.variant.type) {
                 case Variant::Type::ARRAY:
@@ -1767,7 +1766,7 @@ namespace Liquid {
     struct SizeDotFilterNode : DotFilterNodeType {
         SizeDotFilterNode() : DotFilterNodeType("size") { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             if (node.type && node.type->type == NodeType::Type::VARIABLE && node.children.size() == 1) {
                 pair<void*, Renderer::DropFunction> drop = renderer.getInternalDrop(*node.children[0].get(), store);
                 if (drop.second)
@@ -1817,7 +1816,7 @@ namespace Liquid {
 
     struct DefaultFilterNode : FilterNodeType {
         DefaultFilterNode() : FilterNodeType("default", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             if (operand.variant.isTruthy(renderer.context.falsiness))
@@ -1828,7 +1827,7 @@ namespace Liquid {
 
     struct DateFilterNode : FilterNodeType {
         DateFilterNode() : FilterNodeType("date", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             time_t operand = (time_t)getOperand(renderer, node, store).variant.getInt();
             string argument = getArgument(renderer, node, store, 0).getString();
             struct tm * timeinfo = localtime(&operand);

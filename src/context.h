@@ -50,7 +50,7 @@ namespace Liquid {
             Arity arity;
 
             QualifierNodeType(const string& symbol, Arity arity) : NodeType(NodeType::Type::QUALIFIER, symbol, 1, LIQUID_OPTIMIZATION_SCHEME_NONE), arity(arity) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const { return Node(); }
+            Node render(Renderer& renderer, const Node& node, Variable store) const override { return Node(); }
         };
 
         // For things like if/else, and whatnot. else is a free tag that sits inside the if statement.
@@ -146,7 +146,7 @@ namespace Liquid {
     // Represents something a file, or whatnot. Allows the filling in of
     struct ContextBoundaryNode : NodeType {
         ContextBoundaryNode() : NodeType(NodeType::Type::CONTEXTUAL, "", -1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             renderer.nodeContext = this;
             return renderer.retrieveRenderedNode(*node.children[1].get(), store);
         }
@@ -156,14 +156,14 @@ namespace Liquid {
         struct ConcatenationNode : NodeType {
             ConcatenationNode() : NodeType(Type::OPERATOR, "", -1, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
 
-            Node render(Renderer& renderer, const Node& node, Variable store) const;
-            bool optimize(Optimizer& optimizer, Node& node, Variable store) const;
+            Node render(Renderer& renderer, const Node& node, Variable store) const override;
+            bool optimize(Optimizer& optimizer, Node& node, Variable store) const override;
         };
 
         struct OutputNode : ContextualNodeType {
             OutputNode() : ContextualNodeType(Type::OUTPUT) { }
 
-            Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 assert(node.children.size() == 1);
                 auto& argumentNode = node.children.front();
                 assert(argumentNode->children.size() == 1);
@@ -175,7 +175,7 @@ namespace Liquid {
             PassthruNode(NodeType::Type type) :NodeType(type) { }
             ~PassthruNode() { }
 
-            Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 assert(node.children.size() == 1);
                 auto it = node.children.begin();
                 if ((*it)->type)
@@ -192,7 +192,7 @@ namespace Liquid {
         struct ArgumentNode : NodeType { ArgumentNode() : NodeType(Type::ARGUMENTS, "", -1, LIQUID_OPTIMIZATION_SCHEME_NONE) { } };
         struct ArrayLiteralNode : NodeType {
             ArrayLiteralNode() : NodeType(Type::ARRAY_LITERAL) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 Variant var { std::vector<Variant>() };
                 var.a.reserve(node.children.size());
                 for (size_t i = 0; i < node.children.size(); ++i)
@@ -204,7 +204,7 @@ namespace Liquid {
         struct UnknownFilterNode : FilterNodeType {
             UnknownFilterNode() : FilterNodeType("", -1, -1) { }
 
-            Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 if (renderer.logUnknownFilters)
                     renderer.pushUnknownFilterWarning(node, store);
                 return Node();
@@ -218,7 +218,7 @@ namespace Liquid {
         struct VariableNode : NodeType {
             VariableNode() : NodeType(Type::VARIABLE) { }
 
-            Node render(Renderer& renderer, const Node& node, Variable store) const {
+            Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 pair<void*, Renderer::DropFunction> drop = renderer.getInternalDrop(node, store);
                 if (drop.second) {
                     Node result = drop.second(renderer, node, store, drop.first);
@@ -233,7 +233,7 @@ namespace Liquid {
                 }
             }
 
-            bool optimize(Optimizer& optimizer, Node& node, Variable store) const;
+            bool optimize(Optimizer& optimizer, Node& node, Variable store) const override;
         };
 
         unordered_map<string, unique_ptr<NodeType>> tagTypes;

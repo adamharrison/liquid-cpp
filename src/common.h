@@ -41,7 +41,7 @@ namespace Liquid {
             va_end(args);
             internal = buffer;
         }
-        const char * what () const throw () {
+        const char * what () const noexcept override {
             return internal.c_str();
         }
     };

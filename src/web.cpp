@@ -40,7 +40,7 @@ namespace Liquid {
         }
 
         EscapeFilterNode() : FilterNodeType("escape", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             return Variant(htmlEscape(renderer.retrieveRenderedNode(*node.children.front().get(), store).getString()));
         }
     };
@@ -64,7 +64,7 @@ namespace Liquid {
         }
 
         URLEncodeFilterNode() : FilterNodeType("url_encode", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             return Variant(paramEncode(renderer.retrieveRenderedNode(*node.children.front().get(), store).getString()));
         }
     };
@@ -81,7 +81,7 @@ namespace Liquid {
     struct DigestFilterNode : FilterNodeType {
         DigestFilterNode(const string& symbol) : FilterNodeType(symbol, 0, 0) { }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             string incoming = getOperand(renderer, node, store).getString();
             unsigned char c[LENGTH];
             string result;
@@ -94,7 +94,7 @@ namespace Liquid {
 
     struct DigestHMACFilterNode : FilterNodeType {
         DigestHMACFilterNode(const string& symbol) : FilterNodeType(symbol, 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             string incoming = getOperand(renderer, node, store).getString();
             string key = getArgument(renderer, node, store, 0).getString();
             unsigned char c[1024];
@@ -117,7 +117,7 @@ namespace Liquid {
 
     struct LinkToFilterNode : FilterNodeType {
         LinkToFilterNode() : FilterNodeType("link_to", 1, 2) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             string title = getArgument(renderer, node, store, 1).getString();
             string url = "<a " + (!title.empty() ? ("title=\"" + EscapeFilterNode::htmlEscape(title) + "\"") : "") + " href=\"" + getArgument(renderer, node, store, 0).getString() + "\">" + EscapeFilterNode::htmlEscape(getOperand(renderer, node, store).getString()) + "</a>";
             return Variant(move(url));
@@ -126,25 +126,25 @@ namespace Liquid {
 
     struct ImgTagFilterNode : FilterNodeType {
         ImgTagFilterNode() : FilterNodeType("img_tag", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             return Variant(string("<img src='") + getOperand(renderer, node, store).getString() + "'/>");
         }
     };
     struct StylesheetTagFilterNode : FilterNodeType {
         StylesheetTagFilterNode() : FilterNodeType("stylesheet_tag", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             return Variant(string("<link href=\"") + getOperand(renderer, node, store).getString() + "\" rel=\"stylesheet\" type=\"text/css\" media=\"all\" />");
         }
     };
     struct ScriptTagFilterNode : FilterNodeType {
         ScriptTagFilterNode() : FilterNodeType("script_tag", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             return Variant(string("<script src=\"") + getOperand(renderer, node, store).getString() + "\" type=\"text/javascript\"></script>");
         }
     };
     struct HighlightFilterNode : FilterNodeType {
         HighlightFilterNode() : FilterNodeType("highlight", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             string operand = getOperand(renderer, node, store).getString();
             string argument = getArgument(renderer, node, store, 0).getString();
             string result;
@@ -326,21 +326,21 @@ namespace Liquid {
 
     struct ColorToRGBFilterNode : ColorFilterNode {
         ColorToRGBFilterNode() : ColorFilterNode("color_to_rgb", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             return Variant(printRGB(getColorOperand(renderer, node, store)));
         }
     };
 
     struct ColorToHSLFilterNode : ColorFilterNode {
         ColorToHSLFilterNode() : ColorFilterNode("color_to_hsl", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             return Variant(printHSL(getColorOperand(renderer, node, store)));
         }
     };
 
     struct ColorToHexFilterNode : ColorFilterNode {
         ColorToHexFilterNode() : ColorFilterNode("color_to_hex", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             return Variant(printHex(getColorOperand(renderer, node, store)));
         }
     };
@@ -348,7 +348,7 @@ namespace Liquid {
 
     struct ColorExtractFilterNode : ColorFilterNode {
         ColorExtractFilterNode() : ColorFilterNode("color_extract", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             unsigned int color = getColorOperand(renderer, node, store);
             string op = getArgument(renderer, node, store, 0).getString();
             if (op == "red")
@@ -371,14 +371,14 @@ namespace Liquid {
 
     struct ColorBrightnessFilterNode : ColorFilterNode {
         ColorBrightnessFilterNode() : ColorFilterNode("color_brightness", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             return Variant(getBrightness(getColorOperand(renderer, node, store)));
         }
     };
 
     struct ColorModifyFilterNode : ColorFilterNode {
         ColorModifyFilterNode() : ColorFilterNode("color_modify", 2, 2) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             unsigned int color = getColorOperand(renderer, node, store);
             string op = getArgument(renderer, node, store, 0).getString();
             Variant v = getArgument(renderer, node, store, 1).variant;
@@ -409,7 +409,7 @@ namespace Liquid {
 
     struct ColorLightenFilterNode : ColorFilterNode {
         ColorLightenFilterNode() : ColorFilterNode("color_lighten", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             unsigned int color = getColorOperand(renderer, node, store);
             HSL hsl = getHSL(color);
             float percent = getArgument(renderer, node, store, 0).variant.getFloat() / 100.0f;
@@ -420,7 +420,7 @@ namespace Liquid {
 
     struct ColorDarkenFilterNode : ColorFilterNode {
         ColorDarkenFilterNode() : ColorFilterNode("color_darken", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             unsigned int color = getColorOperand(renderer, node, store);
             HSL hsl = getHSL(color);
             float percent = getArgument(renderer, node, store, 0).variant.getFloat() / 100.0f;
@@ -432,7 +432,7 @@ namespace Liquid {
 
     struct ColorSaturateFilterNode : ColorFilterNode {
         ColorSaturateFilterNode() : ColorFilterNode("color_saturate", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             unsigned int color = getColorOperand(renderer, node, store);
             HSL hsl = getHSL(color);
             float percent = getArgument(renderer, node, store, 0).variant.getFloat() / 100.0f;
@@ -443,7 +443,7 @@ namespace Liquid {
 
     struct ColorDesaturateFilterNode : ColorFilterNode {
         ColorDesaturateFilterNode() : ColorFilterNode("color_desaturate", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             unsigned int color = getColorOperand(renderer, node, store);
             HSL hsl = getHSL(color);
             float percent = getArgument(renderer, node, store, 0).variant.getFloat() / 100.0f;
@@ -454,7 +454,7 @@ namespace Liquid {
 
     struct ColorMixFilterNode : ColorFilterNode {
         ColorMixFilterNode() : ColorFilterNode("color_mix", 2, 2) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             unsigned int input = getColorOperand(renderer, node, store);
             unsigned int mix = getColorString(getArgument(renderer, node, store, 0).getString());
             float percent = getArgument(renderer, node, store, 1).variant.getFloat() / 100.0f;
@@ -470,7 +470,7 @@ namespace Liquid {
 
     struct ColorContrastFilterNode : ColorFilterNode {
         ColorContrastFilterNode() : ColorFilterNode("color_contrast", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             unsigned int color1 = getColorOperand(renderer, node, store);
             unsigned int color2 = getColorString(getArgument(renderer, node, store, 0).getString());
 
@@ -489,7 +489,7 @@ namespace Liquid {
 
         float square(float f) const { return f*f; }
 
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             unsigned int color1 = getColorOperand(renderer, node, store);
             unsigned int color2 = getColorString(getArgument(renderer, node, store, 0).getString());
             return Variant(sqrtf(square(getRed(color1) - getRed(color2)) + square(getBlue(color1) - getBlue(color2)) + square(getBlue(color1) - getBlue(color2))));
@@ -499,7 +499,7 @@ namespace Liquid {
 
     struct BrightnessDifferenceFilterNode : ColorFilterNode {
         BrightnessDifferenceFilterNode() : ColorFilterNode("brightness_difference", 1, 1) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             unsigned int color1 = getColorOperand(renderer, node, store);
             unsigned int color2 = getColorString(getArgument(renderer, node, store, 0).getString());
             return Variant(abs(getBrightness(color1) - getBrightness(color2)));
@@ -508,7 +508,7 @@ namespace Liquid {
 
     struct NewlineToBrFilterNode : FilterNodeType {
         NewlineToBrFilterNode() : FilterNodeType("newline_to_br", 0, 0) { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             if (operand.type)
                 return Node();
@@ -528,7 +528,7 @@ namespace Liquid {
     #if LIQUID_INCLUDE_RAPIDJSON_VARIABLE
     struct JSONFilterNode : FilterNodeType {
         JSONFilterNode() : FilterNodeType("json") { }
-        Node render(Renderer& renderer, const Node& node, Variable store) const {
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Node argument = getOperand(renderer, node, store);
             return argument;
         }

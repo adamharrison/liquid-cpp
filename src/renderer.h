@@ -80,7 +80,7 @@ namespace Liquid {
                 message = Error::english(error);
             }
 
-            const char* what() const noexcept {
+            const char* what() const noexcept override {
                return message.data();
             }
         };

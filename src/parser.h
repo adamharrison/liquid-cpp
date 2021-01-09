@@ -157,7 +157,7 @@ namespace Liquid {
                 englishDefault = Lexer::Error::english(lexerError);
 
             }
-            const char* what() const noexcept {
+            const char* what() const noexcept override {
                 return englishDefault.c_str();
             }
         };

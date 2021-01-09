@@ -9,7 +9,7 @@
         struct WebDialect : Dialect {
             static void implement(Context& context);
         };
-    };
+    }
 #endif
 
 #endif

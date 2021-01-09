@@ -100,5 +100,4 @@ namespace Liquid {
         --optimizer.renderer.currentRenderingDepth;
         return true;
     }
-
-};
+}

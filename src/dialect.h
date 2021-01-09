@@ -57,7 +57,7 @@ namespace Liquid {
             );
         }
     };
-};
+}
 
 #ifdef LIQUID_INCLUDE_WEB_DIALECT
     #include "web.h"
