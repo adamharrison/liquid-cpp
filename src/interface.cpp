@@ -95,6 +95,23 @@ LiquidTemplateRender liquidRendererRenderTemplate(LiquidRenderer renderer, void*
     return LiquidTemplateRender({ str });
 }
 
+
+void* liquidRendererRenderArgument(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRendererError* error) {
+    if (error)
+        error->type = LIQUID_RENDERER_ERROR_TYPE_NONE;
+    Variable variable;
+    try {
+        Variant variant = static_cast<Renderer*>(renderer.renderer)->renderArgument(*static_cast<Node*>(tmpl.ast), Variable({ variableStore }));
+        static_cast<Renderer*>(renderer.renderer)->inject(variable, variant);
+
+    } catch (Renderer::Exception& exp) {
+        if (error)
+            *error = exp.rendererError;
+        return nullptr;
+    }
+    return variable;
+}
+
 size_t liquidGetRendererWarningCount(LiquidRenderer renderer) {
     return static_cast<Renderer*>(renderer.renderer)->errors.size();
 }

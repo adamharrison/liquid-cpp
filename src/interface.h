@@ -177,6 +177,7 @@ extern "C" {
     void liquidFreeParser(LiquidParser parser);
 
     LiquidTemplate liquidParserParseTemplate(LiquidParser parser, const char* buffer, size_t size, const char* file, LiquidLexerError* lexer, LiquidParserError* error);
+    LiquidTemplate liquidParserParseArgument(LiquidParser parser, const char* buffer, size_t size, LiquidLexerError* lexer, LiquidParserError* error);
     void liquidFreeTemplate(LiquidTemplate tmpl);
 
     LiquidOptimizer liquidCreateOptimizer(LiquidRenderer renderer);
@@ -184,6 +185,7 @@ extern "C" {
     void liquidFreeOptimizer(LiquidOptimizer optimizer);
 
     LiquidTemplateRender liquidRendererRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRendererError* error);
+    void* liquidRendererRenderArgument(LiquidRenderer renderer, void* variableStore, LiquidTemplate argument, LiquidRendererError* error);
     typedef void (*LiquidWalkTemplateFunction)(LiquidTemplate tmpl, const LiquidNode node, void* data);
     void liquidWalkTemplate(LiquidTemplate tmpl, LiquidWalkTemplateFunction callback, void* data);
     void liquidFreeTemplateRender(LiquidTemplateRender render);
