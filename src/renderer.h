@@ -122,6 +122,7 @@ namespace Liquid {
         Renderer(const Context& context, LiquidVariableResolver variableResolver);
 
         vector<Error> errors;
+        Variant renderArgument(const Node& ast, Variable store);
         LiquidRendererErrorType render(const Node& ast, Variable store, void (*)(const char* chunk, size_t size, void* data), void* data);
         string render(const Node& ast, Variable store);
         // Retrieves a rendered node, if possible. If the node in question has a nodetype that is PARTIAL optimized, Has the potential to return node with

@@ -94,14 +94,14 @@ namespace Liquid {
         }
 
         // Must be a whole file, for now. Should be null-terminated.
-        Error parse(const char* str, size_t size) {
+        Error parse(const char* str, size_t size, Lexer::State initialState = State::INITIAL) {
             size_t offset = 0;
             size_t lastInitial = 0;
             size_t i;
             bool ongoing = true;
             line = 1;
             column = 0;
-            state = State::INITIAL;
+            state = initialState;
             while (ongoing && offset < size) {
                 ++column;
                 switch (state) {
@@ -305,6 +305,8 @@ namespace Liquid {
                             else
                                 ++offset;
                         }
+                        if (offset == size && !processComplete)
+                            ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
                     } break;
                     case State::RAW: {
                         // Go until the next raw tag;
@@ -339,12 +341,10 @@ namespace Liquid {
                 }
             }
             if (ongoing) {
-                if (state != State::INITIAL) {
+                if (state != initialState) {
                     return Error(*this, Error::Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END);
-                } else {
-                    if (offset > lastInitial) {
-                        static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial);
-                    }
+                } else if (state == State::INITIAL && offset > lastInitial) {
+                    static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial);
                 }
             }
             return Error();

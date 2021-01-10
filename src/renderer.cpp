@@ -12,6 +12,23 @@ namespace Liquid {
 
     }
 
+    Variant Renderer::renderArgument(const Node& ast, Variable store) {
+        nodeContext = nullptr;
+        errors.clear();
+        unknownErrors.clear();
+        renderStartTime = std::chrono::system_clock::now();
+        currentMemoryUsage = 0;
+        currentRenderingDepth = 0;
+        error = Error::Type::LIQUID_RENDERER_ERROR_TYPE_NONE;
+        internalRender = true;
+        Node node = retrieveRenderedNode(ast, store);
+        internalRender = false;
+        assert(node.type == nullptr);
+        if (error != LIQUID_RENDERER_ERROR_TYPE_NONE)
+            throw Error(error, Node());
+        return node.variant;
+    }
+
     LiquidRendererErrorType Renderer::render(const Node& ast, Variable store, void (*callback)(const char* chunk, size_t size, void* data), void* data) {
         if (internalRender) {
             Node node = retrieveRenderedNode(ast, store);

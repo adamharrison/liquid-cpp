@@ -12,10 +12,7 @@ namespace Liquid {
     template <bool allowGlobals>
     struct AssignNode : TagNodeType {
 
-        struct AssignOperator : OperatorNodeType {
-            AssignOperator() : OperatorNodeType("=", Arity::BINARY, 0) { }
-            Node render(Renderer& renderer, const Node& node, Variable store) const override { return Node(); }
-        };
+        struct AssignOperator : OperatorNodeType { AssignOperator() : OperatorNodeType("=", Arity::BINARY, 0) { } };
 
         AssignNode() : TagNodeType(Composition::FREE, "assign", 1, 1, LIQUID_OPTIMIZATION_SCHEME_NONE) {
             registerType<AssignOperator>();

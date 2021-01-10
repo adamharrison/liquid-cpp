@@ -179,6 +179,11 @@ namespace Liquid {
         bool hasNode(NodeType::Type type) const;
         bool hasNode(const NodeType* type) const;
 
+        Node parseArgument(const char* buffer, size_t len);
+        Node parseArgument(const std::string& str) {
+            return parseArgument(str.data(), str.size());
+        }
+
         Node parse(const char* buffer, size_t len, const std::string& file);
         Node parse(const string& str, const std::string& file = "") {
             return parse(str.data(), str.size(), file);

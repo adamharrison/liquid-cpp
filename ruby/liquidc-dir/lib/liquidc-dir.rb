@@ -1,6 +1,38 @@
 require 'liquidc'
 
 module Liquid
+
+    class Tag
+    end
+
+    class Block < Tag
+        attr_accessor :body
+
+        def render(stash)
+            return self.body
+        end
+    end
+
+    class Include < Tag
+        def render(stash)
+
+        end
+    end
+
+    class LocalFileSystem
+        attr_accessor :root
+
+        def initialize(path)
+            self.root = path
+        end
+
+        def full_path(path)
+
+        end
+    end
+
+
+
     class Error < StandardError
         def self.translate_error(e)
             if e.is_a?(LiquidC::Parser::Error)
@@ -8,7 +40,7 @@ module Liquid
                 when 2
                     error = SyntaxError.new("Unknown tag '" + e.message + "'", e.line, e.file)
                 when 7
-                    error = SyntaxError.new("Invalid arguments for '" + e.message + "', expected " + e.args[0].to_s + ", got", e.line, e.file)
+                    error = SyntaxError.new("Invalid arguments for '" + e.args[0] + "', expected " + e.args[1] + ", got" + e.args[1], e.line, e.file)
                 else
                     error = SyntaxError.new(e.message, e.line, e.file)
                 end
@@ -25,6 +57,58 @@ module Liquid
             self.line_number = line_number
             self.template_name = template_name
         end
+    end
+
+    class ArgumentError < Error
+
+    end
+
+    class FileSystemError < Error
+
+    end
+
+    class ContextError < Error
+
+    end
+
+    class StackLevelError < Error
+
+    end
+
+    class MemoryError < Error
+
+    end
+
+    class ZeroDivisionError < Error
+
+    end
+
+    class FloatDomainError < Error
+
+    end
+
+    class UndefinedVariable < Error
+
+    end
+
+    class UndefinedDropMethod < Error
+
+    end
+
+    class UndefinedFilter < Error
+
+    end
+
+    class MethodOverrideError < Error
+
+    end
+
+    class DisabledError < Error
+
+    end
+
+    class InternalError < Error
+
     end
 
     class Template
@@ -99,4 +183,6 @@ module Liquid
             end
         end
     end
+
+    Liquid::Template.registerTag("include", Liquid::Include)
 end

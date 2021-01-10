@@ -511,6 +511,28 @@ namespace Liquid {
         return true;
     }
 
+    Node Parser::parseArgument(const char* buffer, size_t len) {
+        errors.clear();
+        nodes.clear();
+
+        filterState = EFilterState::UNSET;
+        blockType = EBlockType::INTERMEDIATE;
+        state = State::ARGUMENT;
+
+        pushNode(make_unique<Node>(context.getOutputNodeType()), true);
+        Lexer::Error error = lexer.parse(buffer, len, Lexer::State::OUTPUT);
+        if (error.type != Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_NONE)
+            throw Exception(error);
+        if (errors.size() > 0)
+            throw Exception(errors);
+        if (!popNodeUntil(NodeType::Type::OUTPUT))
+            return Node();
+        assert(nodes.size() == 1);
+        Node node = move(*nodes.back()->children[0].get());
+        nodes.clear();
+        return node;
+    }
+
     Node Parser::parse(const char* buffer, size_t len, const string& file) {
         errors.clear();
         nodes.clear();
@@ -518,7 +540,7 @@ namespace Liquid {
         blockType = EBlockType::NONE;
         state = State::NODE;
 
-        nodes.push_back(std::make_unique<Node>(context.getConcatenationNodeType()));
+        pushNode(make_unique<Node>(context.getConcatenationNodeType()), false);
         Lexer::Error error = lexer.parse(buffer, len);
         if (error.type != Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_NONE)
             throw Exception(error);

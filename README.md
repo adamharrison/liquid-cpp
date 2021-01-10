@@ -56,7 +56,7 @@ requires an underlying ruby module that implements the more modular, sane versio
 
 In development. **Do not use in production code, yet.**
 
-Basic memory audits of the core have been done, and leaks have been closed. A more extensive battery of tests is required to determine if there's actually any UB or
+Basic memory audits of the core have been done with valgrind, and leaks have been closed. A more extensive battery of tests is required to determine if there's actually any undefined behaviour or further leaks.
 
 ### Quick Start
 

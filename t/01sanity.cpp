@@ -359,6 +359,20 @@ TEST(sanity, specialLiterals) {
     ASSERT_EQ(str, "true");
 }
 
+
+TEST(sanity, argumentContext) {
+    CPPVariable hash, internal;
+    Node ast;
+    std::string str;
+
+    hash["a"] = 1;
+
+    ast = getParser().parseArgument("a + 2");
+    Variant result = getRenderer().renderArgument(ast, hash);
+    ASSERT_EQ(result.type, Variant::Type::INT);
+    ASSERT_EQ(result.i, 3);
+}
+
 TEST(sanity, arrayLiterals) {
     CPPVariable hash, internal;
     Node ast;
