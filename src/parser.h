@@ -180,9 +180,11 @@ namespace Liquid {
         bool hasNode(const NodeType* type) const;
 
         Node parseArgument(const char* buffer, size_t len);
-        Node parseArgument(const std::string& str) {
-            return parseArgument(str.data(), str.size());
-        }
+        Node parseArgument(const std::string& str) { return parseArgument(str.data(), str.size()); }
+
+        // Determines whether or not this is an argument, or a text, and then returns whichever it thinks makes more sense.
+        Node parseAppropriate(const char* buffer, size_t len, const std::string& file = "");
+        Node parseAppropriate(const std::string& str, const std::string& file = "") { return parseAppropriate(str.data(), str.size()); }
 
         Node parse(const char* buffer, size_t len, const std::string& file);
         Node parse(const string& str, const std::string& file = "") {

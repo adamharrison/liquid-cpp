@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require 'liquid'
+require 'liquid/c'
 require 'liquidc'
 
 context = LiquidC.new("strict")
@@ -58,7 +59,7 @@ templateContent = '{{ "asdadasdAS" | test }}'
 
 puts "WAT";
 
-templateNew = parser.parse(templateContent);
+templateNew = parser.parseTemplate(templateContent);
 
 puts "TEMPLATE NEW: #{templateNew}";
 

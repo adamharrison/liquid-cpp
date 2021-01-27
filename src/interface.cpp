@@ -69,6 +69,39 @@ LiquidTemplate liquidParserParseTemplate(LiquidParser parser, const char* buffer
     return LiquidTemplate({ new Node(std::move(tmpl)) });
 }
 
+
+LiquidTemplate liquidParserParseArgument(LiquidParser parser, const char* buffer, size_t size, LiquidLexerError* lexerError, LiquidParserError* parserError) {
+    Node tmpl;
+    if (lexerError)
+        lexerError->type = LiquidLexerErrorType::LIQUID_LEXER_ERROR_TYPE_NONE;
+    if (parserError)
+        parserError->type = LiquidParserErrorType::LIQUID_PARSER_ERROR_TYPE_NONE;
+    try {
+        tmpl = static_cast<Parser*>(parser.parser)->parseArgument(buffer, size);
+    } catch (Parser::Exception& exp) {
+        if (parserError)
+            *parserError = exp.parserErrors[0];
+        return LiquidTemplate({ NULL });
+    }
+    return LiquidTemplate({ new Node(std::move(tmpl)) });
+}
+
+LiquidTemplate liquidParserParseAppropriate(LiquidParser parser, const char* buffer, size_t size, const char* file, LiquidLexerError* lexerError, LiquidParserError* parserError) {
+    Node tmpl;
+    if (lexerError)
+        lexerError->type = LiquidLexerErrorType::LIQUID_LEXER_ERROR_TYPE_NONE;
+    if (parserError)
+        parserError->type = LiquidParserErrorType::LIQUID_PARSER_ERROR_TYPE_NONE;
+    try {
+        tmpl = static_cast<Parser*>(parser.parser)->parseAppropriate(buffer, size, file);
+    } catch (Parser::Exception& exp) {
+        if (parserError)
+            *parserError = exp.parserErrors[0];
+        return LiquidTemplate({ NULL });
+    }
+    return LiquidTemplate({ new Node(std::move(tmpl)) });
+}
+
 size_t liquidGetParserWarningCount(LiquidParser parser) {
     return static_cast<Parser*>(parser.parser)->errors.size();
 }

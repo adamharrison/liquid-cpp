@@ -366,11 +366,18 @@ TEST(sanity, argumentContext) {
     std::string str;
 
     hash["a"] = 1;
+    internal["title"] = "The Greatest Thing Ever";
+    hash["product"] = move(internal);
 
     ast = getParser().parseArgument("a + 2");
     Variant result = getRenderer().renderArgument(ast, hash);
     ASSERT_EQ(result.type, Variant::Type::INT);
     ASSERT_EQ(result.i, 3);
+
+    ast = getParser().parseAppropriate("{% if product.title contains 'a' %}1{% else %}0{% endif %}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "1");
+
 }
 
 TEST(sanity, arrayLiterals) {

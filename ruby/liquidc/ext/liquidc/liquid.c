@@ -424,7 +424,7 @@ VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
     return str;
 }
 
-VALUE method_liquidCParserParse(int argc, VALUE* argv, VALUE self) {
+VALUE method_liquidCParserParseTemplate(int argc, VALUE* argv, VALUE self) {
     LiquidParser* parser;
     LiquidTemplate tmpl;
     char* fileBody;
@@ -467,6 +467,89 @@ VALUE method_liquidCParserParse(int argc, VALUE* argv, VALUE self) {
     rb_obj_call_init(result, 1, &arg);
     return result;
 }
+
+VALUE method_liquidCParserParseAppropriate(int argc, VALUE* argv, VALUE self) {
+    LiquidParser* parser;
+    LiquidTemplate tmpl;
+    char* fileBody;
+    char* textBody;
+    int textLength;
+    LiquidLexerError lexerError;
+    LiquidParserError parserError;
+    VALUE result, arg, exception;
+    VALUE exceptionInit[PACK_EXCEPTION_LENGTH];
+    char buffer[512];
+    int j;
+
+    TypedData_Get_Struct(self, LiquidParser, &liquidCParser_type, parser);
+
+    Check_Type(argv[0], T_STRING);
+    textBody = StringValueCStr(argv[0]);
+    textLength = RSTRING_LEN(argv[0]);
+    if (argc > 1) {
+        Check_Type(argv[1], T_STRING);
+        fileBody = StringValueCStr(argv[1]);
+    } else
+        fileBody = NULL;
+
+    tmpl = liquidParserParseAppropriate(*parser, textBody, textLength, fileBody ? fileBody : "", &lexerError, &parserError);
+    if (lexerError.type) {
+        liquidGetLexerErrorMessage(lexerError, buffer, sizeof(buffer));
+        PACK_EXCEPTION(liquidCParserError, lexerError, exceptionInit, buffer, exception);
+        rb_exc_raise(exception);
+        return self;
+    }
+    if (parserError.type) {
+        liquidGetParserErrorMessage(parserError, buffer, sizeof(buffer));
+        PACK_EXCEPTION(liquidCParserError, parserError, exceptionInit, buffer, exception);
+        rb_exc_raise(exception);
+        return self;
+    }
+    result = rb_obj_alloc(liquidCTemplate);
+    arg = LL2NUM((long long)tmpl.ast);
+    rb_obj_call_init(result, 1, &arg);
+    return result;
+}
+
+
+VALUE method_liquidCParserParseArgument(int argc, VALUE* argv, VALUE self) {
+    LiquidParser* parser;
+    LiquidTemplate tmpl;
+    char* textBody;
+    int textLength;
+    LiquidLexerError lexerError;
+    LiquidParserError parserError;
+    VALUE result, arg, exception;
+    VALUE exceptionInit[PACK_EXCEPTION_LENGTH];
+    char buffer[512];
+    int j;
+
+    TypedData_Get_Struct(self, LiquidParser, &liquidCParser_type, parser);
+
+    Check_Type(argv[0], T_STRING);
+    textBody = StringValueCStr(argv[0]);
+    textLength = RSTRING_LEN(argv[0]);
+
+    tmpl = liquidParserParseArgument(*parser, textBody, textLength, &lexerError, &parserError);
+    if (lexerError.type) {
+        liquidGetLexerErrorMessage(lexerError, buffer, sizeof(buffer));
+        PACK_EXCEPTION(liquidCParserError, lexerError, exceptionInit, buffer, exception);
+        rb_exc_raise(exception);
+        return self;
+    }
+    if (parserError.type) {
+        liquidGetParserErrorMessage(parserError, buffer, sizeof(buffer));
+        PACK_EXCEPTION(liquidCParserError, parserError, exceptionInit, buffer, exception);
+        rb_exc_raise(exception);
+        return self;
+    }
+    result = rb_obj_alloc(liquidCTemplate);
+    arg = LL2NUM((long long)tmpl.ast);
+    rb_obj_call_init(result, 1, &arg);
+    return result;
+}
+
+
 
 VALUE method_liquidCParserWarnings(VALUE self) {
     LiquidParser* parser;
@@ -701,7 +784,9 @@ void Init_liquidc() {
 
 	rb_define_alloc_func(liquidCParser, liquidCParser_alloc);
     rb_define_method(liquidCParser, "initialize", liquidCParser_m_initialize, 1);
-    rb_define_method(liquidCParser, "parse", method_liquidCParserParse, -1);
+    rb_define_method(liquidCParser, "parseTemplate", method_liquidCParserParseTemplate, -1);
+    rb_define_method(liquidCParser, "parseArgument", method_liquidCParserParseArgument, -1);
+    rb_define_method(liquidCParser, "parseAppropriate", method_liquidCParserParseAppropriate, -1);
     rb_define_method(liquidCParser, "warnings", method_liquidCParserWarnings, 0);
 
 	rb_define_alloc_func(liquidCRenderer, liquidCRenderer_alloc);

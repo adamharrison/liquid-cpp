@@ -125,6 +125,7 @@ namespace Liquid {
         Variant renderArgument(const Node& ast, Variable store);
         LiquidRendererErrorType render(const Node& ast, Variable store, void (*)(const char* chunk, size_t size, void* data), void* data);
         string render(const Node& ast, Variable store);
+        string renderTrimmed(const Node& ast, Variable store);
         // Retrieves a rendered node, if possible. If the node in question has a nodetype that is PARTIAL optimized, Has the potential to return node with
         // a type still attached; otherwise, will always be a variant node.
         Node retrieveRenderedNode(const Node& node, Variable store) {

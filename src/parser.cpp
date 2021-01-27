@@ -533,6 +533,18 @@ namespace Liquid {
         return node;
     }
 
+
+    Node Parser::parseAppropriate(const char* buffer, size_t len, const std::string& file) {
+        bool hasBraces = false;
+        for (size_t i = 1; i < len; ++i) {
+            if (buffer[i-1] == '{' && (buffer[i] == '{' || buffer[i] == '%')) {
+                hasBraces = true;
+                break;
+            }
+        }
+        return hasBraces ? parse(buffer, len, file) : parseArgument(buffer, len);
+    }
+
     Node Parser::parse(const char* buffer, size_t len, const string& file) {
         errors.clear();
         nodes.clear();

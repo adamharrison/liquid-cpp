@@ -64,6 +64,16 @@ namespace Liquid {
         return accumulator;
     }
 
+    string Renderer::renderTrimmed(const Node& ast, Variable store) {
+        string result = render(ast, store);
+        int start,end;
+        for (start = 0; start < (int)result.size() && isspace(start); ++start);
+        if (start == (int)result.size())
+            return string();
+        for (end = (int)result.size()-1; end >= 0 && isspace(end); --end);
+        return result.substr(start, end - start + 1);
+    }
+
     pair<void*, Renderer::DropFunction> Renderer::getInternalDrop(const string& key) {
         auto it = internalDrops.find(key);
         if (it == internalDrops.end())
