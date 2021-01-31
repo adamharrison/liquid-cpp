@@ -20,12 +20,12 @@ context.registerTag("freetag", LiquidCPP::TAG_TYPE_FREE, -1, -1, LiquidCPP::OPTI
 })
 
 
-text = renderer.render({ }, parser.parse("{% enclosingtag i %}{% endenclosingtag %}{% freetag %}"))
+text = renderer.render({ }, parser.parseTemplate("{% enclosingtag i %}{% endenclosingtag %}{% freetag %}"))
 puts "TEST: " + text
 raise "No warnings." if parser.warnings.size > 0
 
 
-puts renderer.render({ }, parser.parse("{% endif %}"))
+puts renderer.render({ }, parser.parseTemplate("{% endif %}"))
 puts parser.warnings
 puts renderer.warnings
 
@@ -33,7 +33,7 @@ templateContent = "{% if a %}asdfghj {{ a }}{% else %}asdfjlsjkhgsjlkhglsdfjkgdf
 
 start = Time.now
 
-template1 = parser.parse(templateContent)
+template1 = parser.parseTemplate(templateContent)
 optimizer.optimize({ }, template1);
 template2 = Liquid::Template.parse(templateContent)
 

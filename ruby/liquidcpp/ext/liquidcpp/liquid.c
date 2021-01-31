@@ -750,7 +750,7 @@ VALUE method_liquidC_registerDotFilter(VALUE self, VALUE symbol, VALUE optimizat
 
 
 
-void Init_liquidc() {
+void Init_liquidcpp() {
 	VALUE liquidC, liquidCRenderer, liquidCOptimizer, liquidCParser, liquidCError;
 	liquidC = rb_define_class("LiquidCPP", rb_cData);
 	liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cData);
