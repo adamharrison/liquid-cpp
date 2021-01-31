@@ -278,6 +278,7 @@ This is what I'm aiming for at any rate.
 
 * Ability to partially render content, then spit back out the remaining liquid that genreated it.
 * General polish pass to clean up reundant code, and ensure consistency across the C, C++, Perl and Ruby APIs.
+* Write a register-based bytecode compiler/interpreter, which should be significantly faster than walking the parse tree. (not that it really needs it at this point)
 
 ## License
 

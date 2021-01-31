@@ -2,20 +2,20 @@
 
 require 'liquid'
 require 'liquid/c'
-require 'liquidc'
+require 'liquidcpp'
 
-context = LiquidC.new("strict")
-renderer = LiquidC::Renderer.new(context)
-parser = LiquidC::Parser.new(context)
-optimizer = LiquidC::Optimizer.new(renderer)
+context = LiquidCPP.new("strict")
+renderer = LiquidCPP::Renderer.new(context)
+parser = LiquidCPP::Parser.new(context)
+optimizer = LiquidCPP::Optimizer.new(renderer)
 
-context.registerFilter("test", -1, -1, LiquidC::OPTIMIZATION_SCHEME_NONE, Proc.new { |renderer, node, stash, operand|
+context.registerFilter("test", -1, -1, LiquidCPP::OPTIMIZATION_SCHEME_NONE, Proc.new { |renderer, node, stash, operand|
     "operand" + operand
 })
-context.registerTag("enclosingtag", LiquidC::TAG_TYPE_ENCLOSING, -1, -1, LiquidC::OPTIMIZATION_SCHEME_NONE, Proc.new { |renderer, node, stash, child, arguments|
+context.registerTag("enclosingtag", LiquidCPP::TAG_TYPE_ENCLOSING, -1, -1, LiquidCPP::OPTIMIZATION_SCHEME_NONE, Proc.new { |renderer, node, stash, child, arguments|
     'enclosed'
 })
-context.registerTag("freetag", LiquidC::TAG_TYPE_FREE, -1, -1, LiquidC::OPTIMIZATION_SCHEME_NONE, Proc.new { |renderer, node, stash, arguments|
+context.registerTag("freetag", LiquidCPP::TAG_TYPE_FREE, -1, -1, LiquidCPP::OPTIMIZATION_SCHEME_NONE, Proc.new { |renderer, node, stash, arguments|
     'free'
 })
 

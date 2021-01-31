@@ -1,24 +1,24 @@
 require "rake/extensiontask"
 
-Rake::ExtensionTask.new "liquidc" do |ext|
-	ext.lib_dir = "lib/liquidc"
+Rake::ExtensionTask.new "liquidcpp" do |ext|
+	ext.lib_dir = "lib/liquidcpp"
 end
 
-spec = Gem::Specification.new "liquidc", "0.1.0" do |s|
-	s.name		    = 'liquidc'
+spec = Gem::Specification.new "liquidcpp", "0.1.0" do |s|
+	s.name		    = 'liquidcpp'
 	s.version	    = '1.0.0'
 	s.date		    = '2020-12-05'
-	s.summary	    = "LiquidC"
+	s.summary	    = "LiquidCPP"
 	s.description	= "The ruby gem that hooks into the liquid-cpp library."
 	s.authors	    = ["Adam Harrison"]
 	s.email		    = 'adamdharrison@gmail.com'
 	s.homepage	    = 'https://github.com/adamharrison/liquid-cpp'
 	s.license	    = 'MIT'
-	s.extensions    = ["ext/liquidc/extconf.rb"]
-	s.files         = ["ext/liquidc/extconf.rb", "ext/liquidc/liquid.c"]
+	s.extensions    = ["ext/liquidcpp/extconf.rb"]
+	s.files         = ["ext/liquidcpp/extconf.rb", "ext/liquidcpp/liquid.c"]
 end
 
 Gem::PackageTask.new(spec) do |pkg|
 end
 
-Rake::ExtensionTask.new('liquidc', spec)
+Rake::ExtensionTask.new('liquidcpp', spec)

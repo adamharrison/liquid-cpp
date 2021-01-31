@@ -1,0 +1,1 @@
+require "liquidcpp/liquidcpp"

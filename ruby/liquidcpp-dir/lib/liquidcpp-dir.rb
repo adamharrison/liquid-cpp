@@ -1,4 +1,4 @@
-require 'liquidc'
+require 'liquidcpp'
 
 module Liquid
 
@@ -35,7 +35,7 @@ module Liquid
 
     class Error < StandardError
         def self.translate_error(e)
-            if e.is_a?(LiquidC::Parser::Error)
+            if e.is_a?(LiquidCPP::Parser::Error)
                 case e.type
                 when 2
                     error = SyntaxError.new("Unknown tag '" + e.message + "'", e.line, e.file)
@@ -115,7 +115,7 @@ module Liquid
         attr_reader :template
         attr_accessor :errors
 
-        @@globalContext = LiquidC.new("strict")
+        @@globalContext = LiquidCPP.new("strict")
         @@globalErrorMode = :lax
 
         def self.error_mode
@@ -127,7 +127,7 @@ module Liquid
         end
 
         def initialize(str, attrs)
-            parser = LiquidC::Parser.new(@@globalContext)
+            parser = LiquidCPP::Parser.new(@@globalContext)
             error_mode = attrs[:error_mode] || @@globalErrorMode
             error = nil
             begin
@@ -141,7 +141,7 @@ module Liquid
                 end
                 # Raise on exceptions that :lax raises on, which is apparently not accepting of "everything" as the docs say.
                 raise warnings.select { |x| x.type == 2 }.first if warnings.select { |x| x.type == 2 }.size > 0
-            rescue LiquidC::Parser::Error => e
+            rescue LiquidCPP::Parser::Error => e
                 error = Liquid::Error.translate_error(e)
             end
             raise error if error
@@ -152,7 +152,7 @@ module Liquid
         end
 
         def render(stash, attrs = {})
-            renderer = LiquidC::Renderer.new(@@globalContext)
+            renderer = LiquidCPP::Renderer.new(@@globalContext)
             renderer.setStrictVariables(true) if attrs[:strict_variables]
             renderer.setStrictFilters(true) if attrs[:strict_filters]
             result = renderer.render(stash, self.template)

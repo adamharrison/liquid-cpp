@@ -752,7 +752,7 @@ VALUE method_liquidC_registerDotFilter(VALUE self, VALUE symbol, VALUE optimizat
 
 void Init_liquidc() {
 	VALUE liquidC, liquidCRenderer, liquidCOptimizer, liquidCParser, liquidCError;
-	liquidC = rb_define_class("LiquidC", rb_cData);
+	liquidC = rb_define_class("LiquidCPP", rb_cData);
 	liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cData);
 	liquidCOptimizer = rb_define_class_under(liquidC, "Optimizer", rb_cData);
 	liquidCTemplate = rb_define_class_under(liquidC, "Template", rb_cData);

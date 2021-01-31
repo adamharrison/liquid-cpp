@@ -2,7 +2,7 @@
 
 require 'mkmf'
 
-extension_name = 'liquidc'
+extension_name = 'liquidcpp'
 
 dir_config(extension_name);
 
