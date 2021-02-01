@@ -96,6 +96,8 @@ extern "C" {
     typedef struct SLiquidParser { void* parser; } LiquidParser;
     typedef struct SLiquidTemplate { void* ast; } LiquidTemplate;
     typedef struct SLiquidOptimizer { void* optimizer; } LiquidOptimizer;
+    typedef struct SLiquidCompiler { void* compiler; } LiquidCompiler;
+    typedef struct SLiquidProgram { void* program; } LiquidProgram;
     typedef struct SLiquidNode { void* node; } LiquidNode;
     typedef struct SLiquidTemplateRender { void* internal; } LiquidTemplateRender;
 
@@ -204,6 +206,7 @@ extern "C" {
     int liquidGetArgumentCount(LiquidNode node);
     int liquidGetChildCount(LiquidNode node);
     typedef void (*LiquidRenderFunction)(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data);
+    typedef void (*LiquidCompileFunction)(LiquidCompiler compiler, LiquidNode node, void* data);
     void liquidRegisterVariableResolver(LiquidRenderer renderer, LiquidVariableResolver resolver);
 
     // Passing -1 to min/maxArguments means no min or max.

@@ -18,7 +18,7 @@ LIBRARYSOURCES=$(filter-out $(NONLIBRARYSOURCES),$(SOURCES))
 LIBRARYOBJECTS=$(patsubst %.cpp,%.o,$(patsubst %.c,%.o,$(patsubst $(SDIR)/%,$(ODIR)/%,$(LIBRARYSOURCES))))
 LIBRARY = $(BDIR)/libliquid.a
 DEPENDS=$(wildcard $(ODIR)/*.d)
-DEBUGFLAGS=-g3 -pthread -gdwarf-4 -Wno-deprecated -fno-elide-type -fdiagnostics-show-template-tree -Wall -Werror -Wextra -Wpedantic -Wvla -Wextra-semi -Wnull-dereference -fvar-tracking-assignments -Wduplicated-cond -Wduplicated-branches -Wsuggest-override -Wno-unused-parameter
+DEBUGFLAGS=-g3 -pthread -gdwarf-4 -Wno-deprecated -fno-elide-type -fdiagnostics-show-template-tree -Wall -Werror -Wextra -Wvla -Wextra-semi -Wnull-dereference -fvar-tracking-assignments -Wduplicated-cond -Wduplicated-branches -Wsuggest-override -Wno-unused-parameter
 
 $(BDIR)/01sanity: $(LIBRARY) $(ODIR)/01sanity.o
 	$(CXX) $(ODIR)/01sanity.o -L$(BDIR) -lliquid -lgtest -lpthread -o $(BDIR)/01sanity $(LDFLAGS)

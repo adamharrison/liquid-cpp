@@ -1,5 +1,6 @@
 #include "context.h"
 #include "optimizer.h"
+#include "compiler.h"
 
 namespace Liquid {
 
@@ -22,6 +23,18 @@ namespace Liquid {
         userRenderFunction(LiquidRenderer{&renderer}, LiquidNode{const_cast<Node*>(&node)}, store, userData);
         return renderer.returnValue;
     }
+
+
+    void NodeType::compile(Compiler& compiler, const Node& node) const {
+        if (!userCompileFunction) {
+            for (auto& child : node.children)
+                compiler.compileBranch(*child.get());
+            compiler.add(OP_CALL, 0x0, (long long)userRenderFunction);
+        } else
+            userCompileFunction(LiquidCompiler{&compiler}, LiquidNode{const_cast<Node*>(&node)}, userData);
+    }
+
+
 
     Node FilterNodeType::getOperand(Renderer& renderer, const Node& node, Variable store) const {
         return renderer.retrieveRenderedNode(*node.children[0].get(), store);
@@ -76,6 +89,7 @@ namespace Liquid {
         --renderer.currentRenderingDepth;
         return Node(move(s));
     }
+
     bool Context::ConcatenationNode::optimize(Optimizer& optimizer, Node& node, Variable store) const {
         if (++optimizer.renderer.currentRenderingDepth > optimizer.renderer.maximumRenderingDepth) {
             --optimizer.renderer.currentRenderingDepth;
@@ -99,5 +113,55 @@ namespace Liquid {
         }
         --optimizer.renderer.currentRenderingDepth;
         return true;
+    }
+
+    void OperatorNodeType::compile(Compiler& compiler, const Node& node) const {
+        compiler.freeRegister = 0;
+        for (auto& child : node.children) {
+            compiler.compileBranch(*child.get());
+            compiler.add(OP_PUSH, 0x0);
+            compiler.freeRegister = 0;
+        }
+        compiler.add(OP_CALL, 0x0, node.children.size());
+    }
+
+    void Context::ConcatenationNode::compile(Compiler& compiler, const Node& node) const {
+        for (auto& child : node.children) {
+            if (child->type) {
+                compiler.compileBranch(*child.get());
+                compiler.add(OP_OUTPUT, 0x0);
+            } else {
+                assert(child->variant.type == Variant::Type::STRING);
+                int offset = compiler.add(child->variant.s.data(), child->variant.s.size());
+                compiler.add(OP_MOVSTR, 0x0, offset);
+                compiler.add(OP_OUTPUT, 0x0);
+            }
+        }
+    }
+
+    void Context::ArgumentNode::compile(Compiler& compiler, const Node& node) const {
+        for (auto& child : node.children) {
+            compiler.compileBranch(*child.get());
+            compiler.add(OP_PUSH, 0x0);
+        }
+    }
+
+
+    void Context::OutputNode::compile(Compiler& compiler, const Node& node) const {
+        assert(node.children.size() == 1);
+        compiler.compileBranch(*node.children[0].get()->children[0].get());
+    }
+
+
+    void Context::VariableNode::compile(Compiler& compiler, const Node& node) const {
+        int target = 0x0;
+        for (size_t i = 0; i < node.children.size(); ++i) {
+            compiler.compileBranch(*node.children[i].get());
+            compiler.add(OP_RESOLVE, 0x0, target);
+            if (i < node.children.size() -1) {
+                compiler.add(OP_MOV, 0x0, 0x1);
+                target = 0x1;
+            }
+        }
     }
 }

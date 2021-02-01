@@ -72,20 +72,18 @@
 		<Unit filename="perl/lib/WWW/Shopify/Liquid/XS.pm" />
 		<Unit filename="perl/t/WWW-Shopify-Liquid-XS.t" />
 		<Unit filename="perl/test.pl" />
-		<Unit filename="ruby/liquidcpp-dir/lib/liquidc-dir.rb" />
-		<Unit filename="ruby/liquidcpp-dir/liquidc-dir-1.0.0.gem" />
-		<Unit filename="ruby/liquidcpp-dir/liquidc-dir.gemspec" />
+		<Unit filename="ruby/liquidcpp-dir/lib/liquidcpp-dir.rb" />
+		<Unit filename="ruby/liquidcpp-dir/liquidcpp-dir.gemspec" />
 		<Unit filename="ruby/liquidcpp-dir/t/test.rb" />
 		<Unit filename="ruby/liquidcpp/Rakefile" />
-		<Unit filename="ruby/liquidcpp/ext/liquidc/extconf.rb" />
-		<Unit filename="ruby/liquidcpp/ext/liquidc/liquid.c">
+		<Unit filename="ruby/liquidcpp/ext/liquidcpp/extconf.rb" />
+		<Unit filename="ruby/liquidcpp/ext/liquidcpp/liquid.c">
 			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="ruby/liquidcpp/lib/liquidc.rb" />
-		<Unit filename="ruby/liquidcpp/lib/liquidc.so" />
-		<Unit filename="ruby/liquidcpp/lib/liquidc/liquidc.so" />
+		<Unit filename="ruby/liquidcpp/lib/liquidcpp.rb" />
 		<Unit filename="ruby/liquidcpp/t/test.rb" />
 		<Unit filename="src/common.h" />
+		<Unit filename="src/compiler.cpp" />
 		<Unit filename="src/compiler.h" />
 		<Unit filename="src/context.cpp" />
 		<Unit filename="src/context.h" />

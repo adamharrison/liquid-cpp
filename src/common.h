@@ -455,6 +455,8 @@ namespace Liquid {
     struct Parser;
     struct Context;
     struct Optimizer;
+    struct Compiler;
+    struct Program;
 
     struct NodeType {
         enum Type {
@@ -478,6 +480,7 @@ namespace Liquid {
         LiquidOptimizationScheme optimization;
         void* userData = nullptr;
         LiquidRenderFunction userRenderFunction = nullptr;
+        LiquidCompileFunction userCompileFunction = nullptr;
 
         NodeType(Type type, string symbol = "", int maxChildren = -1, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : type(type), symbol(symbol), maxChildren(maxChildren), optimization(optimization) { }
         NodeType(const NodeType&) = default;
@@ -485,6 +488,7 @@ namespace Liquid {
         virtual ~NodeType() { }
 
         virtual Node render(Renderer& renderer, const Node& node, Variable store) const;
+        virtual void compile(Compiler& compiler, const Node& node) const;
         virtual bool validate(Parser& parser, const Node& node) const { return true; }
         virtual bool optimize(Optimizer& optimizer, Node& node, Variable store) const;
 

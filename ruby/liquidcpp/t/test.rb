@@ -19,6 +19,13 @@ context.registerTag("freetag", LiquidCPP::TAG_TYPE_FREE, -1, -1, LiquidCPP::OPTI
     'free'
 })
 
+require 'json'
+
+tmpl = parser.parseTemplate("{{ product.id }}")
+json = JSON.parse('{"product":{"id":1}}')
+
+puts "TEST1: " + renderer.render(json, tmpl)
+
 
 text = renderer.render({ }, parser.parseTemplate("{% enclosingtag i %}{% endenclosingtag %}{% freetag %}"))
 puts "TEST: " + text

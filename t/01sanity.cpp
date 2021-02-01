@@ -2,6 +2,7 @@
 #include "../src/lexer.h"
 #include "../src/parser.h"
 #include "../src/renderer.h"
+#include "../src/compiler.h"
 #include "../src/optimizer.h"
 #include "../src/dialect.h"
 #include "../src/cppvariable.h"
@@ -28,6 +29,14 @@ Context& getContext() {
 Renderer& getRenderer() {
     static Renderer renderer(getContext(), CPPVariableResolver());
     return renderer;
+}
+Compiler& getCompiler() {
+    static Compiler compiler(getContext());
+    return compiler;
+}
+Interpreter& getInterpreter() {
+    static Interpreter interpreter(getContext(), CPPVariableResolver());
+    return interpreter;
 }
 Parser& getParser() {
     static Parser parser(getContext());
@@ -666,6 +675,36 @@ TEST(sanity, strict) {
     result = renderer.render(ast, hash);
     ASSERT_TRUE(parser.errors.size() > 0);
 }
+
+TEST(sanity, vm) {
+    CPPVariable hash = { };
+    hash["a"] = 1;
+    Node ast;
+    Program program;
+    std::string str;
+    std::string result;
+
+    if (false) {
+        ast = getParser().parse("asdlsjaflkdhsfjlkdshf");
+        program = getCompiler().compile(ast);
+        result = getInterpreter().renderTemplate(program, hash);
+        ASSERT_EQ(result, "asdlsjaflkdhsfjlkdshf");
+
+        ast = getParser().parse("jaslkdjfasdkf {{ a }} kjhdfjkhgsdfg");
+        program = getCompiler().compile(ast);
+        result = getInterpreter().renderTemplate(program, hash);
+        ASSERT_EQ(result, "jaslkdjfasdkf 1 kjhdfjkhgsdfg");
+    }
+
+    ast = getParser().parse("kjhafsdjkhfjkdhsf {{ a + 1 }} jhafsdkhgsdfjkg");
+    program = getCompiler().compile(ast);
+    result = getInterpreter().renderTemplate(program, hash);
+    fprintf(stderr, "%s", getCompiler().decompile(program).data());
+    ASSERT_EQ(result, "jaslkdjfasdkf 2 kjhdfjkhgsdfg");
+
+
+}
+
 
 TEST(sanity, error) {
     CPPVariable hash = { };

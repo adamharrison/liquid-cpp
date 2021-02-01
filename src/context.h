@@ -125,6 +125,7 @@ namespace Liquid {
                 break;
             }
         }
+        void compile(Compiler& compiler, const Node& node) const override;
     };
 
     struct FilterNodeType : NodeType {
@@ -158,6 +159,7 @@ namespace Liquid {
 
             Node render(Renderer& renderer, const Node& node, Variable store) const override;
             bool optimize(Optimizer& optimizer, Node& node, Variable store) const override;
+            void compile(Compiler& compiler, const Node& node) const override;
         };
 
         struct OutputNode : ContextualNodeType {
@@ -169,6 +171,8 @@ namespace Liquid {
                 assert(argumentNode->children.size() == 1);
                 return Variant(renderer.getString(renderer.retrieveRenderedNode(*argumentNode->children[0].get(), store)));
             }
+
+            void compile(Compiler& compiler, const Node& node) const override;
         };
 
         struct PassthruNode : NodeType {
@@ -189,7 +193,10 @@ namespace Liquid {
         // These are purely for parsing purpose, and should not make their way to the rednerer.
         struct GroupDereferenceNode : PassthruNode { GroupDereferenceNode() : PassthruNode(Type::GROUP_DEREFERENCE) { } };
         // Used exclusively for tags. Should be never be rendered by itself.
-        struct ArgumentNode : NodeType { ArgumentNode() : NodeType(Type::ARGUMENTS, "", -1, LIQUID_OPTIMIZATION_SCHEME_NONE) { } };
+        struct ArgumentNode : NodeType {
+            ArgumentNode() : NodeType(Type::ARGUMENTS, "", -1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
+            void compile(Compiler& compiler, const Node& node) const override;
+        };
         struct ArrayLiteralNode : NodeType {
             ArrayLiteralNode() : NodeType(Type::ARRAY_LITERAL) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const override {
@@ -234,6 +241,7 @@ namespace Liquid {
             }
 
             bool optimize(Optimizer& optimizer, Node& node, Variable store) const override;
+            void compile(Compiler& compiler, const Node& node) const override;
         };
 
         unordered_map<string, unique_ptr<NodeType>> tagTypes;
