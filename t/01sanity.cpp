@@ -694,13 +694,29 @@ TEST(sanity, vm) {
         program = getCompiler().compile(ast);
         result = getInterpreter().renderTemplate(program, hash);
         ASSERT_EQ(result, "jaslkdjfasdkf 1 kjhdfjkhgsdfg");
+
+        ast = getParser().parse("kjhafsdjkhfjkdhsf {{ a + 1 }} jhafsdkhgsdfjkg");
+        program = getCompiler().compile(ast);
+        result = getInterpreter().renderTemplate(program, hash);
+        ASSERT_EQ(result, "kjhafsdjkhfjkdhsf 2 jhafsdkhgsdfjkg");
+
+        ast = getParser().parse("kjhafsdjkhfjkdhsf {{ a + 1 + 2 }} jhafsdkhgsdfjkg");
+        program = getCompiler().compile(ast);
+        result = getInterpreter().renderTemplate(program, hash);
+        ASSERT_EQ(result, "kjhafsdjkhfjkdhsf 4 jhafsdkhgsdfjkg");
+
+        ast = getParser().parse("fahsdjkhgflghljh {% if a %}A{% else %}B{% endif %} kjdjkghdf");
+        program = getCompiler().compile(ast);
+        result = getInterpreter().renderTemplate(program, hash);
+        ASSERT_EQ(result, "fahsdjkhgflghljh A kjdjkghdf");
     }
 
-    ast = getParser().parse("kjhafsdjkhfjkdhsf {{ a + 1 }} jhafsdkhgsdfjkg");
+    ast = getParser().parse("asdjkfsdhsjkg {{ a | plus: 3 | minus: 5 | multiply: 6 }}");
     program = getCompiler().compile(ast);
-    result = getInterpreter().renderTemplate(program, hash);
     fprintf(stderr, "%s", getCompiler().decompile(program).data());
-    ASSERT_EQ(result, "jaslkdjfasdkf 2 kjhdfjkhgsdfg");
+    result = getInterpreter().renderTemplate(program, hash);
+    ASSERT_EQ(result, "asdjkfsdhsjkg -6");
+
 
 
 }

@@ -25,15 +25,14 @@ namespace Liquid {
     }
 
 
-    void NodeType::compile(Compiler& compiler, const Node& node) const {
-        if (!userCompileFunction) {
-            for (auto& child : node.children)
-                compiler.compileBranch(*child.get());
-            compiler.add(OP_CALL, 0x0, (long long)userRenderFunction);
-        } else
-            userCompileFunction(LiquidCompiler{&compiler}, LiquidNode{const_cast<Node*>(&node)}, userData);
-    }
 
+    Node OperatorNodeType::getOperand(Renderer& renderer, const Node& node, Variable store, int idx) const {
+        if (renderer.mode == Renderer::ExecutionMode::INTERPRETER) {
+            return static_cast<Interpreter&>(renderer).getStack(-1 - idx);
+        } else {
+            return renderer.retrieveRenderedNode(*node.children[idx].get(), store);
+        }
+    }
 
 
     Node FilterNodeType::getOperand(Renderer& renderer, const Node& node, Variable store) const {
@@ -44,11 +43,15 @@ namespace Liquid {
     }
 
     Node NodeType::getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const {
-        int offset = node.type->type == NodeType::Type::TAG ? 0 : 1;
-        if (idx >= (int)node.children[offset]->children.size())
-            return Node();
-        assert(node.children[offset]->type->type == NodeType::Type::ARGUMENTS);
-        return renderer.retrieveRenderedNode(*node.children[offset]->children[idx].get(), store);
+        if (renderer.mode == Renderer::ExecutionMode::INTERPRETER) {
+            return static_cast<Interpreter&>(renderer).getStack(-1 - idx);
+        } else {
+            int offset = node.type->type == NodeType::Type::TAG ? 0 : 1;
+            if (idx >= (int)node.children[offset]->children.size())
+                return Node();
+            assert(node.children[offset]->type->type == NodeType::Type::ARGUMENTS);
+            return renderer.retrieveRenderedNode(*node.children[offset]->children[idx].get(), store);
+        }
     }
     int NodeType::getArgumentCount(const Node& node) const {
         int offset = node.type->type == NodeType::Type::TAG ? 0 : 1;
@@ -115,53 +118,4 @@ namespace Liquid {
         return true;
     }
 
-    void OperatorNodeType::compile(Compiler& compiler, const Node& node) const {
-        compiler.freeRegister = 0;
-        for (auto& child : node.children) {
-            compiler.compileBranch(*child.get());
-            compiler.add(OP_PUSH, 0x0);
-            compiler.freeRegister = 0;
-        }
-        compiler.add(OP_CALL, 0x0, node.children.size());
-    }
-
-    void Context::ConcatenationNode::compile(Compiler& compiler, const Node& node) const {
-        for (auto& child : node.children) {
-            if (child->type) {
-                compiler.compileBranch(*child.get());
-                compiler.add(OP_OUTPUT, 0x0);
-            } else {
-                assert(child->variant.type == Variant::Type::STRING);
-                int offset = compiler.add(child->variant.s.data(), child->variant.s.size());
-                compiler.add(OP_MOVSTR, 0x0, offset);
-                compiler.add(OP_OUTPUT, 0x0);
-            }
-        }
-    }
-
-    void Context::ArgumentNode::compile(Compiler& compiler, const Node& node) const {
-        for (auto& child : node.children) {
-            compiler.compileBranch(*child.get());
-            compiler.add(OP_PUSH, 0x0);
-        }
-    }
-
-
-    void Context::OutputNode::compile(Compiler& compiler, const Node& node) const {
-        assert(node.children.size() == 1);
-        compiler.compileBranch(*node.children[0].get()->children[0].get());
-    }
-
-
-    void Context::VariableNode::compile(Compiler& compiler, const Node& node) const {
-        int target = 0x0;
-        for (size_t i = 0; i < node.children.size(); ++i) {
-            compiler.compileBranch(*node.children[i].get());
-            compiler.add(OP_RESOLVE, 0x0, target);
-            if (i < node.children.size() -1) {
-                compiler.add(OP_MOV, 0x0, 0x1);
-                target = 0x1;
-            }
-        }
-    }
 }

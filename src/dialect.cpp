@@ -2,6 +2,7 @@
 #include "dialect.h"
 #include "parser.h"
 #include "optimizer.h"
+#include "compiler.h"
 #include <cmath>
 #include <ctime>
 #include <algorithm>
@@ -112,8 +113,7 @@ namespace Liquid {
     template <bool INVERSE>
     struct BranchNode : TagNodeType {
         static Node internalRender(Renderer& renderer, const Node& node, Variable store) {
-            auto& arguments = node.children.front();
-            Node result = renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
+            Node result = static_cast<const BranchNode*>(node.type)->getArgument(renderer, node, store, 0);
             bool truthy = result.variant.isTruthy(renderer.context.falsiness);
             if (INVERSE)
                 truthy = !truthy;
@@ -154,6 +154,16 @@ namespace Liquid {
             return true;
         }
 
+        static void internalCompile(Compiler& compiler, const Node& node) {
+            compiler.compileBranch(*node.children[0].get()->children[0].get());
+            int conditionalFalseJump = compiler.add(OP_JMPFALSE, 0x0, 0x0);
+            int truePath = compiler.compileBranch(*node.children[1].get());
+            int conditionalTrueJump = compiler.add(OP_JMP, 0x0, 0x0);
+            compiler.modify(conditionalFalseJump, OP_JMPFALSE, 0x0, truePath);
+            compiler.compileBranch(*node.children[2].get());
+            compiler.modify(conditionalTrueJump, OP_JMP, 0x0, compiler.currentOffset());
+        }
+
 
         struct ElsifNode : TagNodeType {
             ElsifNode() : TagNodeType(Composition::FREE, "elsif", 1, 1) { }
@@ -161,6 +171,7 @@ namespace Liquid {
                 auto& arguments = node.children.front();
                 return renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
             }
+            void compile(Compiler& compiler, const Node& node) const override { }
         };
 
         struct ElseNode : TagNodeType {
@@ -168,6 +179,7 @@ namespace Liquid {
             Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 return Node(Variant(true));
             }
+            void compile(Compiler& compiler, const Node& node) const override { }
         };
 
         BranchNode(const std::string symbol) : TagNodeType(Composition::ENCLOSED, symbol, 1, 1, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) {
@@ -197,6 +209,9 @@ namespace Liquid {
             return BranchNode<INVERSE>::internalOptimize(optimizer, node, store);
         }
 
+        void compile(Compiler& compiler, const Node& node) const override {
+            return BranchNode<INVERSE>::internalCompile(compiler, node);
+        }
     };
 
 
@@ -481,8 +496,8 @@ namespace Liquid {
         long long operate(long long v1, long long v2) const { return Function()(v1, v2); }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+            Node op1 = getOperand(renderer, node, store, 0);
+            Node op2 = getOperand(renderer, node, store, 1);
             switch (op1.variant.type) {
                 case Variant::Type::INT:
                     switch (op2.variant.type) {

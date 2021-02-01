@@ -126,6 +126,8 @@ namespace Liquid {
             }
         }
         void compile(Compiler& compiler, const Node& node) const override;
+
+        Node getOperand(Renderer& renderer, const Node& node, Variable store, int idx) const;
     };
 
     struct FilterNodeType : NodeType {

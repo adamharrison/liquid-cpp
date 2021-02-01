@@ -11,12 +11,18 @@ namespace Liquid {
     struct Renderer {
         const Context& context;
 
+        enum class ExecutionMode {
+            PARSE_TREE,
+            INTERPRETER
+        };
+
         enum class Control {
             NONE,
             BREAK,
             CONTINUE,
             EXIT
         };
+        ExecutionMode mode = ExecutionMode::PARSE_TREE;
         // The current state of the break. Allows us to have break/continue statements.
         Control control = Control::NONE;
         // In order to have a more genericized version of forloop drops, that are not affected by assigns.
