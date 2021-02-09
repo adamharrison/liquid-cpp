@@ -180,6 +180,7 @@ namespace Liquid {
             case OP_MOD:
             case OP_DIV:
             case OP_PUSH:
+            case OP_MOVNIL:
                 return false;
             default:
                 return true;
@@ -198,6 +199,8 @@ namespace Liquid {
                 return "OP_MOVBOOL";
             case OP_MOVFLOAT:
                 return "OP_MOVFLOAT";
+            case OP_MOVNIL:
+                return "OP_MOVNIL";
             case OP_PUSH:
                 return "OP_PUSH";
             case OP_POP:
@@ -290,6 +293,10 @@ namespace Liquid {
                 } break;
                 case Variant::Type::INT: {
                     add(OP_MOVINT, freeRegister, branch.variant.i);
+                    ++freeRegister;
+                } break;
+                case Variant::Type::NIL: {
+                    add(OP_MOVNIL, freeRegister);
                     ++freeRegister;
                 } break;
                 case Variant::Type::FLOAT: {
@@ -403,6 +410,9 @@ namespace Liquid {
                     if (idx == i)
                         return Node(value ? true : false);
                 } break;
+                case Register::Type::NIL: {
+                    return Node(nullptr);
+                } break;
                 case Register::Type::SHORT_STRING:
                 case Register::Type::LONG_STRING: {
                     unsigned int len = type >> 8;
@@ -420,6 +430,42 @@ namespace Liquid {
         return Node();
     }
 
+    void Interpreter::pushStack(Register& reg) {
+        switch (reg.type) {
+            case Register::Type::INT:
+                *((long long*)stackPointer) = reg.i;
+                stackPointer += sizeof(long long);
+                *((unsigned int*)stackPointer) = (unsigned int)Register::Type::INT;
+                stackPointer += sizeof(unsigned int);
+            break;
+            case Register::Type::BOOL:
+                *((unsigned int*)stackPointer) = (reg.b << 8) | (unsigned int)Register::Type::BOOL;
+                stackPointer += sizeof(unsigned int);
+            break;
+            case Register::Type::NIL:
+                *((unsigned int*)stackPointer) = (unsigned int)Register::Type::NIL;
+                stackPointer += sizeof(unsigned int);
+            break;
+            case Register::Type::SHORT_STRING:
+                memcpy(stackPointer, reg.buffer, reg.length);
+                stackPointer += reg.length + (reg.length % 4);
+                *((unsigned int*)stackPointer) = ((unsigned int)Register::Type::SHORT_STRING | (reg.length << 8));
+                stackPointer += sizeof(unsigned int);
+            break;
+            case Register::Type::FLOAT:
+                *((double*)stackPointer) = reg.f;
+                stackPointer += sizeof(double);
+                *((unsigned int*)stackPointer) = (unsigned int)Register::Type::FLOAT;
+                stackPointer += sizeof(unsigned int);
+            break;
+            case Register::Type::LONG_STRING:
+            case Register::Type::EXTRA_LONG_STRING:
+            case Register::Type::VARIABLE:
+                assert(false);
+            break;
+        }
+    }
+
     void Interpreter::popStack(int popCount) {
         assert(stackPointer > stack);
         for (int i = 0; i < popCount; ++i) {
@@ -428,6 +474,7 @@ namespace Liquid {
                 case Register::Type::INT:
                     stackPointer -= sizeof(unsigned int) + sizeof(long long);
                 break;
+                case Register::Type::NIL:
                 case Register::Type::BOOL:
                     stackPointer -= sizeof(unsigned int);
                 break;
@@ -456,7 +503,7 @@ namespace Liquid {
             break;
             case Variant::Type::FLOAT:
                 reg.type = Register::Type::FLOAT;
-                reg.i = node.variant.f;
+                reg.f = node.variant.f;
             break;
             case Variant::Type::STRING:
                 reg.type = Register::Type::SHORT_STRING;
@@ -480,6 +527,8 @@ namespace Liquid {
     string Interpreter::renderTemplate(const Program& prog, Variable store) {
         buffer = 0;
         const unsigned int* instructionPointer = reinterpret_cast<const unsigned int*>(&prog.code[prog.codeOffset]);
+        stackPointer = stack;
+        buffers[buffer].clear();
         unsigned int instruction, target;
         long long operand;
         Variable var;
@@ -514,35 +563,7 @@ namespace Liquid {
                     registers[target].f = *(double*)&operand;
                 } break;
                 case OP_PUSH: {
-                    switch (registers[target].type) {
-                        case Register::Type::INT:
-                            *((long long*)stackPointer) = registers[target].i;
-                            stackPointer += sizeof(long long);
-                            *((unsigned int*)stackPointer) = (unsigned int)Register::Type::INT;
-                            stackPointer += sizeof(unsigned int);
-                        break;
-                        case Register::Type::BOOL:
-                            *((unsigned int*)stackPointer) = (registers[target].b << 8) | (unsigned int)Register::Type::BOOL;
-                            stackPointer += sizeof(unsigned int);
-                        break;
-                        case Register::Type::SHORT_STRING:
-                            memcpy(stackPointer, registers[target].buffer, registers[target].length);
-                            stackPointer += registers[target].length + (registers[target].length % 4);
-                            *((unsigned int*)stackPointer) = ((unsigned int)Register::Type::SHORT_STRING | (registers[target].length << 8));
-                            stackPointer += sizeof(unsigned int);
-                        break;
-                        case Register::Type::FLOAT:
-                            *((double*)stackPointer) = registers[target].f;
-                            stackPointer += sizeof(double);
-                            *((unsigned int*)stackPointer) = (unsigned int)Register::Type::FLOAT;
-                            stackPointer += sizeof(unsigned int);
-                        break;
-                        case Register::Type::LONG_STRING:
-                        case Register::Type::EXTRA_LONG_STRING:
-                        case Register::Type::VARIABLE:
-                            assert(false);
-                        break;
-                    }
+                    pushStack(registers[target]);
                 } break;
                 case OP_JMP:
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
@@ -566,6 +587,7 @@ namespace Liquid {
                         case Register::Type::SHORT_STRING:
                             success = variableResolver.getDictionaryVariable(LiquidRenderer { this }, var, reg.buffer, var);
                         break;
+                        case Register::Type::NIL:
                         case Register::Type::BOOL:
                         case Register::Type::FLOAT:
                         case Register::Type::LONG_STRING:
@@ -588,6 +610,9 @@ namespace Liquid {
                             case LIQUID_VARIABLE_TYPE_FLOAT:
                                 reg.type = Register::Type::FLOAT;
                                 variableResolver.getFloat(LiquidRenderer { this }, var, &reg.f);
+                            break;
+                            case LIQUID_VARIABLE_TYPE_NIL:
+                                reg.type = Register::Type::NIL;
                             break;
                             case LIQUID_VARIABLE_TYPE_STRING: {
                                 reg.type = Register::Type::FLOAT;
@@ -628,6 +653,7 @@ namespace Liquid {
                         case Register::Type::FLOAT:
                             buffers[buffer].append(std::to_string(registers[target].f));
                         break;
+                        case Register::Type::NIL:
                         case Register::Type::VARIABLE:
                         case Register::Type::LONG_STRING:
                         case Register::Type::EXTRA_LONG_STRING:
@@ -645,6 +671,9 @@ namespace Liquid {
                         break;
                         case Register::Type::SHORT_STRING:
                             shouldJump = registers[target].length > 0;
+                        break;
+                        case Register::Type::NIL:
+                            shouldJump = false;
                         break;
                         case Register::Type::FLOAT:
                             shouldJump = registers[target].f;
@@ -672,19 +701,19 @@ namespace Liquid {
         compiler.freeRegister = 0;
         for (auto& child : node.children) {
             compiler.compileBranch(*child.get());
-            compiler.add(OP_PUSH, 0x0);
-            compiler.freeRegister = 0;
+            compiler.add(OP_PUSH, compiler.freeRegister - 1);
+            compiler.freeRegister = 1;
         }
-        compiler.add(OP_MOVINT, 0x0, node.children.size());
-        compiler.add(OP_PUSH, 0x0);
+        compiler.add(OP_MOVINT, compiler.freeRegister, node.children.size());
+        compiler.add(OP_PUSH, compiler.freeRegister);
         compiler.add(OP_CALL, 0x0, (long long)this);
+        compiler.freeRegister = 1;
     }
 
     void Context::ConcatenationNode::compile(Compiler& compiler, const Node& node) const {
         for (auto& child : node.children) {
             if (child->type) {
                 compiler.compileBranch(*child.get());
-                // compiler.add(OP_OUTPUT, 0x0);
             } else {
                 assert(child->variant.type == Variant::Type::STRING);
                 int offset = compiler.add(child->variant.s.data(), child->variant.s.size());
@@ -696,7 +725,7 @@ namespace Liquid {
     void Context::ArgumentNode::compile(Compiler& compiler, const Node& node) const {
         for (auto& child : node.children) {
             compiler.compileBranch(*child.get());
-            compiler.add(OP_PUSH, 0x0);
+            compiler.add(OP_PUSH, compiler.freeRegister - 1);
         }
     }
 
@@ -704,6 +733,8 @@ namespace Liquid {
     void Context::OutputNode::compile(Compiler& compiler, const Node& node) const {
         assert(node.children.size() == 1);
         compiler.compileBranch(*node.children[0].get()->children[0].get());
+        compiler.add(OP_OUTPUT, 0x0);
+        compiler.freeRegister = 0;
     }
 
 
@@ -719,11 +750,27 @@ namespace Liquid {
         }
     }
 
+    void FilterNodeType::compile(Compiler& compiler, const Node& node) const {
+        if (!userCompileFunction) {
+            for (size_t i = 0; i < node.children.size();  ++i) {
+                compiler.compileBranch(*node.children[i].get());
+                if (i == 0)
+                    compiler.add(OP_PUSH, compiler.freeRegister - 1);
+            }
+            compiler.add(OP_MOVINT, compiler.freeRegister, node.children.size());
+            compiler.add(OP_PUSH, compiler.freeRegister);
+            compiler.add(OP_CALL, 0x0, (long long)this);
+            compiler.freeRegister = 1;
+        } else
+            userCompileFunction(LiquidCompiler{&compiler}, LiquidNode{const_cast<Node*>(&node)}, userData);
+    }
+
     void NodeType::compile(Compiler& compiler, const Node& node) const {
         if (!userCompileFunction) {
             for (auto& child : node.children)
                 compiler.compileBranch(*child.get());
             compiler.add(OP_CALL, 0x0, (long long)this);
+            compiler.freeRegister = 1;
         } else
             userCompileFunction(LiquidCompiler{&compiler}, LiquidNode{const_cast<Node*>(&node)}, userData);
     }

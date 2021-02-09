@@ -493,8 +493,8 @@ namespace Liquid {
         virtual bool optimize(Optimizer& optimizer, Node& node, Variable store) const;
 
         Node getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const;
-        int getArgumentCount(const Node& node) const;
         Node getChild(Renderer& renderer, const Node& node, Variable store, int idx) const;
+        int getArgumentCount(const Node& node) const;
         int getChildCount(const Node& node) const;
     };
 }

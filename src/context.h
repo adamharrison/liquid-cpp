@@ -137,6 +137,9 @@ namespace Liquid {
         FilterNodeType(string symbol, int minArguments = -1, int maxArguments = -1, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : NodeType(NodeType::Type::FILTER, symbol, -1, optimization), minArguments(minArguments), maxArguments(maxArguments) { }
 
         Node getOperand(Renderer& renderer, const Node& node, Variable store) const;
+        Node getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const;
+
+        void compile(Compiler& compiler, const Node& node) const override;
     };
 
 

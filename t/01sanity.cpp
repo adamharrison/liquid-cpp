@@ -684,16 +684,18 @@ TEST(sanity, vm) {
     std::string str;
     std::string result;
 
-    if (false) {
+        ast = getParser().parse("jaslkdjfasdkf {{ a }} kjhdfjkhgsdfg");
+        program = getCompiler().compile(ast);
+        result = getInterpreter().renderTemplate(program, hash);
+        ASSERT_EQ(result, "jaslkdjfasdkf 1 kjhdfjkhgsdfg");
+
+
+
         ast = getParser().parse("asdlsjaflkdhsfjlkdshf");
         program = getCompiler().compile(ast);
         result = getInterpreter().renderTemplate(program, hash);
         ASSERT_EQ(result, "asdlsjaflkdhsfjlkdshf");
 
-        ast = getParser().parse("jaslkdjfasdkf {{ a }} kjhdfjkhgsdfg");
-        program = getCompiler().compile(ast);
-        result = getInterpreter().renderTemplate(program, hash);
-        ASSERT_EQ(result, "jaslkdjfasdkf 1 kjhdfjkhgsdfg");
 
         ast = getParser().parse("kjhafsdjkhfjkdhsf {{ a + 1 }} jhafsdkhgsdfjkg");
         program = getCompiler().compile(ast);
@@ -708,14 +710,15 @@ TEST(sanity, vm) {
         ast = getParser().parse("fahsdjkhgflghljh {% if a %}A{% else %}B{% endif %} kjdjkghdf");
         program = getCompiler().compile(ast);
         result = getInterpreter().renderTemplate(program, hash);
+        fprintf(stderr, "%s", getCompiler().decompile(program).data());
         ASSERT_EQ(result, "fahsdjkhgflghljh A kjdjkghdf");
-    }
 
-    ast = getParser().parse("asdjkfsdhsjkg {{ a | plus: 3 | minus: 5 | multiply: 6 }}");
-    program = getCompiler().compile(ast);
-    fprintf(stderr, "%s", getCompiler().decompile(program).data());
-    result = getInterpreter().renderTemplate(program, hash);
-    ASSERT_EQ(result, "asdjkfsdhsjkg -6");
+
+        ast = getParser().parse("asdjkfsdhsjkg {{ a | plus: 3 | minus: 5 | times: 6 }}");
+        program = getCompiler().compile(ast);
+        result = getInterpreter().renderTemplate(program, hash);
+        ASSERT_EQ(result, "asdjkfsdhsjkg -6");
+
 
 
 

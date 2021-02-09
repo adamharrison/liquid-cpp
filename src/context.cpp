@@ -28,7 +28,7 @@ namespace Liquid {
 
     Node OperatorNodeType::getOperand(Renderer& renderer, const Node& node, Variable store, int idx) const {
         if (renderer.mode == Renderer::ExecutionMode::INTERPRETER) {
-            return static_cast<Interpreter&>(renderer).getStack(-1 - idx);
+            return static_cast<Interpreter&>(renderer).getStack(-1 - (idx+1));
         } else {
             return renderer.retrieveRenderedNode(*node.children[idx].get(), store);
         }
@@ -36,15 +36,34 @@ namespace Liquid {
 
 
     Node FilterNodeType::getOperand(Renderer& renderer, const Node& node, Variable store) const {
-        return renderer.retrieveRenderedNode(*node.children[0].get(), store);
+        if (renderer.mode == Renderer::ExecutionMode::INTERPRETER) {
+            int argCount = static_cast<Interpreter&>(renderer).getStack(-1).variant.i;
+            return static_cast<Interpreter&>(renderer).getStack(-(argCount + 1));
+        } else {
+            return renderer.retrieveRenderedNode(*node.children[0].get(), store);
+        }
     }
+
+
+    Node FilterNodeType::getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const {
+        if (renderer.mode == Renderer::ExecutionMode::INTERPRETER) {
+            return static_cast<Interpreter&>(renderer).getStack(-1 - (idx+1));
+        } else {
+            int offset = node.type->type == NodeType::Type::TAG ? 0 : 1;
+            if (idx >= (int)node.children[offset]->children.size())
+                return Node();
+            assert(node.children[offset]->type->type == NodeType::Type::ARGUMENTS);
+            return renderer.retrieveRenderedNode(*node.children[offset]->children[idx].get(), store);
+        }
+    }
+
     Node DotFilterNodeType::getOperand(Renderer& renderer, const Node& node, Variable store) const {
         return renderer.retrieveRenderedNode(*node.children[0].get(), store);
     }
 
     Node NodeType::getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const {
         if (renderer.mode == Renderer::ExecutionMode::INTERPRETER) {
-            return static_cast<Interpreter&>(renderer).getStack(-1 - idx);
+            return static_cast<Interpreter&>(renderer).getStack(-1 - (idx+1));
         } else {
             int offset = node.type->type == NodeType::Type::TAG ? 0 : 1;
             if (idx >= (int)node.children[offset]->children.size())

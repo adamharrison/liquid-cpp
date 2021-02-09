@@ -22,6 +22,7 @@ namespace Liquid {
         OP_MOVINT,      // Pushes the operand into the register.
         OP_MOVBOOL,     // Pushes the operand into the register.
         OP_MOVFLOAT,    // Pushes the operand into the register.
+        OP_MOVNIL,      // Pushes the operand into the register.
         OP_PUSH,        // Pushes the operand onto the stack, from the specified register.
         OP_POP,         // Moves the stack point back to the preivous variable.
         OP_ADD,         // Takes the targeted register, and adds it to the return register.
@@ -86,6 +87,7 @@ namespace Liquid {
                 FLOAT,
                 INT,
                 BOOL,
+                NIL,
                 SHORT_STRING,       // Inline, or in a register.
                 LONG_STRING,        // On stack. Up to 65k; short is multiplexed with the type info.
                 EXTRA_LONG_STRING,  // In memory.
@@ -123,6 +125,7 @@ namespace Liquid {
         // Should be used for conversions only, not for actual optimized code.
         Node getStack(int i);
         void popStack(int i);
+        void pushStack(Register& reg);
         void pushRegister(Register& reg, const Node& node);
 
         string renderTemplate(const Program& tmpl, Variable store);

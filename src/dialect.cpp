@@ -798,7 +798,6 @@ namespace Liquid {
         long long operate(long long v1, long long v2) const { return Function()(v1, v2); }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            assert(node.children[1]->type && node.children[1]->type->type == NodeType::Type::ARGUMENTS);
             Node op1 = getOperand(renderer, node, store);
             Node op2 = getArgument(renderer, node, store, 0);
             switch (op1.variant.type) {
