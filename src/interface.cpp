@@ -2,6 +2,7 @@
 #include "dialect.h"
 #include "context.h"
 #include "optimizer.h"
+#include "compiler.h"
 #include <memory>
 
 using namespace Liquid;
@@ -27,7 +28,7 @@ void liquidImplementPermissiveStandardDialect(LiquidContext context) {
 #endif
 
 LiquidRenderer liquidCreateRenderer(LiquidContext context) {
-    return LiquidRenderer({ new Renderer(*static_cast<Context*>(context.context)) });
+    return LiquidRenderer({ new Interpreter(*static_cast<Context*>(context.context)) });
 }
 
 void liquidFreeRenderer(LiquidRenderer renderer) {
@@ -52,6 +53,44 @@ void liquidOptimizeTemplate(LiquidOptimizer optimizer, LiquidTemplate tmpl, void
 void liquidFreeOptimizer(LiquidOptimizer optimizer) {
     delete (Optimizer*)optimizer.optimizer;
 }
+
+LiquidCompiler liquidCreateCompiler(LiquidContext context) {
+    return LiquidCompiler({ new Compiler(*static_cast<Context*>(context.context)) } );
+}
+
+void liquidFreeCompiler(LiquidCompiler compiler) {
+    delete (Compiler*)compiler.compiler;
+}
+
+LiquidProgram liquidCompilerCompileTemplate(LiquidCompiler compiler, LiquidTemplate tmpl) {
+    return LiquidProgram({ new Program(move(static_cast<Compiler*>(compiler.compiler)->compile(*static_cast<Node*>(tmpl.ast)))) });
+}
+
+int liquidCompilerDisassembleProgram(LiquidCompiler compiler, LiquidProgram program, char* buffer, size_t maxSize) {
+    string disassembly = static_cast<Compiler*>(compiler.compiler)->disassemble(*static_cast<Program*>(program.program));
+    size_t copied = std::min(maxSize, disassembly.size());
+    strncpy(buffer, disassembly.data(), copied);
+    return copied;
+}
+
+void liquidFreeProgram(LiquidProgram program) {
+    delete static_cast<Program*>(program.program);
+}
+
+LiquidTemplateRender liquidRendererRunTemplate(LiquidRenderer renderer, void* variableStore, LiquidProgram program, LiquidRendererError* error) {
+    if (error)
+        error->type = LIQUID_RENDERER_ERROR_TYPE_NONE;
+    std::string* str;
+    try {
+        str = new std::string(std::move(static_cast<Interpreter*>(renderer.renderer)->renderTemplate(*static_cast<Program*>(program.program), Variable({ variableStore }))));
+    } catch (Renderer::Exception& exp) {
+        if (error)
+            *error = exp.rendererError;
+        return LiquidTemplateRender({ NULL });
+    }
+    return LiquidTemplateRender({ str });
+}
+
 
 LiquidTemplate liquidParserParseTemplate(LiquidParser parser, const char* buffer, size_t size, const char* file, LiquidLexerError* lexerError, LiquidParserError* parserError) {
     Node tmpl;

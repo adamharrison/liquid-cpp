@@ -97,6 +97,7 @@ extern "C" {
     typedef struct SLiquidTemplate { void* ast; } LiquidTemplate;
     typedef struct SLiquidOptimizer { void* optimizer; } LiquidOptimizer;
     typedef struct SLiquidCompiler { void* compiler; } LiquidCompiler;
+    typedef struct SLiquidInterpreter { void* interpreter; } LiquidInterpreter;
     typedef struct SLiquidProgram { void* program; } LiquidProgram;
     typedef struct SLiquidNode { void* node; } LiquidNode;
     typedef struct SLiquidTemplateRender { void* internal; } LiquidTemplateRender;
@@ -186,6 +187,14 @@ extern "C" {
     LiquidOptimizer liquidCreateOptimizer(LiquidRenderer renderer);
     void liquidOptimizeTemplate(LiquidOptimizer optimizer, LiquidTemplate tmpl, void* variableStore);
     void liquidFreeOptimizer(LiquidOptimizer optimizer);
+
+    LiquidCompiler liquidCreateCompiler(LiquidContext context);
+    void liquidFreeCompiler(LiquidCompiler compiler);
+    LiquidProgram liquidCompilerCompileTemplate(LiquidCompiler compiler, LiquidTemplate tmpl);
+    void liquidFreeProgram(LiquidProgram program);
+    int liquidCompilerDisassembleProgram(LiquidCompiler compiler, LiquidProgram program, char* buffer, size_t maxSize);
+
+    LiquidTemplateRender liquidRendererRunTemplate(LiquidInterpreter interpreter, void* variableStore, LiquidProgram program, LiquidRendererError* error);
 
     LiquidTemplateRender liquidRendererRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRendererError* error);
     void* liquidRendererRenderArgument(LiquidRenderer renderer, void* variableStore, LiquidTemplate argument, LiquidRendererError* error);

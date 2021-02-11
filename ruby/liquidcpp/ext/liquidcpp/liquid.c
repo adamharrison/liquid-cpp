@@ -3,7 +3,7 @@
 
 // Global definitions.
 
-static VALUE liquidCParserError, liquidCRendererError, liquidCTemplate;
+static VALUE liquidCParserError, liquidCRendererError, liquidCTemplate, liquidCProgram;
 
 struct SLiquidCRubyContext {
     LiquidContext context;
@@ -208,6 +208,16 @@ void liquidCOptimizer_free(void* data) {
         liquidFreeOptimizer(*((LiquidOptimizer*)data));
     free(data);
 }
+void liquidCCompiler_free(void* data) {
+    if (((LiquidCompiler*)data)->compiler)
+        liquidFreeCompiler(*((LiquidCompiler*)data));
+    free(data);
+}
+void liquidCProgram_free(void* data) {
+    if (((LiquidProgram*)data)->program)
+        liquidFreeProgram(*((LiquidProgram*)data));
+    free(data);
+}
 
 void liquidC_mark(void* self) {
     rb_gc_mark(((LiquidCRubyContext*)self)->registeredFunctionArray);
@@ -218,6 +228,8 @@ size_t liquidCTemplate_size(const void* data) { return sizeof(LiquidTemplate); }
 size_t liquidC_size(const void* data) { return sizeof(LiquidCRubyContext); }
 size_t liquidCParser_size(const void* data) { return sizeof(LiquidParser); }
 size_t liquidCRenderer_size(const void* data) { return sizeof(LiquidRenderer); }
+size_t liquidCCompiler_size(const void* data) { return sizeof(LiquidCompiler); }
+size_t liquidCProgram_size(const void* data) { return sizeof(LiquidProgram); }
 
 
 static const rb_data_type_t liquidC_type = {
@@ -273,6 +285,26 @@ static const rb_data_type_t liquidCOptimizer_type = {
     .data = NULL,
     .flags = RUBY_TYPED_FREE_IMMEDIATELY,
 };
+static const rb_data_type_t liquidCCompiler_type = {
+    .wrap_struct_name = "Compiler",
+    .function = {
+            .dmark = NULL,
+            .dfree = liquidCCompiler_free,
+            .dsize = liquidCCompiler_size,
+    },
+    .data = NULL,
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
+};
+static const rb_data_type_t liquidCProgram_type = {
+    .wrap_struct_name = "Program",
+    .function = {
+            .dmark = NULL,
+            .dfree = liquidCProgram_free,
+            .dsize = liquidCProgram_size,
+    },
+    .data = NULL,
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
+};
 
 VALUE liquidC_alloc(VALUE self) {
     LiquidCRubyContext* data = (LiquidCRubyContext*)malloc(sizeof(LiquidCRubyContext));
@@ -299,6 +331,16 @@ VALUE liquidCOptimizer_alloc(VALUE self) {
     LiquidOptimizer* data = (LiquidOptimizer*)malloc(sizeof(LiquidOptimizer));
     data->optimizer = NULL;
     return TypedData_Wrap_Struct(self, &liquidCOptimizer_type, data);
+}
+VALUE liquidCCompiler_alloc(VALUE self) {
+    LiquidCompiler* data = (LiquidCompiler*)malloc(sizeof(LiquidCompiler));
+    data->compiler = NULL;
+    return TypedData_Wrap_Struct(self, &liquidCCompiler_type, data);
+}
+VALUE liquidCProgram_alloc(VALUE self) {
+    LiquidProgram* data = (LiquidProgram*)malloc(sizeof(LiquidProgram));
+    data->program = NULL;
+    return TypedData_Wrap_Struct(self, &liquidCProgram_type, data);
 }
 
 // Actual implementations.
@@ -386,6 +428,16 @@ VALUE liquidCOptimizer_m_initialize(VALUE self, VALUE incomingRenderer) {
     *optimizer = liquidCreateOptimizer(*renderer);
     return self;
 }
+
+VALUE liquidCCompiler_m_initialize(VALUE self, VALUE incomingContext) {
+    LiquidCompiler* compiler;
+    LiquidCRubyContext* context;
+    TypedData_Get_Struct(self, LiquidCompiler, &liquidCCompiler_type, compiler);
+    TypedData_Get_Struct(incomingContext, LiquidCRubyContext, &liquidC_type, context);
+    *compiler = liquidCreateCompiler(context->context);
+    return self;
+}
+
 
 #define PACK_EXCEPTION_LENGTH 6
 #define PACK_EXCEPTION(rubytype, error, package, english, exception) \
@@ -620,6 +672,32 @@ VALUE method_liquidCOptimizer_optimize(VALUE self, VALUE stash, VALUE incomingTe
     return self;
 }
 
+VALUE method_liquidCCompiler_compile(VALUE self, VALUE incomingTemplate) {
+    LiquidCompiler* compiler;
+    LiquidTemplate* tmpl;
+    LiquidProgram program;
+    VALUE result, arg;
+
+    TypedData_Get_Struct(self, LiquidCompiler, &liquidCCompiler_type, compiler);
+    TypedData_Get_Struct(incomingTemplate, LiquidTemplate, &liquidCTemplate_type, tmpl);
+
+    program = liquidCompilerCompileTemplate(*compiler, *tmpl);
+
+    result = rb_obj_alloc(liquidCProgram);
+    arg = LL2NUM((long long)program.program);
+    rb_obj_call_init(result, 1, &arg);
+    return result;
+}
+
+VALUE liquidCProgram_m_initialize(VALUE self, VALUE incomingProgram) {
+    LiquidProgram* program;
+    Check_Type(incomingProgram, T_FIXNUM);
+    TypedData_Get_Struct(self, LiquidProgram, &liquidCProgram_type, program);
+    program->program = (void*)NUM2LL(incomingProgram);
+    return self;
+}
+
+
 static void liquidCRenderTag(LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) {
     VALUE result, renderProc;
     VALUE arguments[5];
@@ -751,12 +829,14 @@ VALUE method_liquidC_registerDotFilter(VALUE self, VALUE symbol, VALUE optimizat
 
 
 void Init_liquidcpp() {
-	VALUE liquidC, liquidCRenderer, liquidCOptimizer, liquidCParser, liquidCError;
+	VALUE liquidC, liquidCRenderer, liquidCOptimizer, liquidCParser, liquidCCompiler, liquidCError;
 	liquidC = rb_define_class("LiquidCPP", rb_cData);
 	liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cData);
 	liquidCOptimizer = rb_define_class_under(liquidC, "Optimizer", rb_cData);
 	liquidCTemplate = rb_define_class_under(liquidC, "Template", rb_cData);
 	liquidCParser = rb_define_class_under(liquidC, "Parser", rb_cData);
+	liquidCCompiler = rb_define_class_under(liquidC, "Compiler", rb_cData);
+	liquidCProgram = rb_define_class_under(liquidC, "Program", rb_cData);
 
 	liquidCError = rb_define_class_under(liquidC, "Error", rb_eStandardError);
     rb_define_attr(liquidCError, "type", 1, 0);
@@ -781,7 +861,6 @@ void Init_liquidcpp() {
     rb_define_method(liquidC, "registerOperator", method_liquidC_registerOperator, 4);
     rb_define_method(liquidC, "registerDotFilter", method_liquidC_registerDotFilter, 3);
 
-
 	rb_define_alloc_func(liquidCParser, liquidCParser_alloc);
     rb_define_method(liquidCParser, "initialize", liquidCParser_m_initialize, 1);
     rb_define_method(liquidCParser, "parseTemplate", method_liquidCParserParseTemplate, -1);
@@ -799,6 +878,13 @@ void Init_liquidcpp() {
     rb_define_alloc_func(liquidCOptimizer, liquidCOptimizer_alloc);
     rb_define_method(liquidCOptimizer, "initialize", liquidCOptimizer_m_initialize, 1);
     rb_define_method(liquidCOptimizer, "optimize", method_liquidCOptimizer_optimize, 2);
+
+    rb_define_alloc_func(liquidCCompiler, liquidCCompiler_alloc);
+    rb_define_method(liquidCCompiler, "initialize", liquidCCompiler_m_initialize, 1);
+    rb_define_method(liquidCCompiler, "compileTemplate", method_liquidCCompiler_compile, 1);
+
+    rb_define_alloc_func(liquidCProgram, liquidCProgram_alloc);
+	rb_define_method(liquidCTemplate, "initialize", liquidCProgram_m_initialize, 1);
 
 	rb_define_alloc_func(liquidCTemplate, liquidCTemplate_alloc);
 	rb_define_method(liquidCTemplate, "initialize", liquidCTemplate_m_initialize, 1);

@@ -155,13 +155,21 @@ namespace Liquid {
         }
 
         static void internalCompile(Compiler& compiler, const Node& node) {
-            compiler.compileBranch(*node.children[0].get()->children[0].get());
-            int conditionalFalseJump = compiler.add(OP_JMPFALSE, 0x0, 0x0);
-            int truePath = compiler.compileBranch(*node.children[1].get());
-            int conditionalTrueJump = compiler.add(OP_JMP, 0x0, 0x0);
-            compiler.modify(conditionalFalseJump, OP_JMPFALSE, 0x0, truePath);
-            compiler.compileBranch(*node.children[2].get());
-            compiler.modify(conditionalTrueJump, OP_JMP, 0x0, compiler.currentOffset());
+            vector<int> endJumps;
+            for (size_t i = 0; i < node.children.size(); i += 2) {
+                if (node.children[i]->type->symbol == "else") {
+                    compiler.compileBranch(*node.children[i+1].get());
+                } else {
+                    compiler.compileBranch(*node.children[i].get()->children[0].get());
+                    int conditionalFalseJump = compiler.add(OP_JMPFALSE, 0x0, 0x0);
+                    compiler.compileBranch(*node.children[i+1].get());
+                    endJumps.push_back(compiler.add(OP_JMP, 0x0, 0x0));
+                    compiler.modify(conditionalFalseJump, OP_JMPFALSE, 0x0, compiler.currentOffset());
+                }
+            }
+            for (int jmp : endJumps)
+                compiler.modify(jmp, OP_JMP, 0x0, compiler.currentOffset());
+
         }
 
 
@@ -172,14 +180,20 @@ namespace Liquid {
                 return renderer.retrieveRenderedNode(*arguments->children.front().get(), store);
             }
             void compile(Compiler& compiler, const Node& node) const override { }
+            bool optimize(Optimizer& optimizer, Node& node, Variable store) const override {
+                return true;
+            }
         };
 
         struct ElseNode : TagNodeType {
             ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const override {
-                return Node(Variant(true));
+                return Node();
             }
             void compile(Compiler& compiler, const Node& node) const override { }
+            bool optimize(Optimizer& optimizer, Node& node, Variable store) const override {
+                return true;
+            }
         };
 
         BranchNode(const std::string symbol) : TagNodeType(Composition::ENCLOSED, symbol, 1, 1, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) {
@@ -325,11 +339,15 @@ namespace Liquid {
             }
         };
 
+        const NodeType* reversedQualifier;
+        const NodeType* limitQualifier;
+        const NodeType* offsetQualifier;
+
         ForNode() : TagNodeType(Composition::ENCLOSED, "for", 1, -1) {
             registerType<ElseNode>();
-            registerType<ReverseQualifierNode>();
-            registerType<LimitQualifierNode>();
-            registerType<OffsetQualifierNode>();
+            reversedQualifier = registerType<ReverseQualifierNode>();
+            limitQualifier = registerType<LimitQualifierNode>();
+            offsetQualifier = registerType<OffsetQualifierNode>();
         }
 
 
@@ -366,10 +384,6 @@ namespace Liquid {
             int start = 0;
             int limit = -1;
             bool hasLimit = false;
-
-            const NodeType* reversedQualifier = qualifiers.find("reversed")->second.get();
-            const NodeType* limitQualifier = qualifiers.find("limit")->second.get();
-            const NodeType* offsetQualifier = qualifiers.find("offset")->second.get();
 
             for (size_t i = 1; i < arguments->children.size(); ++i) {
                 Node* child = arguments->children[i].get();
@@ -482,6 +496,40 @@ namespace Liquid {
                 return renderer.retrieveRenderedNode(*node.children[3].get(), store);
             }
             return Node(forLoopContext.result);
+        }
+
+
+        void compile(Compiler& compiler, const Node& node) const override {
+            // Create loop index variable, (and reference to current variable in future), on the stack.
+            const Node& sequence = *node.children[0].get()->children[0]->children[1]->children[0].get();
+            fprintf(stderr, "TYPE: %p\n", sequence.type);
+            fprintf(stderr, "SEQ: %d\n", sequence.variant.type);
+            assert(sequence.type && sequence.children.size() == 2);
+            compiler.compileBranch(*sequence.children[1].get());
+            compiler.add(OP_INC, compiler.freeRegister - 1);
+            compiler.addPush(compiler.freeRegister - 1);
+            compiler.compileBranch(*sequence.children[0].get());
+            compiler.addPush(compiler.freeRegister - 1);
+            compiler.freeRegister = 0;
+            const Node& variable = *node.children[0].get()->children[0]->children[0].get();
+            compiler.addDropFrame(variable.children[0].get()->variant.s, +[](Compiler& compiler, Compiler::DropFrameState& state) {
+                int negativeOffset = state.stackPoint - compiler.stackSize;
+                compiler.add(OP_STACK, 0x0, negativeOffset - 1);
+                return 0;
+            });
+            int entryPointJmp = compiler.add(OP_JMP, 0x0, 0x0);
+            int topLoop = compiler.add(OP_STACK, 0x0, -1);
+            compiler.add(OP_STACK, 0x1, -2);
+            compiler.add(OP_INC, 0x0);
+            compiler.add(OP_POP, 0x0, 0x1);
+            compiler.add(OP_PUSH, 0x0);
+            int entryPoint = compiler.add(OP_SUB, 0x1);
+            compiler.modify(entryPointJmp, OP_JMP, 0x0, entryPoint);
+            int endLoopJmp = compiler.add(OP_JMPFALSE, 0x0, 0x0);
+            compiler.compileBranch(*node.children[1].get());
+            compiler.add(OP_JMP, 0x0, topLoop);
+            compiler.modify(endLoopJmp, OP_JMPFALSE, 0x0, compiler.currentOffset());
+            compiler.addPop(2);
         }
     };
 

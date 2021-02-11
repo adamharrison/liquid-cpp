@@ -174,6 +174,7 @@ namespace Liquid {
         switch (opcode) {
             case OP_EXIT:
             case OP_OUTPUT:
+            case OP_INC:
             case OP_ADD:
             case OP_SUB:
             case OP_MUL:
@@ -201,10 +202,14 @@ namespace Liquid {
                 return "OP_MOVFLOAT";
             case OP_MOVNIL:
                 return "OP_MOVNIL";
+            case OP_STACK:
+                return "OP_STACK";
             case OP_PUSH:
                 return "OP_PUSH";
             case OP_POP:
                 return "OP_POP";
+            case OP_INC:
+                return "OP_INC";
             case OP_ADD:
                 return "OP_ADD";
             case OP_SUB:
@@ -257,6 +262,19 @@ namespace Liquid {
         int offset = code.size();
         code.resize(offset + sizeof(int));
         *((int*)&code[offset]) = (opcode & 0xFF) | ((target << 8) & 0xFFFF00);
+        assert(!hasOperand(opcode));
+        return offset;
+    }
+
+    int Compiler::addPush(int target) {
+        int offset = add(OP_PUSH, target);
+        stackSize++;
+        return offset;
+    }
+
+    int Compiler::addPop(int amount) {
+        int offset = add(OP_POP, 0x0, amount);
+        stackSize -= amount;
         return offset;
     }
 
@@ -265,6 +283,7 @@ namespace Liquid {
         code.resize(offset + sizeof(int) + sizeof(long long));
         *((int*)&code[offset]) = (opcode & 0xFF) | ((target << 8) & 0xFFFF00);
         *((long long*)&code[offset+sizeof(int)]) = operand;
+        assert(hasOperand(opcode));
         return offset;
     }
 
@@ -347,7 +366,7 @@ namespace Liquid {
         return program;
     }
 
-    string Compiler::decompile(const Program& program) {
+    string Compiler::disassemble(const Program& program) {
         size_t i = 0;
         string result;
         char buffer[128];
@@ -368,7 +387,8 @@ namespace Liquid {
             result.append(buffer);
             i += sizeof(int);
             if (hasOperand((OPCode)(instruction & 0xFF))) {
-                sprintf(buffer, ", 0x%08x", (unsigned int)*(long long*)&program.code[i]);
+                long long number = *(long long*)&program.code[i];
+                sprintf(buffer, ", 0x%08x%08x", (unsigned int)(number >> 32), (unsigned int)(number & 0xFFFFFFFF));
                 result.append(buffer);
                 i += sizeof(long long);
             }
@@ -377,6 +397,12 @@ namespace Liquid {
         return result;
     }
 
+    Interpreter::Interpreter(const Context& context) : Renderer(context) {
+        buffers[0].reserve(10*1024);
+        buffers[1].reserve(10*1024);
+        mode = Renderer::ExecutionMode::INTERPRETER;
+        stackPointer = stack;
+    }
     Interpreter::Interpreter(const Context& context, LiquidVariableResolver resolver) : Renderer(context, resolver) {
         buffers[0].reserve(10*1024);
         buffers[1].reserve(10*1024);
@@ -411,7 +437,9 @@ namespace Liquid {
                         return Node(value ? true : false);
                 } break;
                 case Register::Type::NIL: {
-                    return Node(nullptr);
+                    localPointer -= sizeof(unsigned int);
+                    if (idx == i)
+                        return Node(nullptr);
                 } break;
                 case Register::Type::SHORT_STRING:
                 case Register::Type::LONG_STRING: {
@@ -428,6 +456,64 @@ namespace Liquid {
         }
         assert(false);
         return Node();
+    }
+
+
+    void Interpreter::getStack(Register& reg, int idx) {
+        char* localPointer = stackPointer;
+        for (int i = -1; i >= idx; --i) {
+            unsigned int type = *(unsigned int*)(localPointer - sizeof(unsigned int));
+            Register::Type regType = (Register::Type)(type & 0xFF);
+            switch (regType) {
+                case Register::Type::INT:
+                    localPointer -= sizeof(unsigned int) + sizeof(long long);
+                    if (idx == i) {
+                        reg.type = regType;
+                        reg.i = *(long long*)localPointer;
+                        return;
+                    }
+                break;
+                case Register::Type::FLOAT:
+                    localPointer -= sizeof(unsigned int) + sizeof(double);
+                    if (idx == i) {
+                        reg.type = regType;
+                        reg.f = *(double*)localPointer;
+                        return;
+                    }
+                break;
+                case Register::Type::BOOL: {
+                    unsigned int value = type >> 8;
+                    localPointer -= sizeof(unsigned int);
+                    if (idx == i) {
+                        reg.type = regType;
+                        reg.b = value ? true : false;
+                        return;
+                    }
+                } break;
+                case Register::Type::NIL: {
+                    localPointer -= sizeof(unsigned int);
+                    if (idx == i) {
+                        reg.type = regType;
+                        return;
+                    }
+                } break;
+                case Register::Type::SHORT_STRING: {
+                    unsigned int len = type >> 8;
+                    localPointer -= sizeof(unsigned int) + len + (len % 4);
+                    if (idx == i) {
+                        reg.type = regType;
+                        strncpy(reg.buffer, localPointer, SHORT_STRING_SIZE);
+                        return;
+                    }
+                } break;
+                case Register::Type::LONG_STRING:
+                case Register::Type::EXTRA_LONG_STRING:
+                case Register::Type::VARIABLE:
+                    assert(false);
+                break;
+            }
+        }
+        assert(false);
     }
 
     void Interpreter::pushStack(Register& reg) {
@@ -557,13 +643,30 @@ namespace Liquid {
                     registers[target].type = Register::Type::INT;
                     registers[target].i = operand;
                 } break;
+                case OP_INC: {
+                    if (registers[target].type == Register::Type::INT)
+                        ++registers[target].i;
+                } break;
+                case OP_SUB: {
+                    assert(registers[target].type == Register::Type::INT);
+                    assert(registers[0].type == Register::Type::INT);
+                    registers[0].i -= registers[target].i;
+                } break;
                 case OP_MOVFLOAT: {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
                     registers[target].type = Register::Type::FLOAT;
                     registers[target].f = *(double*)&operand;
                 } break;
+                case OP_STACK: {
+                    operand = *((long long*)instructionPointer); instructionPointer += 2;
+                    getStack(registers[target], operand);
+                } break;
                 case OP_PUSH: {
                     pushStack(registers[target]);
+                } break;
+                case OP_POP: {
+                    operand = *((long long*)instructionPointer); instructionPointer += 2;
+                    popStack(operand);
                 } break;
                 case OP_JMP:
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
@@ -662,6 +765,7 @@ namespace Liquid {
                 break;
                 case OP_JMPFALSE: {
                     bool shouldJump = false;
+                    operand = *((long long*)instructionPointer); instructionPointer += 2;
                     switch (registers[target].type) {
                         case Register::Type::INT:
                             shouldJump = registers[target].i;
@@ -683,13 +787,14 @@ namespace Liquid {
                         case Register::Type::VARIABLE:
                         break;
                     }
-                    if (!shouldJump) {
-                        operand = (*instructionPointer++);
+                    if (!shouldJump)
                         instructionPointer = reinterpret_cast<const unsigned int*>(&prog.code[operand]);
-                    }
                 } break;
                 case OP_EXIT:
                     finished = true;
+                break;
+                default:
+                    assert(false);
                 break;
             }
         }
@@ -740,12 +845,26 @@ namespace Liquid {
 
     void Context::VariableNode::compile(Compiler& compiler, const Node& node) const {
         int target = 0x0;
+
+        string var;
         for (size_t i = 0; i < node.children.size(); ++i) {
-            compiler.compileBranch(*node.children[i].get());
-            compiler.add(OP_RESOLVE, 0x0, target);
-            if (i < node.children.size() -1) {
-                compiler.add(OP_MOV, 0x0, 0x1);
-                target = 0x1;
+            if (!var.empty())
+                var.append(".");
+            if (node.children[i]->type || node.children[i]->variant.type != Variant::Type::STRING)
+                break;
+            var.append(node.children[i]->variant.s);
+        }
+        auto it = compiler.dropFrames.find(var);
+        if (it != compiler.dropFrames.end() && it->second.size() > 0) {
+            it->second.back().first(compiler, it->second.back().second);
+        } else {
+            for (size_t i = 0; i < node.children.size(); ++i) {
+                compiler.compileBranch(*node.children[i].get());
+                compiler.add(OP_RESOLVE, 0x0, target);
+                if (i < node.children.size() -1) {
+                    compiler.add(OP_MOV, 0x0, 0x1);
+                    target = 0x1;
+                }
             }
         }
     }

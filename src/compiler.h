@@ -23,8 +23,10 @@ namespace Liquid {
         OP_MOVBOOL,     // Pushes the operand into the register.
         OP_MOVFLOAT,    // Pushes the operand into the register.
         OP_MOVNIL,      // Pushes the operand into the register.
+        OP_STACK,       // Pulls the nth item of the stack into a register.
         OP_PUSH,        // Pushes the operand onto the stack, from the specified register.
         OP_POP,         // Moves the stack point back to the preivous variable.
+        OP_INC,         // Increments the targeted register.
         OP_ADD,         // Takes the targeted register, and adds it to the return register.
         OP_SUB,         // Takes the targeted register, and sub it to the return register.
         OP_MUL,         // Takes the targeted register, and multplies it to the return register.
@@ -60,8 +62,20 @@ namespace Liquid {
         const Context& context;
         // For forloops, and the forloop vairables, amongst other things. Space should likely be allocated only when actually  needed.
         // Returns the offset from the current stack frame.
-        typedef int (dropFrameCallback)(void* data);
-        std::unordered_map<std::string, std::vector<int>> dropFrames;
+        struct DropFrameState {
+            int stackPoint;
+        };
+        int stackSize;
+        typedef int (*DropFrameCallback)(Compiler& compiler, DropFrameState& state);
+        std::unordered_map<std::string, std::vector<std::pair<DropFrameCallback, DropFrameState>>> dropFrames;
+
+        void addDropFrame(const std::string& name, DropFrameCallback callback) {
+            dropFrames[name].emplace_back(callback, DropFrameState { stackSize });
+        }
+
+        void clearDropFrame(const std::string& name) {
+            dropFrames[name].pop_back();
+        }
 
         Compiler(const Context& context);
         ~Compiler();
@@ -69,6 +83,10 @@ namespace Liquid {
         int add(const char* str, int length);
         int add(OPCode code, int target);
         int add(OPCode code, int target, long long operand);
+
+        int addPush(int target);
+        int addPop(int amount);
+
         void modify(int offset, OPCode code, int target, long long operand);
         int currentOffset() const;
 
@@ -76,7 +94,7 @@ namespace Liquid {
         int compileBranch(const Node& branch);
         Program compile(const Node& tmpl);
 
-        string decompile(const Program& program);
+        string disassemble(const Program& program);
     };
 
     struct Interpreter : Renderer {
@@ -119,11 +137,13 @@ namespace Liquid {
         int frames[MAX_FRAMES];
         char stack[STACK_SIZE];
 
+        Interpreter(const Context& context);
         Interpreter(const Context& context, LiquidVariableResolver resolver);
         ~Interpreter();
 
         // Should be used for conversions only, not for actual optimized code.
         Node getStack(int i);
+        void getStack(Register& reg, int i);
         void popStack(int i);
         void pushStack(Register& reg);
         void pushRegister(Register& reg, const Node& node);

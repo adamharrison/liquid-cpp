@@ -66,8 +66,9 @@ namespace Liquid {
 
         // Used for registering intermedaites and qualiifers.
         template <class T>
-        void registerType() {
+        T* registerType() {
             auto nodeType = make_unique<T>();
+            T* pointer = nodeType.get();
             switch (nodeType->type) {
                 case NodeType::Type::TAG:
                     intermediates[nodeType->symbol] = std::move(nodeType);
@@ -85,6 +86,7 @@ namespace Liquid {
                     assert(false);
                 break;
             }
+            return pointer;
         }
     };
 

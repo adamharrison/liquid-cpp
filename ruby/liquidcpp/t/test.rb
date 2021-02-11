@@ -7,6 +7,7 @@ require 'liquidcpp'
 context = LiquidCPP.new("strict")
 renderer = LiquidCPP::Renderer.new(context)
 parser = LiquidCPP::Parser.new(context)
+compiler = LiquidCPP::Compiler.new(context)
 optimizer = LiquidCPP::Optimizer.new(renderer)
 
 context.registerFilter("test", -1, -1, LiquidCPP::OPTIMIZATION_SCHEME_NONE, Proc.new { |renderer, node, stash, operand|
@@ -42,7 +43,8 @@ start = Time.now
 
 template1 = parser.parseTemplate(templateContent)
 optimizer.optimize({ }, template1);
-template2 = Liquid::Template.parse(templateContent)
+template2 = compiler.compileTemplate(template1)
+template3 = Liquid::Template.parse(templateContent)
 
 s = nil
 (1..10000).each { |x|
@@ -52,10 +54,20 @@ puts s
 
 puts (Time.now - start)*1000
 
+
+#s = nil
+#(1..10000).each { |x|
+	#s = renderer.render({ "a" => false }, template2)
+#}
+#puts s
+
+#puts (Time.now - start)*1000
+
+
 start = Time.now
 
 (1..10000).each { |x|
-	s = template2.render({ "a" => false })
+	s = template3.render({ "a" => false })
 }
 puts s
 

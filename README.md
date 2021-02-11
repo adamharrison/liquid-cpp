@@ -181,7 +181,7 @@ The ruby module uses the C interface to interface with the liquid library.
 
 Currently the package isn't uploaded on rubygems, so it has to be build manually. Luckily; this is easy:
 
-```cd ruby/liquidc && rake compile && rake gem && gem install pkg/*.gem && cd - && cd ruby/liquidc-dir && rake compile && rake gem && gem install pkg/*.gem && cd -```
+```cd ruby/liquidcpp && rake compile && rake gem && gem install pkg/*.gem && cd - && cd ruby/liquidc-dir && rake compile && rake gem && gem install pkg/*.gem && cd -```
 
 ##### Usage
 
@@ -189,9 +189,9 @@ There're two ways to get the ruby library working. You can use the OO way, which
 
 ```ruby
 require 'liquidc'
-context = LiquidC.new()
-parser = LiquidC::Parser.new(context)
-renderer = LiquidC::Renderer.new(context)
+context = LiquidCPP.new()
+parser = LiquidCPP::Parser.new(context)
+renderer = LiquidCPP::Renderer.new(context)
 template = parser.parse("{% if a %}asdfghj {{ a }}{% endif %}")
 puts renderer.render({ "a" => 1 }, template)
 ```
@@ -201,7 +201,7 @@ The advantage of this is that by simply replacing your require statements, you s
 faster.
 
 ```ruby
-require 'liquidc-dir'
+require 'liquidcpp-dir'
 
 template = Liquid::Template.parse("{% if a %}asdfghj {{ a }}{% endif %}")
 puts template.render({ "a" => 1 }, template)

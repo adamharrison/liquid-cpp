@@ -678,11 +678,27 @@ TEST(sanity, strict) {
 
 TEST(sanity, vm) {
     CPPVariable hash = { };
-    hash["a"] = 1;
     Node ast;
     Program program;
     std::string str;
     std::string result;
+
+
+        ast = getParser().parse("{% if a %}asdfghj {{ a }}{% else %}asdfjlsjkhgsjlkhglsdfjkgdfhs{% for i in (1..10) %}{{ i }}fasdfsdf{% endfor %}{% endif %}");
+        getOptimizer().optimize(ast, hash);
+        program = getCompiler().compile(ast);
+        hash["a"] = false;
+        result = getInterpreter().renderTemplate(program, hash);
+        ASSERT_EQ(result, "asdfjlsjkhgsjlkhglsdfjkgdfhs1fasdfsdf2fasdfsdf3fasdfsdf4fasdfsdf5fasdfsdf6fasdfsdf7fasdfsdf8fasdfsdf9fasdfsdf10fasdfsdf");
+
+        hash["a"] = 1;
+
+        ast = getParser().parse("{% for i in (1..3) %}{{ i }}fasdfsdf{% endfor %}");
+        program = getCompiler().compile(ast);
+        result = getInterpreter().renderTemplate(program, hash);
+        ASSERT_EQ(result, "1fasdfsdf2fasdfsdf3fasdfsdf");
+
+
 
         ast = getParser().parse("jaslkdjfasdkf {{ a }} kjhdfjkhgsdfg");
         program = getCompiler().compile(ast);
@@ -710,7 +726,6 @@ TEST(sanity, vm) {
         ast = getParser().parse("fahsdjkhgflghljh {% if a %}A{% else %}B{% endif %} kjdjkghdf");
         program = getCompiler().compile(ast);
         result = getInterpreter().renderTemplate(program, hash);
-        fprintf(stderr, "%s", getCompiler().decompile(program).data());
         ASSERT_EQ(result, "fahsdjkhgflghljh A kjdjkghdf");
 
 
@@ -718,7 +733,6 @@ TEST(sanity, vm) {
         program = getCompiler().compile(ast);
         result = getInterpreter().renderTemplate(program, hash);
         ASSERT_EQ(result, "asdjkfsdhsjkg -6");
-
 
 
 
