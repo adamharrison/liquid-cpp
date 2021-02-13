@@ -37,36 +37,53 @@ puts renderer.render({ }, parser.parseTemplate("{% endif %}"))
 puts parser.warnings
 puts renderer.warnings
 
-templateContent = "{% if a %}asdfghj {{ a }}{% else %}asdfjlsjkhgsjlkhglsdfjkgdfhs{% for i in (1..10) %}{{ i }}fasdfsdf{% endfor %}{% endif %}"
+templateContent = "{% if a %}asdfghj {{ a }}{% else %}asdfjlsjkhgsjlkhglsdfjkgdfhs{% for i in (1..100) %}{{ i }}fasdfsdf{% endfor %}{% endif %}"
 
-start = Time.now
+
+puts "A"
 
 template1 = parser.parseTemplate(templateContent)
 optimizer.optimize({ }, template1);
 template2 = compiler.compileTemplate(template1)
 template3 = Liquid::Template.parse(templateContent)
 
+# raise compiler.decompileProgram(template2)
+
+iterations = 10000
+
+start = Time.now
+
+i = 0
+(1..iterations).each { |x|
+    ++i
+}
+
+puts (Time.now - start)*1000
+
+start = Time.now
+
 s = nil
-(1..10000).each { |x|
+(1..iterations).each { |x|
 	s = renderer.render({ "a" => false }, template1)
 }
 puts s
 
 puts (Time.now - start)*1000
 
+start = Time.now
 
-#s = nil
-#(1..10000).each { |x|
-	#s = renderer.render({ "a" => false }, template2)
-#}
-#puts s
+s = nil
+(1..iterations).each { |x|
+	s = renderer.render({ "a" => false }, template2)
+}
+puts s
 
-#puts (Time.now - start)*1000
+puts (Time.now - start)*1000
 
 
 start = Time.now
 
-(1..10000).each { |x|
+(1..iterations).each { |x|
 	s = template3.render({ "a" => false })
 }
 puts s

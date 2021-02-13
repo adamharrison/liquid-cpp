@@ -675,6 +675,40 @@ TEST(sanity, strict) {
     result = renderer.render(ast, hash);
     ASSERT_TRUE(parser.errors.size() > 0);
 }
+TEST(sanity, clang) {
+    CPPVariable hash = { };
+    LiquidContext context = liquidCreateContext();
+    liquidImplementStrictStandardDialect(context);
+    LiquidParser parser = liquidCreateParser(context);
+    LiquidRenderer renderer = liquidCreateRenderer(context);
+    LiquidOptimizer optimizer = liquidCreateOptimizer(renderer);
+    liquidRegisterVariableResolver(renderer, CPPVariableResolver());
+    LiquidCompiler compiler = liquidCreateCompiler(context);
+    char buffer[] = "{% if a %}asdfghj {{ a }}{% else %}asdfjlsjkhgsjlkhglsdfjkgdfhs{% for i in (1..10) %}{{ i }}fasdfsdf{% endfor %}{% endif %}";
+    LiquidTemplate tmpl = liquidParserParseTemplate(parser, buffer, strlen(buffer), nullptr, nullptr, nullptr);
+    liquidOptimizeTemplate(optimizer, tmpl, &hash);
+
+    LiquidTemplateRender result = liquidRendererRenderTemplate(renderer, &hash, tmpl, nullptr);
+    ASSERT_STREQ(liquidTemplateRenderGetBuffer(result), "asdfjlsjkhgsjlkhglsdfjkgdfhs1fasdfsdf2fasdfsdf3fasdfsdf4fasdfsdf5fasdfsdf6fasdfsdf7fasdfsdf8fasdfsdf9fasdfsdf10fasdfsdf");
+    liquidFreeTemplateRender(result);
+
+    LiquidProgram program = liquidCompilerCompileTemplate(compiler, tmpl);
+    char target[10*1024];
+    liquidCompilerDisassembleProgram(compiler, program, target, 10*1024);
+
+    fprintf(stderr, "PROGRAM:\n%s", target);
+
+    result = liquidRendererRunProgram(renderer, &hash, program, nullptr);
+    ASSERT_STREQ(liquidTemplateRenderGetBuffer(result), "asdfjlsjkhgsjlkhglsdfjkgdfhs1fasdfsdf2fasdfsdf3fasdfsdf4fasdfsdf5fasdfsdf6fasdfsdf7fasdfsdf8fasdfsdf9fasdfsdf10fasdfsdf");
+    liquidFreeTemplateRender(result);
+    liquidFreeProgram(program);
+
+    liquidFreeTemplate(tmpl);
+    liquidFreeCompiler(compiler);
+    liquidFreeRenderer(renderer);
+    liquidFreeParser(parser);
+    liquidFreeContext(context);
+}
 
 TEST(sanity, vm) {
     CPPVariable hash = { };

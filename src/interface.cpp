@@ -32,7 +32,7 @@ LiquidRenderer liquidCreateRenderer(LiquidContext context) {
 }
 
 void liquidFreeRenderer(LiquidRenderer renderer) {
-    delete (Renderer*)renderer.renderer;
+    delete (Interpreter*)renderer.renderer;
 }
 
 LiquidParser liquidCreateParser(LiquidContext context) {
@@ -62,6 +62,14 @@ void liquidFreeCompiler(LiquidCompiler compiler) {
     delete (Compiler*)compiler.compiler;
 }
 
+void liquidCreateInterpreter(LiquidContext context) {
+
+}
+
+void liquidFreeInterpreter(LiquidInterpreter interpreter) {
+    delete (Interpreter*)interpreter.interpreter;
+}
+
 LiquidProgram liquidCompilerCompileTemplate(LiquidCompiler compiler, LiquidTemplate tmpl) {
     return LiquidProgram({ new Program(move(static_cast<Compiler*>(compiler.compiler)->compile(*static_cast<Node*>(tmpl.ast)))) });
 }
@@ -70,6 +78,7 @@ int liquidCompilerDisassembleProgram(LiquidCompiler compiler, LiquidProgram prog
     string disassembly = static_cast<Compiler*>(compiler.compiler)->disassemble(*static_cast<Program*>(program.program));
     size_t copied = std::min(maxSize, disassembly.size());
     strncpy(buffer, disassembly.data(), copied);
+    disassembly[copied-1] = 0;
     return copied;
 }
 
@@ -77,7 +86,7 @@ void liquidFreeProgram(LiquidProgram program) {
     delete static_cast<Program*>(program.program);
 }
 
-LiquidTemplateRender liquidRendererRunTemplate(LiquidRenderer renderer, void* variableStore, LiquidProgram program, LiquidRendererError* error) {
+LiquidTemplateRender liquidRendererRunProgram(LiquidRenderer renderer, void* variableStore, LiquidProgram program, LiquidRendererError* error) {
     if (error)
         error->type = LIQUID_RENDERER_ERROR_TYPE_NONE;
     std::string* str;
@@ -99,7 +108,7 @@ LiquidTemplate liquidParserParseTemplate(LiquidParser parser, const char* buffer
     if (parserError)
         parserError->type = LiquidParserErrorType::LIQUID_PARSER_ERROR_TYPE_NONE;
     try {
-        tmpl = static_cast<Parser*>(parser.parser)->parse(buffer, size, file);
+        tmpl = static_cast<Parser*>(parser.parser)->parse(buffer, size, file ? file : "");
     } catch (Parser::Exception& exp) {
         if (parserError)
             *parserError = exp.parserErrors[0];

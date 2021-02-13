@@ -14,6 +14,7 @@ namespace Liquid {
 
     Variant Renderer::renderArgument(const Node& ast, Variable store) {
         nodeContext = nullptr;
+        mode = Renderer::ExecutionMode::PARSE_TREE;
         errors.clear();
         unknownErrors.clear();
         renderStartTime = std::chrono::system_clock::now();
@@ -36,6 +37,7 @@ namespace Liquid {
             auto s = node.getString();
             callback(s.data(), s.size(), data);
         } else {
+            mode = Renderer::ExecutionMode::PARSE_TREE;
             nodeContext = nullptr;
             errors.clear();
             unknownErrors.clear();

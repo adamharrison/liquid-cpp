@@ -36,9 +36,9 @@ namespace Liquid {
         OP_OUTPUTMEM,   // Takes the targeted memory address, and appends it to the selected output buffer. Optimized version of OP_OUTPUT to reduce copying.
         OP_ASSIGN,      // Assigning a variable from the contents of the return register to the specified operand. If 0x0 to the gloabl vairable context.
         OP_JMP,         // Unconditional jump.
-        OP_JMPFALSE,     // Jumps to the instruction if primary register is false.
+        OP_JMPFALSE,    // Jumps to the instruction if primary register is false.
         OP_CALL,        // Calls the function specified with the amount of arugments on the stack.
-        OP_RESOLVE,      // Resovles the named variable in the register and places it into the same register. Operand is either 0x0, for the top-level context, or a register, which contains the context for the next deference.,
+        OP_RESOLVE,     // Resovles the named variable in the register and places it into the same register. Operand is either 0x0, for the top-level context, or a register, which contains the context for the next deference.,
         OP_EXIT         // Quits the program.
     };
 

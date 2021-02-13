@@ -97,13 +97,13 @@ static bool liquidCgetFloat(LiquidRenderer renderer, void* variable, double* tar
 }
 
 static bool liquidCgetDictionaryVariable(LiquidRenderer renderer, void* variable, const char* key, void** target) {
-    VALUE value;
+    VALUE result;
     if (TYPE((VALUE)variable) != T_HASH)
         return false;
-    value = rb_hash_aref((VALUE)variable, rb_str_new2(key));
-    if (TYPE(value) == T_UNDEF)
+    result = rb_hash_lookup2((VALUE)variable, rb_str_new2(key), Qundef);
+    if (result == Qundef)
         return false;
-    *target = (void*)value;
+    *target = (void*)result;
     return true;
 }
 
@@ -455,16 +455,22 @@ VALUE liquidCCompiler_m_initialize(VALUE self, VALUE incomingContext) {
 VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
     VALUE str, exceptionInit[PACK_EXCEPTION_LENGTH], exception;
     LiquidTemplate* liquidTemplate;
+    LiquidProgram* liquidProgram;
     LiquidRenderer* liquidRenderer;
     LiquidRendererError error;
     LiquidTemplateRender result;
     char buffer[512];
     int j;
 
-    TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, liquidRenderer);
-    TypedData_Get_Struct(tmpl, LiquidTemplate, &liquidCTemplate_type, liquidTemplate);
     Check_Type(stash, T_HASH);
-    result = liquidRendererRenderTemplate(*liquidRenderer, (void*)stash, *liquidTemplate, &error);
+    TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, liquidRenderer);
+    if (RBASIC_CLASS(tmpl) == liquidCProgram) {
+        TypedData_Get_Struct(tmpl, LiquidProgram, &liquidCProgram_type, liquidProgram);
+        result = liquidRendererRunProgram(*liquidRenderer, (void*)stash, *liquidProgram, &error);
+    } else {
+        TypedData_Get_Struct(tmpl, LiquidTemplate, &liquidCTemplate_type, liquidTemplate);
+        result = liquidRendererRenderTemplate(*liquidRenderer, (void*)stash, *liquidTemplate, &error);
+    }
     if (error.type != LIQUID_RENDERER_ERROR_TYPE_NONE) {
         liquidGetRendererErrorMessage(error, buffer, sizeof(buffer));
         PACK_EXCEPTION(liquidCRendererError, error, exceptionInit, buffer, exception);
@@ -689,6 +695,19 @@ VALUE method_liquidCCompiler_compile(VALUE self, VALUE incomingTemplate) {
     return result;
 }
 
+VALUE method_liquidCCompiler_decompile(VALUE self, VALUE incomingProgram) {
+    LiquidCompiler* compiler;
+    LiquidProgram* program;
+    char buffer[100*1024];
+    int size;
+
+    TypedData_Get_Struct(self, LiquidCompiler, &liquidCCompiler_type, compiler);
+    TypedData_Get_Struct(incomingProgram, LiquidProgram, &liquidCProgram_type, program);
+
+    size = liquidCompilerDisassembleProgram(*compiler, *program, buffer, sizeof(buffer));
+    return rb_str_new(buffer, size);
+}
+
 VALUE liquidCProgram_m_initialize(VALUE self, VALUE incomingProgram) {
     LiquidProgram* program;
     Check_Type(incomingProgram, T_FIXNUM);
@@ -882,9 +901,10 @@ void Init_liquidcpp() {
     rb_define_alloc_func(liquidCCompiler, liquidCCompiler_alloc);
     rb_define_method(liquidCCompiler, "initialize", liquidCCompiler_m_initialize, 1);
     rb_define_method(liquidCCompiler, "compileTemplate", method_liquidCCompiler_compile, 1);
+    rb_define_method(liquidCCompiler, "decompileProgram", method_liquidCCompiler_decompile, 1);
 
     rb_define_alloc_func(liquidCProgram, liquidCProgram_alloc);
-	rb_define_method(liquidCTemplate, "initialize", liquidCProgram_m_initialize, 1);
+	rb_define_method(liquidCProgram, "initialize", liquidCProgram_m_initialize, 1);
 
 	rb_define_alloc_func(liquidCTemplate, liquidCTemplate_alloc);
 	rb_define_method(liquidCTemplate, "initialize", liquidCTemplate_m_initialize, 1);

@@ -188,7 +188,7 @@ namespace Liquid {
         struct ElseNode : TagNodeType {
             ElseNode() : TagNodeType(Composition::FREE, "else", 0, 0) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const override {
-                return Node();
+                return Node(true);
             }
             void compile(Compiler& compiler, const Node& node) const override { }
             bool optimize(Optimizer& optimizer, Node& node, Variable store) const override {
@@ -501,9 +501,8 @@ namespace Liquid {
 
         void compile(Compiler& compiler, const Node& node) const override {
             // Create loop index variable, (and reference to current variable in future), on the stack.
-            const Node& sequence = *node.children[0].get()->children[0]->children[1]->children[0].get();
-            fprintf(stderr, "TYPE: %p\n", sequence.type);
-            fprintf(stderr, "SEQ: %d\n", sequence.variant.type);
+            const Node& group = *node.children[0].get()->children[0]->children[1].get();
+            const Node& sequence = group.type && group.type->type == NodeType::Type::GROUP ? *group.children[0].get() : group;
             assert(sequence.type && sequence.children.size() == 2);
             compiler.compileBranch(*sequence.children[1].get());
             compiler.add(OP_INC, compiler.freeRegister - 1);

@@ -290,6 +290,7 @@ namespace Liquid {
     void Compiler::modify(int offset, OPCode opcode, int target, long long operand) {
         *((int*)&code[offset]) = (opcode & 0xFF) | ((target << 8) & 0xFFFF00);
         *((long long*)&code[offset+sizeof(int)]) = operand;
+        assert(hasOperand(opcode));
     }
 
     int Compiler::currentOffset() const { return code.size(); }
@@ -336,6 +337,7 @@ namespace Liquid {
     Program Compiler::compile(const Node& tmpl) {
         Program program;
         freeRegister = 0;
+        stackSize = 0;
         data.clear();
         code.clear();
         existingStrings.clear();
@@ -400,13 +402,11 @@ namespace Liquid {
     Interpreter::Interpreter(const Context& context) : Renderer(context) {
         buffers[0].reserve(10*1024);
         buffers[1].reserve(10*1024);
-        mode = Renderer::ExecutionMode::INTERPRETER;
         stackPointer = stack;
     }
     Interpreter::Interpreter(const Context& context, LiquidVariableResolver resolver) : Renderer(context, resolver) {
         buffers[0].reserve(10*1024);
         buffers[1].reserve(10*1024);
-        mode = Renderer::ExecutionMode::INTERPRETER;
         stackPointer = stack;
     }
     Interpreter::~Interpreter() {
@@ -612,6 +612,7 @@ namespace Liquid {
 
     string Interpreter::renderTemplate(const Program& prog, Variable store) {
         buffer = 0;
+        mode = Renderer::ExecutionMode::INTERPRETER;
         const unsigned int* instructionPointer = reinterpret_cast<const unsigned int*>(&prog.code[prog.codeOffset]);
         stackPointer = stack;
         buffers[buffer].clear();
@@ -643,6 +644,14 @@ namespace Liquid {
                     registers[target].type = Register::Type::INT;
                     registers[target].i = operand;
                 } break;
+                case OP_MOVFLOAT: {
+                    operand = *((double*)instructionPointer); instructionPointer += 2;
+                    registers[target].type = Register::Type::FLOAT;
+                    registers[target].f = operand;
+                } break;
+                case OP_MOVNIL: {
+                    registers[target].type = Register::Type::NIL;
+                } break;
                 case OP_INC: {
                     if (registers[target].type == Register::Type::INT)
                         ++registers[target].i;
@@ -651,11 +660,6 @@ namespace Liquid {
                     assert(registers[target].type == Register::Type::INT);
                     assert(registers[0].type == Register::Type::INT);
                     registers[0].i -= registers[target].i;
-                } break;
-                case OP_MOVFLOAT: {
-                    operand = *((long long*)instructionPointer); instructionPointer += 2;
-                    registers[target].type = Register::Type::FLOAT;
-                    registers[target].f = *(double*)&operand;
                 } break;
                 case OP_STACK: {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
@@ -794,6 +798,7 @@ namespace Liquid {
                     finished = true;
                 break;
                 default:
+                    fprintf(stderr,"TYPE: %d\n", instruction & 0xFF);
                     assert(false);
                 break;
             }
