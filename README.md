@@ -54,7 +54,7 @@ requires an underlying ruby module that implements the more modular, sane versio
 
 ## Status
 
-In development. **Do not use in production code, yet.**
+In development. Mostly stable. **VM/Compiler/Interpreter, should not be used in production code, yet, though the rest of the library can be.**
 
 Basic memory audits of the core have been done with valgrind, and leaks have been closed. A more extensive battery of tests is required to determine if there's actually any undefined behaviour or further leaks.
 
@@ -258,7 +258,7 @@ This is what I'm aiming for at any rate.
 * Ability to easily specify additions of filters, operators, and tags called `Dialects`, which can be mixed and matched.
 * Small footprint. Aiming for under 5K SLOC, with full standard Liquid as part of the core library.
 * Fully featured `extern "C"` interface for easy linking to most scripting languages. OOB bindings for both Ruby and Perl will be provided, that will act as drop-in replacements for `Liquid` and `WWW::Shopify::Liquid`.
-* Significant speedup over ruby-based liquid. (Need to do benchmarks; but at first glance seems like a minimum of a 10-20x speedup over regular Liquid for both rendering and parsing)
+* Significant speedup over ruby-based `liquid` and `liquid/c`. (Need to do more comprehensive benchmarks; but at first glance seems like somewhere between a 10-50x speedup over regular `liquid/c` for both rendering and parsing using the VM.)
 * Fully compatible with both `Liquid`, Shopify's ruby gem, and `WWW::Shopify::Liquid`, the perl implementation.
 * Use a standard build system; like cmake.
 * Optional compatibilty with rapidjson to allow for easy JSON reading in C++.
@@ -273,12 +273,12 @@ This is what I'm aiming for at any rate.
 ### Partial
 
 * Full test suite that runs all major examples from Shopify's doucmentation. (Test suite runs some examples, but not all).
+* Write a register-based bytecode compiler/interpreter, which should be significantly faster than walking the parse tree. (basics in, if statements, for statements, and genrealized non-assembly calling in).
 
 ### TODO
 
 * Ability to partially render content, then spit back out the remaining liquid that genreated it.
 * General polish pass to clean up reundant code, and ensure consistency across the C, C++, Perl and Ruby APIs.
-* Write a register-based bytecode compiler/interpreter, which should be significantly faster than walking the parse tree. (not that it really needs it at this point)
 
 ## License
 

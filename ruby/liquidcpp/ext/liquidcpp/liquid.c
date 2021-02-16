@@ -458,18 +458,20 @@ VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
     LiquidProgram* liquidProgram;
     LiquidRenderer* liquidRenderer;
     LiquidRendererError error;
-    LiquidTemplateRender result;
+    LiquidTemplateRender templateResult;
+    LiquidProgramRender programResult;
     char buffer[512];
     int j;
-
+    bool program;
     Check_Type(stash, T_HASH);
     TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, liquidRenderer);
-    if (RBASIC_CLASS(tmpl) == liquidCProgram) {
+    program = RBASIC_CLASS(tmpl) == liquidCProgram;
+    if (program) {
         TypedData_Get_Struct(tmpl, LiquidProgram, &liquidCProgram_type, liquidProgram);
-        result = liquidRendererRunProgram(*liquidRenderer, (void*)stash, *liquidProgram, &error);
+        programResult = liquidRendererRunProgram(*liquidRenderer, (void*)stash, *liquidProgram, &error);
     } else {
         TypedData_Get_Struct(tmpl, LiquidTemplate, &liquidCTemplate_type, liquidTemplate);
-        result = liquidRendererRenderTemplate(*liquidRenderer, (void*)stash, *liquidTemplate, &error);
+        templateResult = liquidRendererRenderTemplate(*liquidRenderer, (void*)stash, *liquidTemplate, &error);
     }
     if (error.type != LIQUID_RENDERER_ERROR_TYPE_NONE) {
         liquidGetRendererErrorMessage(error, buffer, sizeof(buffer));
@@ -477,8 +479,12 @@ VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
         rb_exc_raise(exception);
         return self;
     }
-    str = rb_str_new(liquidTemplateRenderGetBuffer(result), liquidTemplateRenderGetSize(result));
-    liquidFreeTemplateRender(result);
+    if (program)  {
+        str = rb_str_new(programResult.str, programResult.len);
+    } else {
+        str = rb_str_new(liquidTemplateRenderGetBuffer(templateResult), liquidTemplateRenderGetSize(templateResult));
+        liquidFreeTemplateRender(templateResult);
+    }
     return str;
 }
 

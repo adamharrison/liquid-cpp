@@ -101,6 +101,7 @@ extern "C" {
     typedef struct SLiquidProgram { void* program; } LiquidProgram;
     typedef struct SLiquidNode { void* node; } LiquidNode;
     typedef struct SLiquidTemplateRender { void* internal; } LiquidTemplateRender;
+    typedef struct SLiquidProgramRender { char* str; size_t len; } LiquidProgramRender;
 
     typedef enum ELiquidVariableType {
         LIQUID_VARIABLE_TYPE_NIL,
@@ -194,7 +195,7 @@ extern "C" {
     void liquidFreeProgram(LiquidProgram program);
     int liquidCompilerDisassembleProgram(LiquidCompiler compiler, LiquidProgram program, char* buffer, size_t maxSize);
 
-    LiquidTemplateRender liquidRendererRunProgram(LiquidRenderer renderer, void* variableStore, LiquidProgram program, LiquidRendererError* error);
+    LiquidProgramRender liquidRendererRunProgram(LiquidRenderer renderer, void* variableStore, LiquidProgram program, LiquidRendererError* error);
     LiquidTemplateRender liquidRendererRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRendererError* error);
     void* liquidRendererRenderArgument(LiquidRenderer renderer, void* variableStore, LiquidTemplate argument, LiquidRendererError* error);
     typedef void (*LiquidWalkTemplateFunction)(LiquidTemplate tmpl, const LiquidNode node, void* data);

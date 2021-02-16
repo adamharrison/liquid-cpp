@@ -86,18 +86,21 @@ void liquidFreeProgram(LiquidProgram program) {
     delete static_cast<Program*>(program.program);
 }
 
-LiquidTemplateRender liquidRendererRunProgram(LiquidRenderer renderer, void* variableStore, LiquidProgram program, LiquidRendererError* error) {
+LiquidProgramRender liquidRendererRunProgram(LiquidRenderer renderer, void* variableStore, LiquidProgram program, LiquidRendererError* error) {
     if (error)
         error->type = LIQUID_RENDERER_ERROR_TYPE_NONE;
-    std::string* str;
+
+    static_cast<Interpreter*>(renderer.renderer)->buffer.clear();
     try {
-        str = new std::string(std::move(static_cast<Interpreter*>(renderer.renderer)->renderTemplate(*static_cast<Program*>(program.program), Variable({ variableStore }))));
+        static_cast<Interpreter*>(renderer.renderer)->renderTemplate(*static_cast<Program*>(program.program), Variable({ variableStore }), +[](const char* chunk, size_t len, void* data) {
+            static_cast<Interpreter*>(data)->buffer.append(chunk, len);
+        }, renderer.renderer);
     } catch (Renderer::Exception& exp) {
         if (error)
             *error = exp.rendererError;
-        return LiquidTemplateRender({ NULL });
+        return { nullptr, 0 };
     }
-    return LiquidTemplateRender({ str });
+    return { static_cast<Interpreter*>(renderer.renderer)->buffer.data(), static_cast<Interpreter*>(renderer.renderer)->buffer.size() };
 }
 
 

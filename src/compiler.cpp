@@ -1,4 +1,5 @@
 #include <cstring>
+#include <cstdlib>
 
 #include "compiler.h"
 #include "context.h"
@@ -400,13 +401,11 @@ namespace Liquid {
     }
 
     Interpreter::Interpreter(const Context& context) : Renderer(context) {
-        buffers[0].reserve(10*1024);
-        buffers[1].reserve(10*1024);
+        buffer.reserve(10*1024);
         stackPointer = stack;
     }
     Interpreter::Interpreter(const Context& context, LiquidVariableResolver resolver) : Renderer(context, resolver) {
-        buffers[0].reserve(10*1024);
-        buffers[1].reserve(10*1024);
+        buffer.reserve(10*1024);
         stackPointer = stack;
     }
     Interpreter::~Interpreter() {
@@ -611,11 +610,37 @@ namespace Liquid {
     }
 
     string Interpreter::renderTemplate(const Program& prog, Variable store) {
-        buffer = 0;
+        renderTemplate(prog, store, +[](const char* chunk, size_t len, void* data) {
+            static_cast<Interpreter*>(data)->buffer.append(chunk, len);
+        }, this);
+        return buffer;
+    }
+
+    char* itoa(int value, char* result) {
+        char* ptr = result, *ptr1 = result, tmp_char;
+        int tmp_value;
+
+        do {
+            tmp_value = value;
+            value /= 10;
+            *ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz" [35 + (tmp_value - value * 10)];
+        } while ( value );
+
+        // Apply negative sign
+        if (tmp_value < 0) *ptr++ = '-';
+        *ptr-- = '\0';
+        while(ptr1 < ptr) {
+            tmp_char = *ptr;
+            *ptr--= *ptr1;
+            *ptr1++ = tmp_char;
+        }
+        return result;
+    }
+
+    void Interpreter::renderTemplate(const Program& prog, Variable store, void (*callback)(const char* chunk, size_t len, void* data), void* data) {
         mode = Renderer::ExecutionMode::INTERPRETER;
         const unsigned int* instructionPointer = reinterpret_cast<const unsigned int*>(&prog.code[prog.codeOffset]);
         stackPointer = stack;
-        buffers[buffer].clear();
         unsigned int instruction, target;
         long long operand;
         Variable var;
@@ -743,23 +768,30 @@ namespace Liquid {
                 case OP_OUTPUTMEM: {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
                     unsigned int len = *(unsigned int*)&prog.code[operand];
-                    buffers[buffer].append(&prog.code[operand+sizeof(unsigned int)], len);
+                    callback(&prog.code[operand+sizeof(unsigned int)], len, data);
                 } break;
                 case OP_OUTPUT:
                     // This could potentially be made *way* more efficient.
                     switch (registers[target].type) {
-                        case Register::Type::INT:
-                            buffers[buffer].append(std::to_string(registers[target].i));
-                        break;
+                        case Register::Type::INT: {
+                            char buffer[32];
+                            itoa(registers[target].i, buffer);
+                            callback(buffer, strlen(buffer), data);
+                        } break;
                         case Register::Type::BOOL:
-                            buffers[buffer].append(registers[target].b ? "true" : "false");
+                            if (registers[target].b)
+                                callback("true", 4, data);
+                            else
+                                callback("false", 5, data);
                         break;
                         case Register::Type::SHORT_STRING:
-                            buffers[buffer].append(registers[target].buffer, registers[target].length);
+                            callback(registers[target].buffer, registers[target].length, data);
                         break;
-                        case Register::Type::FLOAT:
-                            buffers[buffer].append(std::to_string(registers[target].f));
-                        break;
+                        case Register::Type::FLOAT: {
+                            char buffer[32];
+                            size_t len = sprintf(buffer, "%g", registers[target].f);
+                            callback(buffer, len, data);
+                        } break;
                         case Register::Type::NIL:
                         case Register::Type::VARIABLE:
                         case Register::Type::LONG_STRING:
@@ -803,7 +835,6 @@ namespace Liquid {
                 break;
             }
         }
-        return buffers[0];
     }
 
 

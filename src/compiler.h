@@ -129,8 +129,7 @@ namespace Liquid {
         static constexpr int TOTAL_REGISTERS = 4;
         static constexpr int MAX_FRAMES = 128;
 
-        int buffer = 0;
-        string buffers[2];
+        string buffer;
         Register registers[TOTAL_REGISTERS];
         char* stackPointer;
 
@@ -148,6 +147,7 @@ namespace Liquid {
         void pushStack(Register& reg);
         void pushRegister(Register& reg, const Node& node);
 
+        void renderTemplate(const Program& tmpl, Variable store, void (*)(const char* chunk, size_t len, void* data), void* data);
         string renderTemplate(const Program& tmpl, Variable store);
     };
 }
