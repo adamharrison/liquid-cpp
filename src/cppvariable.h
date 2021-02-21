@@ -309,7 +309,7 @@ namespace Liquid {
             if (type != LIQUID_VARIABLE_TYPE_ARRAY)
                 return false;
             if (limit < 0)
-                limit = (int)a.size() + limit;
+                limit = (int)a.size() + limit + 1;
             if (start < 0)
                 start = 0;
             int endIndex = std::min(start+limit-1, (int)a.size());

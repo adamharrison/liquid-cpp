@@ -688,29 +688,28 @@ TEST(sanity, clang) {
     LiquidTemplate tmpl = liquidParserParseTemplate(parser, buffer, strlen(buffer), nullptr, nullptr, nullptr);
     liquidOptimizeTemplate(optimizer, tmpl, &hash);
 
-    // LiquidTemplateRender result;
-
-    /*result = liquidRendererRenderTemplate(renderer, &hash, tmpl, nullptr);
+    LiquidTemplateRender result = liquidRendererRenderTemplate(renderer, &hash, tmpl, nullptr);
     ASSERT_STREQ(liquidTemplateRenderGetBuffer(result), "asdfjlsjkhgsjlkhglsdfjkgdfhs1fasdfsdf2fasdfsdf3fasdfsdf4fasdfsdf5fasdfsdf6fasdfsdf7fasdfsdf8fasdfsdf9fasdfsdf10fasdfsdf");
     liquidFreeTemplateRender(result);
 
 
-    char target[10*1024];
-    liquidCompilerDisassembleProgram(compiler, program, target, 10*1024);*/
     LiquidProgram program = liquidCompilerCompileTemplate(compiler, tmpl);
+
+    char target[10*1024];
+    liquidCompilerDisassembleProgram(compiler, program, target, 10*1024);
 
     for (int i = 0; i < 100000; ++i) {
         LiquidProgramRender result = liquidRendererRunProgram(renderer, &hash, program, nullptr);
         ASSERT_STREQ(result.str, "asdfjlsjkhgsjlkhglsdfjkgdfhs1fasdfsdf2fasdfsdf3fasdfsdf4fasdfsdf5fasdfsdf6fasdfsdf7fasdfsdf8fasdfsdf9fasdfsdf10fasdfsdf");
     }
 
-    /*liquidFreeProgram(program);
+    liquidFreeProgram(program);
 
     liquidFreeTemplate(tmpl);
     liquidFreeCompiler(compiler);
     liquidFreeRenderer(renderer);
     liquidFreeParser(parser);
-    liquidFreeContext(context);*/
+    liquidFreeContext(context);
 }
 
 TEST(sanity, vm) {
@@ -719,6 +718,20 @@ TEST(sanity, vm) {
     Program program;
     std::string str;
     std::string result;
+
+    hash[0] = 1;
+    hash[1] = 3;
+    hash[2] = 5;
+    hash[3] = 7;
+
+
+        ast = getParser().parse("{% if a %}asdfghj {{ a }}{% else %}asdfjlsjkhgsjlkhglsdfjkgdfhs{% for i in b %}{{ i }}fasdfsdf{% endfor %}{% endif %}");
+        getOptimizer().optimize(ast, hash);
+        program = getCompiler().compile(ast);
+        result =  getInterpreter().renderTemplate(program, hash);
+        ASSERT_EQ(result, "asdfjlsjkhgsjlkhglsdfjkgdfhs1fasdfsdf3fasdfsdf5fasdfsdf7fasdfsdf");
+
+        hash.clear();
 
 
         ast = getParser().parse("{% if a %}asdfghj {{ a }}{% else %}asdfjlsjkhgsjlkhglsdfjkgdfhs{% for i in (1..10) %}{{ i }}fasdfsdf{% endfor %}{% endif %}");
@@ -732,7 +745,6 @@ TEST(sanity, vm) {
 
         ast = getParser().parse("{% for i in (1..3) %}{{ i }}fasdfsdf{% endfor %}");
         program = getCompiler().compile(ast);
-        getInterpreter().renderTemplate(program, hash);
         result = getInterpreter().renderTemplate(program, hash);
         ASSERT_EQ(result, "1fasdfsdf2fasdfsdf3fasdfsdf");
 
@@ -740,7 +752,6 @@ TEST(sanity, vm) {
 
         ast = getParser().parse("jaslkdjfasdkf {{ a }} kjhdfjkhgsdfg");
         program = getCompiler().compile(ast);
-        getInterpreter().renderTemplate(program, hash);
         result = getInterpreter().renderTemplate(program, hash);
         ASSERT_EQ(result, "jaslkdjfasdkf 1 kjhdfjkhgsdfg");
 

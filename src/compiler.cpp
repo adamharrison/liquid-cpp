@@ -235,6 +235,8 @@ namespace Liquid {
                 return "OP_CALL";
             case OP_RESOLVE:
                 return "OP_RESOLVE";
+            case OP_ITERATE:
+                return "OP_ITERATE";
             case OP_EXIT:
                 return "OP_EXIT";
         }
@@ -358,6 +360,7 @@ namespace Liquid {
             switch (instruction) {
                 case OP_JMP:
                 case OP_JMPFALSE:
+                case OP_ITERATE:
                     *((long long*)&program.code[i]) += program.codeOffset;
                 break;
                 default:
@@ -378,7 +381,7 @@ namespace Liquid {
             int length = *((int*)&program.code[i]);
             result.append(buffer);
             result.append(" \"");
-            result.append(&program.code[i+sizeof(int)], length);
+            result.append((const char*)&program.code[i+sizeof(int)], length);
             result.append("\"");
             result.append("\n");
             i += length + sizeof(int) + 1;
@@ -505,9 +508,16 @@ namespace Liquid {
                         return;
                     }
                 } break;
+                case Register::Type::VARIABLE:
+                    localPointer -= sizeof(unsigned int) + sizeof(void*);
+                    if (idx == i) {
+                        reg.type = regType;
+                        reg.pointer = *(void**)localPointer;
+                        return;
+                    }
+                break;
                 case Register::Type::LONG_STRING:
                 case Register::Type::EXTRA_LONG_STRING:
-                case Register::Type::VARIABLE:
                     assert(false);
                 break;
             }
@@ -543,9 +553,14 @@ namespace Liquid {
                 *((unsigned int*)stackPointer) = (unsigned int)Register::Type::FLOAT;
                 stackPointer += sizeof(unsigned int);
             break;
+            case Register::Type::VARIABLE:
+                *((void**)stackPointer) = reg.pointer;
+                stackPointer += sizeof(void*);
+                *((unsigned int*)stackPointer) = (unsigned int)Register::Type::VARIABLE;
+                stackPointer += sizeof(unsigned int);
+            break;
             case Register::Type::LONG_STRING:
             case Register::Type::EXTRA_LONG_STRING:
-            case Register::Type::VARIABLE:
                 assert(false);
             break;
         }
@@ -571,8 +586,10 @@ namespace Liquid {
                     unsigned int len = type >> 8;
                     stackPointer -= sizeof(unsigned int) + len + (len % 4);
                 } break;
-                case Register::Type::EXTRA_LONG_STRING:
                 case Register::Type::VARIABLE:
+                    stackPointer -= sizeof(unsigned int) + sizeof(void*);
+                break;
+                case Register::Type::EXTRA_LONG_STRING:
                     assert(false);
                 break;
             }
@@ -610,6 +627,7 @@ namespace Liquid {
     }
 
     string Interpreter::renderTemplate(const Program& prog, Variable store) {
+        buffer.clear();
         renderTemplate(prog, store, +[](const char* chunk, size_t len, void* data) {
             static_cast<Interpreter*>(data)->buffer.append(chunk, len);
         }, this);
@@ -637,26 +655,21 @@ namespace Liquid {
         return result;
     }
 
-    void Interpreter::renderTemplate(const Program& prog, Variable store, void (*callback)(const char* chunk, size_t len, void* data), void* data) {
-        mode = Renderer::ExecutionMode::INTERPRETER;
-        const unsigned int* instructionPointer = reinterpret_cast<const unsigned int*>(&prog.code[prog.codeOffset]);
-        stackPointer = stack;
+    bool Interpreter::run(const unsigned char* code, Variable store, void (*callback)(const char* chunk, size_t len, void* data), void* data, const unsigned char* iteration) {
         unsigned int instruction, target;
         long long operand;
-        Variable var;
-        bool finished = false;
         Node node;
-        while (!finished) {
+        while (true) {
             instruction = *instructionPointer++;
             target = instruction >> 8;
             switch (instruction & 0xFF) {
                 case OP_MOVSTR: {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
-                    unsigned int length = *(unsigned int*)&prog.code[operand];
+                    unsigned int length = *(unsigned int*)&code[operand];
                     assert(length < SHORT_STRING_SIZE);
                     registers[target].type = Register::Type::SHORT_STRING;
                     registers[target].length = length;
-                    memcpy(registers[target].buffer, &prog.code[operand+sizeof(unsigned int)], length);
+                    memcpy(registers[target].buffer, &code[operand+sizeof(unsigned int)], length);
                     registers[target].buffer[length] = 0;
                 } break;
                 case OP_MOVBOOL: {
@@ -699,7 +712,7 @@ namespace Liquid {
                 } break;
                 case OP_JMP:
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
-                    instructionPointer = reinterpret_cast<const unsigned int*>(&prog.code[operand]);
+                    instructionPointer = reinterpret_cast<const unsigned int*>(&code[operand]);
                 break;
                 case OP_CALL: {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
@@ -709,7 +722,7 @@ namespace Liquid {
                 } break;
                 case OP_RESOLVE: {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
-                    var = operand == 0 ? (void*)store : registers[operand].pointer;
+                    Variable var = operand == 0 ? (void*)store : registers[operand].pointer;
                     Register& reg = registers[target];
                     bool success = false;
                     switch (reg.type) {
@@ -765,10 +778,31 @@ namespace Liquid {
                 case OP_ASSIGN:
 
                 break;
+                case OP_ITERATE: {
+                    if (iteration == (const unsigned char*)instructionPointer) {
+                        instructionPointer += 2;
+                        return true;
+                    }
+                    // TODO: This is a bit of a hack. Probably should allow for an iterator context which will allow us to call this non-recursively.
+                    operand = *((long long*)instructionPointer);
+                    Register& reg = registers[target];
+                    void* pointers[] = { this, const_cast<unsigned char*>(code), store.pointer, (void*)callback, data, const_cast<unsigned int*>(instructionPointer) };
+                    instructionPointer += 2;
+                    Variable var = reg.pointer == nullptr ? (void*)store : reg.pointer;
+                    variableResolver.iterate(LiquidRenderer { this }, var, +[](void* variable, void* data){
+                        void** pointers = (void**)data;
+                        Interpreter* interpreter = (Interpreter*)pointers[0];
+                        interpreter->registers[0].type = Register::Type::VARIABLE;
+                        interpreter->registers[0].pointer = variable;
+                        interpreter->run((const unsigned char*)pointers[1], Variable { pointers[2] }, (void (*)(const char*, size_t, void*))pointers[3], pointers[4], (const unsigned char*)pointers[5]);
+                        return true;
+                    }, pointers, 0, -1, false);
+                    instructionPointer = reinterpret_cast<const unsigned int*>(&code[operand]);
+                } break;
                 case OP_OUTPUTMEM: {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
-                    unsigned int len = *(unsigned int*)&prog.code[operand];
-                    callback(&prog.code[operand+sizeof(unsigned int)], len, data);
+                    unsigned int len = *(unsigned int*)&code[operand];
+                    callback((const char*)&code[operand+sizeof(unsigned int)], len, data);
                 } break;
                 case OP_OUTPUT:
                     // This could potentially be made *way* more efficient.
@@ -792,10 +826,25 @@ namespace Liquid {
                             size_t len = sprintf(buffer, "%g", registers[target].f);
                             callback(buffer, len, data);
                         } break;
-                        case Register::Type::NIL:
-                        case Register::Type::VARIABLE:
+                        case Register::Type::VARIABLE: {
+                            long long len = variableResolver.getStringLength(LiquidRenderer { this }, registers[target].pointer);
+                            if (len > 0) {
+                                if (len < 4096) {
+                                    char buffer[4096];
+                                    variableResolver.getString(LiquidRenderer { this }, registers[target].pointer, buffer);
+                                    callback(buffer, len, data);
+                                } else {
+                                    vector<char> buffer;
+                                    buffer.resize(len);
+                                    variableResolver.getString(LiquidRenderer { this }, registers[target].pointer, &buffer[0]);
+                                    callback(buffer.data(), len, data);
+                                }
+                            }
+                        } break;
+                        case Register::Type::NIL: break;
                         case Register::Type::LONG_STRING:
                         case Register::Type::EXTRA_LONG_STRING:
+                            assert(false);
                         break;
                     }
                 break;
@@ -824,17 +873,22 @@ namespace Liquid {
                         break;
                     }
                     if (!shouldJump)
-                        instructionPointer = reinterpret_cast<const unsigned int*>(&prog.code[operand]);
+                        instructionPointer = reinterpret_cast<const unsigned int*>(&code[operand]);
                 } break;
                 case OP_EXIT:
-                    finished = true;
-                break;
+                    return false;
                 default:
-                    fprintf(stderr,"TYPE: %d\n", instruction & 0xFF);
                     assert(false);
                 break;
             }
         }
+    }
+
+    void Interpreter::renderTemplate(const Program& prog, Variable store, void (*callback)(const char* chunk, size_t len, void* data), void* data) {
+        mode = Renderer::ExecutionMode::INTERPRETER;
+        instructionPointer = reinterpret_cast<const unsigned int*>(&prog.code[prog.codeOffset]);
+        stackPointer = stack;
+        run(prog.code.data(), store, callback, data);
     }
 
 

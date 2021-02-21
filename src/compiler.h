@@ -39,6 +39,7 @@ namespace Liquid {
         OP_JMPFALSE,    // Jumps to the instruction if primary register is false.
         OP_CALL,        // Calls the function specified with the amount of arugments on the stack.
         OP_RESOLVE,     // Resovles the named variable in the register and places it into the same register. Operand is either 0x0, for the top-level context, or a register, which contains the context for the next deference.,
+        OP_ITERATE,     // Iterates through the variable in the specified register, and pops the value into 0x0. If iteration is over, JMPs to the specified instruction.
         OP_EXIT         // Quits the program.
     };
 
@@ -50,12 +51,12 @@ namespace Liquid {
     // Then comes the actual code segment.
     struct Program {
         unsigned int codeOffset;
-        std::vector<char> code;
+        std::vector<unsigned char> code;
     };
 
     struct Compiler {
-        std::vector<char> data;
-        std::vector<char> code;
+        std::vector<unsigned char> data;
+        std::vector<unsigned char> code;
         int freeRegister;
         std::unordered_map<long long, int> existingStrings;
 
@@ -130,7 +131,9 @@ namespace Liquid {
         static constexpr int MAX_FRAMES = 128;
 
         string buffer;
+
         Register registers[TOTAL_REGISTERS];
+        const unsigned int* instructionPointer;
         char* stackPointer;
 
         int frames[MAX_FRAMES];
@@ -146,6 +149,8 @@ namespace Liquid {
         void popStack(int i);
         void pushStack(Register& reg);
         void pushRegister(Register& reg, const Node& node);
+
+        bool run(const unsigned char* code, Variable store, void (*callback)(const char* chunk, size_t len, void* data), void* data, const unsigned char* iteration = nullptr);
 
         void renderTemplate(const Program& tmpl, Variable store, void (*)(const char* chunk, size_t len, void* data), void* data);
         string renderTemplate(const Program& tmpl, Variable store);

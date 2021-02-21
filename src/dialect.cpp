@@ -503,32 +503,62 @@ namespace Liquid {
             // Create loop index variable, (and reference to current variable in future), on the stack.
             const Node& group = *node.children[0].get()->children[0]->children[1].get();
             const Node& sequence = group.type && group.type->type == NodeType::Type::GROUP ? *group.children[0].get() : group;
-            assert(sequence.type && sequence.children.size() == 2);
-            compiler.compileBranch(*sequence.children[1].get());
-            compiler.add(OP_INC, compiler.freeRegister - 1);
-            compiler.addPush(compiler.freeRegister - 1);
-            compiler.compileBranch(*sequence.children[0].get());
-            compiler.addPush(compiler.freeRegister - 1);
-            compiler.freeRegister = 0;
-            const Node& variable = *node.children[0].get()->children[0]->children[0].get();
-            compiler.addDropFrame(variable.children[0].get()->variant.s, +[](Compiler& compiler, Compiler::DropFrameState& state) {
-                int negativeOffset = state.stackPoint - compiler.stackSize;
-                compiler.add(OP_STACK, 0x0, negativeOffset - 1);
-                return 0;
-            });
-            int entryPointJmp = compiler.add(OP_JMP, 0x0, 0x0);
-            int topLoop = compiler.add(OP_STACK, 0x0, -1);
-            compiler.add(OP_STACK, 0x1, -2);
-            compiler.add(OP_INC, 0x0);
-            compiler.add(OP_POP, 0x0, 0x1);
-            compiler.add(OP_PUSH, 0x0);
-            int entryPoint = compiler.add(OP_SUB, 0x1);
-            compiler.modify(entryPointJmp, OP_JMP, 0x0, entryPoint);
-            int endLoopJmp = compiler.add(OP_JMPFALSE, 0x0, 0x0);
-            compiler.compileBranch(*node.children[1].get());
-            compiler.add(OP_JMP, 0x0, topLoop);
-            compiler.modify(endLoopJmp, OP_JMPFALSE, 0x0, compiler.currentOffset());
-            compiler.addPop(2);
+
+            if (sequence.type && sequence.type->type == NodeType::Type::VARIABLE) {
+                compiler.compileBranch(sequence);
+                compiler.addPush(0x0);
+                compiler.add(OP_MOVNIL, 0x0);
+                compiler.addPush(0x0);
+                compiler.add(OP_MOVINT, 0x0, 0);
+                compiler.addPush(0x0);
+                compiler.freeRegister = 0;
+                const Node& variable = *node.children[0].get()->children[0]->children[0].get();
+                compiler.addDropFrame(variable.children[0].get()->variant.s, +[](Compiler& compiler, Compiler::DropFrameState& state) {
+                    int negativeOffset = state.stackPoint - compiler.stackSize;
+                    compiler.add(OP_STACK, 0x0, negativeOffset - 2);
+                    return 0;
+                });
+                // Counter
+                int topLoop = compiler.add(OP_STACK, 0x1, -1);
+                // Variable Context
+                compiler.add(OP_STACK, 0x2, -3);
+                int iterationInstruction = compiler.add(OP_ITERATE, 0x2, 0x0);
+                compiler.add(OP_POP, 0x0, 0x2);
+                compiler.add(OP_PUSH, 0x0);
+                compiler.add(OP_INC, 0x1);
+                compiler.add(OP_PUSH, 0x1);
+                compiler.compileBranch(*node.children[1].get());
+                compiler.add(OP_JMP, 0x0, topLoop);
+                compiler.modify(iterationInstruction, OP_ITERATE, 0x2, compiler.currentOffset());
+                compiler.addPop(3);
+            } else {
+                assert(sequence.type && sequence.children.size() == 2);
+                compiler.compileBranch(*sequence.children[1].get());
+                compiler.add(OP_INC, compiler.freeRegister - 1);
+                compiler.addPush(compiler.freeRegister - 1);
+                compiler.compileBranch(*sequence.children[0].get());
+                compiler.addPush(compiler.freeRegister - 1);
+                compiler.freeRegister = 0;
+                const Node& variable = *node.children[0].get()->children[0]->children[0].get();
+                compiler.addDropFrame(variable.children[0].get()->variant.s, +[](Compiler& compiler, Compiler::DropFrameState& state) {
+                    int negativeOffset = state.stackPoint - compiler.stackSize;
+                    compiler.add(OP_STACK, 0x0, negativeOffset - 1);
+                    return 0;
+                });
+                int entryPointJmp = compiler.add(OP_JMP, 0x0, 0x0);
+                int topLoop = compiler.add(OP_STACK, 0x0, -1);
+                compiler.add(OP_STACK, 0x1, -2);
+                compiler.add(OP_INC, 0x0);
+                compiler.add(OP_POP, 0x0, 0x1);
+                compiler.add(OP_PUSH, 0x0);
+                int entryPoint = compiler.add(OP_SUB, 0x1);
+                compiler.modify(entryPointJmp, OP_JMP, 0x0, entryPoint);
+                int endLoopJmp = compiler.add(OP_JMPFALSE, 0x0, 0x0);
+                compiler.compileBranch(*node.children[1].get());
+                compiler.add(OP_JMP, 0x0, topLoop);
+                compiler.modify(endLoopJmp, OP_JMPFALSE, 0x0, compiler.currentOffset());
+                compiler.addPop(2);
+            }
         }
     };
 
