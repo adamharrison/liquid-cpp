@@ -693,7 +693,16 @@ TEST(sanity, error) {
     });
     ASSERT_EQ(getParser().errors.size(), 1);
 
-
+    auto context = liquidCreateContext();
+    liquidImplementPermissiveStandardDialect(context);
+    auto parser = liquidCreateParser(context);
+    LiquidLexerError lexerError;
+    LiquidParserError parserError;
+    LiquidTemplate tmpl = liquidParserParseTemplate(parser, "sdfosidfj{{ fasdf", sizeof("sdfosidfj{{ fasdf")-1, "", &lexerError, &parserError);
+    ASSERT_TRUE(!tmpl.ast);
+    liquidFreeTemplate(tmpl);
+    liquidFreeParser(parser);
+    liquidFreeContext(context);
 }
 
 #ifdef LIQUID_INCLUDE_RAPIDJSON_VARIABLE

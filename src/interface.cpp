@@ -62,7 +62,9 @@ LiquidTemplate liquidParserParseTemplate(LiquidParser parser, const char* buffer
     try {
         tmpl = static_cast<Parser*>(parser.parser)->parse(buffer, size, file);
     } catch (Parser::Exception& exp) {
-        if (parserError)
+        if (lexerError)
+            *lexerError = exp.lexerError;
+        if (parserError && exp.parserErrors.size() > 0)
             *parserError = exp.parserErrors[0];
         return LiquidTemplate({ NULL });
     }
