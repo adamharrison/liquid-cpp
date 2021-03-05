@@ -154,6 +154,14 @@ TEST(sanity, whitespace) {
     std::string str;
     hash["b"] = 2;
     variable["a"] = std::move(hash);
+
+
+
+    // UTF-8 whitespace.
+    ast = getParser().parse("asdbfsdf             {{- 1 -}}b");
+    str = getRenderer().render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf1b");
+
     ast = getParser().parse("asdbfsdf        {{ 1 }} b");
     str = getRenderer().render(ast, variable);
     ASSERT_EQ(str, "asdbfsdf        1 b");
@@ -168,6 +176,7 @@ TEST(sanity, whitespace) {
     ast = getParser().parse("asdbfsdf        {{- 1 -}}b");
     str = getRenderer().render(ast, variable);
     ASSERT_EQ(str, "asdbfsdf1b");
+
 }
 
 
@@ -646,6 +655,10 @@ TEST(sanity, malicious) {
     CPPVariable hash, order, transaction;
     Node ast;
     std::string str;
+
+    ast = getParser().parse("{{ nil | default: a: 2 | sort | json }}");
+    str = getRenderer().render(ast, hash);
+
 
     ASSERT_ANY_THROW(ast = getParser().parse("{% assign a = (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((( %}"));
 }
