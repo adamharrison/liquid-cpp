@@ -404,6 +404,18 @@ TEST(sanity, filters) {
     Node ast;
     std::string str;
 
+    struct TestingFilter : FilterNodeType {
+        TestingFilter() : FilterNodeType("testing", -1, -1, true) { }
+    };
+    getContext().registerType<TestingFilter>();
+
+    hash["a"] = 1;
+    ast = getParser().parse("{% assign a = a | testing: a: 2 %}{{ a }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "");
+
+
+
     hash["a"] = "A B C";
     ast = getParser().parse("{% assign a = a | split: \" \" %}{{ a | size }}");
     str = getRenderer().render(ast, hash);

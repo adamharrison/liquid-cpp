@@ -11,6 +11,27 @@ namespace Liquid {
             parser.nodes.back()->children.push_back(nullptr);
             return true;
         }
+        if (parser.filterState == Parser::EFilterState::ARGUMENTS) {
+            auto qualifierNode = make_unique<Node>(context.getFilterWildcardQualifierNodeType());
+            // Check to see if the parent filter has the ability to have wildcard qualifiers.
+            for (auto it = parser.nodes.rbegin(); it != parser.nodes.rend(); ++it) {
+                if ((*it)->type && (*it)->type->type == NodeType::Type::FILTER) {
+                    if (!static_cast<const FilterNodeType*>((*it)->type)->allowsWildcardQualifiers) {
+                        parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS, ":"));
+                        return false;
+                    }
+                    break;
+                }
+            }
+            // Only applies if the variable has a single underlying string that qualifies it.
+            if (parser.nodes.back()->children.size() != 1 || parser.nodes.back()->children.front()->type || parser.nodes.back()->children.front()->variant.type != Variant::Type::STRING) {
+                parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL, ":"));
+                return false;
+            }
+            qualifierNode->children.push_back(move(parser.nodes.back()));
+            qualifierNode->children.push_back(nullptr);
+            parser.nodes.back() = move(qualifierNode);
+        }
         if (parser.nodes.back()->type && parser.nodes.back()->type->type == NodeType::Type::QUALIFIER) {
             if (static_cast<const TagNodeType::QualifierNodeType*>(parser.nodes.back()->type)->arity == TagNodeType::QualifierNodeType::Arity::NONARY) {
                 parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_OPERAND, parser.nodes.back()->type->symbol));
@@ -238,7 +259,7 @@ namespace Liquid {
                     return parser.pushNode(move(make_unique<Node>(Variant(true))));
                 else if (strncmp(str, "false", len) == 0)
                     return parser.pushNode(move(make_unique<Node>(Variant(false))));
-                else if (strncmp(str, "null", len) == 0)
+                else if (strncmp(str, "null", len) == 0 || strncmp(str, "nil", len) == 0)
                     return parser.pushNode(move(make_unique<Node>(Variant(nullptr))));
                 auto& lastNode = parser.nodes.back();
                 if (lastNode->type && (lastNode->type->type == NodeType::Type::VARIABLE || lastNode->type->type == NodeType::Type::DOT_FILTER) && !lastNode->children.back().get()) {

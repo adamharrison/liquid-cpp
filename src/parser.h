@@ -96,7 +96,8 @@ namespace Liquid {
             UNSET,
             COLON,
             NAME,
-            ARGUMENTS
+            ARGUMENTS,
+            QUALIFIERS
         };
 
 
