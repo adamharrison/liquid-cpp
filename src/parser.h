@@ -61,6 +61,9 @@ namespace Liquid {
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS:
                         sprintf(buffer, "Invalid arguments for '%s' on line %lu, column %lu; expected %s, got %s.", error.details.args[0], error.details.line, error.details.column, error.details.args[0], error.details.args[1]);
                     break;
+                    case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_QUALIFIER:
+                        sprintf(buffer, "Invalid qualifier for '%s' on line %lu, column %lu.", error.details.args[0], error.details.line, error.details.column);
+                    break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_FILTER:
                         sprintf(buffer, "Unknown filter '%s' on line %lu, column %lu.", error.details.args[0], error.details.line, error.details.column);
                     break;

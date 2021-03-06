@@ -17,7 +17,7 @@ namespace Liquid {
             for (auto it = parser.nodes.rbegin(); it != parser.nodes.rend(); ++it) {
                 if ((*it)->type && (*it)->type->type == NodeType::Type::FILTER) {
                     if (!static_cast<const FilterNodeType*>((*it)->type)->allowsWildcardQualifiers) {
-                        parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS, ":"));
+                        parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_QUALIFIER, (*it)->type->symbol));
                         return false;
                     }
                     break;
