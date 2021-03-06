@@ -77,7 +77,11 @@
 		<Unit filename="ruby/liquidcpp-dir/liquidcpp-dir.gemspec" />
 		<Unit filename="ruby/liquidcpp-dir/t/test.rb" />
 		<Unit filename="ruby/liquidcpp/Rakefile" />
+<<<<<<< HEAD
 		<Unit filename="ruby/liquidcpp/ext/liquidcpp/extconf.rb" />
+=======
+		<Unit filename="ruby/liquidcpp/ext/liquidc/extconf.rb" />
+>>>>>>> main
 		<Unit filename="ruby/liquidcpp/ext/liquidcpp/liquid.c">
 			<Option compilerVar="CC" />
 		</Unit>

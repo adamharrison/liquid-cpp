@@ -27,6 +27,7 @@ extern "C" {
         LIQUID_PARSER_ERROR_TYPE_UNKNOWN_FILTER,
         LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_OPERAND,
         LIQUID_PARSER_ERROR_TYPE_INVALID_ARGUMENTS,
+        LIQUID_PARSER_ERROR_TYPE_INVALID_QUALIFIER,
         // Weird symbol in weird place.
         LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL,
         // Was expecting somthing else, i.e. {{ i + }}; was expecting a number there.

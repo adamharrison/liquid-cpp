@@ -163,6 +163,14 @@ TEST(sanity, whitespace) {
     std::string str;
     hash["b"] = 2;
     variable["a"] = std::move(hash);
+
+
+
+    // UTF-8 whitespace.
+    ast = getParser().parse("asdbfsdf             {{- 1 -}}b");
+    str = getRenderer().render(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf1b");
+
     ast = getParser().parse("asdbfsdf        {{ 1 }} b");
     str = getRenderer().render(ast, variable);
     ASSERT_EQ(str, "asdbfsdf        1 b");
@@ -177,6 +185,7 @@ TEST(sanity, whitespace) {
     ast = getParser().parse("asdbfsdf        {{- 1 -}}b");
     str = getRenderer().render(ast, variable);
     ASSERT_EQ(str, "asdbfsdf1b");
+
 }
 
 
@@ -403,6 +412,18 @@ TEST(sanity, filters) {
     CPPVariable hash = { };
     Node ast;
     std::string str;
+
+    struct TestingFilter : FilterNodeType {
+        TestingFilter() : FilterNodeType("testing", -1, -1, true) { }
+    };
+    getContext().registerType<TestingFilter>();
+
+    hash["a"] = 1;
+    ast = getParser().parse("{% assign a = a | testing: a: 2 %}{{ a }}");
+    str = getRenderer().render(ast, hash);
+    ASSERT_EQ(str, "");
+
+
 
     hash["a"] = "A B C";
     ast = getParser().parse("{% assign a = a | split: \" \" %}{{ a | size }}");
@@ -656,6 +677,10 @@ TEST(sanity, malicious) {
     Node ast;
     std::string str;
 
+    ast = getParser().parse("{{ nil | default: a: 2 | sort | json }}");
+    str = getRenderer().render(ast, hash);
+
+
     ASSERT_ANY_THROW(ast = getParser().parse("{% assign a = (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((( %}"));
 }
 
@@ -815,7 +840,16 @@ TEST(sanity, error) {
     });
     ASSERT_EQ(getParser().errors.size(), 1);
 
-
+    auto context = liquidCreateContext();
+    liquidImplementPermissiveStandardDialect(context);
+    auto parser = liquidCreateParser(context);
+    LiquidLexerError lexerError;
+    LiquidParserError parserError;
+    LiquidTemplate tmpl = liquidParserParseTemplate(parser, "sdfosidfj{{ fasdf", sizeof("sdfosidfj{{ fasdf")-1, "", &lexerError, &parserError);
+    ASSERT_TRUE(!tmpl.ast);
+    liquidFreeTemplate(tmpl);
+    liquidFreeParser(parser);
+    liquidFreeContext(context);
 }
 
 #ifdef LIQUID_INCLUDE_RAPIDJSON_VARIABLE

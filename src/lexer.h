@@ -77,7 +77,100 @@ namespace Liquid {
         bool openParenthesis() { return true; }
         bool closeParenthesis() { return true; }
 
-        bool isWhitespace(char c) { return c == ' ' || c == '\t' || c == '\n'; }
+        bool isWhitespace(char c) { return isspace(c); }
+        bool isWhitespace(unsigned int c) {
+            switch (c) {
+                case ' ':
+                case '\t':
+                case '\n':
+                case '\r':
+                case 0xc2a0:
+                case 0xe19a80:
+                case 0xe28080:
+                case 0xe28081:
+                case 0xe28082:
+                case 0xe28083:
+                case 0xe28084:
+                case 0xe28085:
+                case 0xe28086:
+                case 0xe28087:
+                case 0xe28088:
+                case 0xe28089:
+                case 0xe2808a:
+                case 0xe2808b:
+                case 0xe280af:
+                case 0xe2819f:
+                case 0xe38080:
+                    return true;
+            }
+            return false;
+        }
+
+        bool isUTF8Character(const char* offset) {
+            return *offset & 0xC0;
+        }
+
+        unsigned int getUTF8Character(const char* offset, const char* end, int* length) {
+            int bytes = 1;
+            int c = *offset++;
+            while ((*offset & 0xC0) == 0x80) {
+                if (++offset >= end)
+                    break;
+                c |= *offset << (8*++bytes);
+            }
+            *length = bytes;
+            return c;
+        }
+
+        // 0 for no, whitespace, if multi-width utf8 character, returns width, otherwise 1.
+        int isWhitespace(const char* offset, const char* end) {
+            if (isUTF8Character(offset)) {
+                int length;
+                unsigned int character = getUTF8Character(offset, end, &length);
+                return isWhitespace(character) ? length : 0;
+            }
+            return isWhitespace(*offset);
+        }
+
+        // Gets the closest actual character, starting on the first character. Doesn't ever go past start.
+        // Given that this is being embedded in large interpreters like perl and ruby; I have no idea what's going to happen
+        // if I just go setting the C locale willy-nilly.
+        // I also don't want to re-write to use C++ strings.
+        // So, I'm literally just going to parse in and look at the 25 or so UTF-8 condepoints that correspond to spaces.
+        // God help me.
+        const char* previousBoundary(const char* start, const char* offset)  {
+            while (offset > start) {
+                if (isWhitespace(*offset))
+                    --offset;
+                else if (isUTF8Character(offset)) {
+                    // Assuming that we're a UTF-8 multibyte string. Currently, that's the only thing we support.
+                    int bytes = 0;
+                    unsigned int c = 0;
+                    while ((*offset & 0xC0) == 0x80) {
+                        c |= ((unsigned char)*offset) << (8*bytes++);
+                        if (--offset < start)
+                            return start;
+                    }
+                    c |= ((unsigned char)*offset) << (8*bytes++);
+                    if (!isWhitespace(c))
+                        return offset;
+                    --offset;
+                } else {
+                    return offset;
+                }
+            }
+            return start;
+        }
+
+        const char* nextBoundary(const char* offset, const char* end) {
+            while (offset < end) {
+                int size = isWhitespace(offset, end);
+                if (size == 0)
+                    return offset;
+                offset += size;
+            }
+            return offset;
+        }
 
         Lexer(const Context& context) : context(context) { }
         ~Lexer() { }
@@ -93,13 +186,14 @@ namespace Liquid {
             return true;
         }
 
-        // Must be a whole file, for now. Should be null-terminated.
+        // Must be a whole file, for now. Should be null-terminated. Treats it as UTF8.
         Error parse(const char* str, size_t size, Lexer::State initialState = State::INITIAL) {
             size_t offset = 0;
             size_t lastInitial = 0;
             size_t i;
             bool ongoing = true;
             line = 1;
+            const char* end = str+size;
             column = 0;
             state = initialState;
             while (ongoing && offset < size) {
@@ -115,7 +209,7 @@ namespace Liquid {
                                 if (offset > 0 && str[offset-1] == '{') {
                                     if (offset-1 < size && str[offset+1] == '-') {
                                         if (offset - lastInitial - 1 > 0) {
-                                            for (i = offset-2; isWhitespace(str[i]); --i);
+                                            i = (size_t)(previousBoundary(str, &str[offset-2]) - str);
                                             static_cast<T*>(this)->literal(&str[lastInitial], i - lastInitial + 1);
                                         }
                                         ongoing = static_cast<T*>(this)->startOutputBlock(true);
@@ -132,7 +226,7 @@ namespace Liquid {
                                 if (offset > 0 && str[offset-1] == '{') {
                                     if (offset-1 < size && str[offset+1] == '-') {
                                         if (offset - lastInitial - 1 > 0) {
-                                            for (i = offset-2; isWhitespace(str[i]); --i);
+                                            i = (size_t)(previousBoundary(str, &str[offset-2]) - str);
                                             static_cast<T*>(this)->literal(&str[lastInitial], i - lastInitial + 1);
                                         }
                                         ++offset;
@@ -142,9 +236,9 @@ namespace Liquid {
                                     }
 
                                     // Check for the raw tag. This is a special lexing halter.
-                                    for (i = offset+1; i < size && isWhitespace(str[i]); ++i);
+                                    i = (size_t)(nextBoundary(&str[offset+1], end) - str);
                                     if (i < size - 4 && strncmp("raw", &str[i], 3) == 0) {
-                                        for (i = i + 4; i < size && isWhitespace(str[i]); ++i);
+                                        i = (size_t)(nextBoundary(&str[i+4], end) - str);
                                         if (i < size && str[i] == '-')
                                             ++i;
                                         if (i >= size - 2 || str[i] != '%' || str[i+1] != '}')
@@ -162,8 +256,9 @@ namespace Liquid {
                     break;
                     case State::OUTPUT:
                     case State::CONTROL: {
-                        for (; isWhitespace(str[offset]) && offset < size; ++offset);
+                        offset = (size_t)(nextBoundary(&str[offset], end) - str);
                         size_t startOfWord = offset, endOfWord;
+                        int bytes = 1;
                         bool isNumber = true;
                         bool isSymbol = true;
                         bool isWord = true;
@@ -189,16 +284,21 @@ namespace Liquid {
                                         processComplete = true;
                                     }
                                 } break;
+                                case '\n':
+                                    ++line;
+                                    column = 0;
+                                    ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                    processComplete = true;
+                                break;
                                 case ' ':
                                 case '\t':
-                                case '\n':
                                     ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
                                     processComplete = true;
                                 break;
                                 case '-':
                                     // Special case: when this is NOT followed by a space, and it's part of a word, this is treated as part of a literal.
                                     if (offset != startOfWord) {
-                                        if (!isWord || offset+1 >= size || isblank(str[offset+1])) {
+                                        if (!isWord || offset+1 >= size || isWhitespace(&str[offset+1], end)) {
                                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
                                             isNumber = false;
                                         }
@@ -250,37 +350,13 @@ namespace Liquid {
                                         isSymbol = false;
                                     }
                                 break;
-                                default:
-                                    // In the case where we change from symbol to word, word to symbol, or from number to either, we process a control chunk and split the thing up.
-                                    isNumber = false;
-                                    if (hasPoint) {
-                                        ongoing = static_cast<T*>(this)->dot();
-                                        processComplete = true;
-                                    } else {
-                                        if (isalpha(str[offset]) || str[offset] == '_') {
-                                            if (!isWord) {
-                                                ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
-                                                processComplete = true;
-                                            } else {
-                                                isSymbol = false;
-                                            }
-                                        } else {
-                                            if (!isSymbol) {
-                                                ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
-                                                processComplete = true;
-                                            } else {
-                                                isWord = false;
-                                            }
-                                        }
-                                    }
-                                break;
                                 case '}': {
                                     if (state == State::CONTROL) {
                                         if (str[offset-1] == '%') {
                                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - (str[offset-2] == '-' ? 2 : 1), isNumber, hasPoint) && static_cast<T*>(this)->endControlBlock(str[offset-2] == '-');
                                             state = State::INITIAL;
                                             if (str[offset-2] == '-')
-                                                for (offset = offset+1; isWhitespace(str[offset]) && offset < size; ++offset);
+                                                offset = (size_t)(nextBoundary(&str[offset+1], end) - str);
                                             else
                                                 ++offset;
                                             lastInitial = offset;
@@ -291,7 +367,7 @@ namespace Liquid {
                                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - (str[offset-2] == '-' ? 2 : 1), isNumber, hasPoint) && static_cast<T*>(this)->endOutputBlock(str[offset-2] == '-');
                                             state = State::INITIAL;
                                             if (str[offset-2] == '-')
-                                                for (offset = offset+1; isWhitespace(str[offset]) && offset < size; ++offset);
+                                                offset = (size_t)(nextBoundary(&str[offset+1], end) - str);
                                             else
                                                 ++offset;
                                             lastInitial = offset;
@@ -299,11 +375,46 @@ namespace Liquid {
                                         }
                                     }
                                 } break;
+                                default:
+                                    unsigned int character;
+                                    if (isUTF8Character(&str[startOfWord])) {
+                                        character = getUTF8Character(&str[startOfWord], end, &bytes);
+                                    } else {
+                                        character = str[offset];
+                                    }
+                                    if (isWhitespace(character)) {
+                                        ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                        processComplete = true;
+                                    } else {
+                                        // In the case where we change from symbol to word, word to symbol, or from number to either, we process a control chunk and split the thing up.
+                                        isNumber = false;
+                                        if (hasPoint) {
+                                            ongoing = static_cast<T*>(this)->dot();
+                                            processComplete = true;
+                                        } else {
+                                            if (isalpha(str[offset]) || str[offset] == '_') {
+                                                if (!isWord) {
+                                                    ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                                    processComplete = true;
+                                                } else {
+                                                    isSymbol = false;
+                                                }
+                                            } else {
+                                                if (!isSymbol) {
+                                                    ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                                    processComplete = true;
+                                                } else {
+                                                    isWord = false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                break;
                             }
                             if (processComplete)
                                 break;
                             else
-                                ++offset;
+                                offset += bytes;
                         }
                         if (offset == size && !processComplete)
                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
@@ -315,9 +426,9 @@ namespace Liquid {
                                 size_t target = offset - 2;
                                 if (str[target] == '-')
                                     --target;
-                                for (; isWhitespace(str[target]); --target);
+                                target = (size_t)(previousBoundary(str, &str[target]) - str);
                                 if (strncmp("endraw", &str[target-5], 6) == 0) {
-                                    for (target = target-6; isWhitespace(str[target]); --target);
+                                    target = (size_t)(previousBoundary(str, &str[target-6]) - str);
                                     bool hasSuppressed = str[target-1] == '-';
                                     if (hasSuppressed)
                                         --target;
@@ -328,7 +439,7 @@ namespace Liquid {
                                         state = State::INITIAL;
                                         ++offset;
                                         if (hasSuppressed)
-                                            for (; isWhitespace(str[offset]) && offset < size; ++offset);
+                                            offset = (size_t)(nextBoundary(&str[offset], end) - str);
                                         lastInitial = offset;
                                         break;
                                     }

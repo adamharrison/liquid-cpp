@@ -135,8 +135,19 @@ namespace Liquid {
     struct FilterNodeType : NodeType {
         int minArguments;
         int maxArguments;
+        bool allowsWildcardQualifiers;
 
-        FilterNodeType(string symbol, int minArguments = -1, int maxArguments = -1, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : NodeType(NodeType::Type::FILTER, symbol, -1, optimization), minArguments(minArguments), maxArguments(maxArguments) { }
+        // Wildcard Qualifier.
+        struct QualifierNodeType : NodeType {
+            QualifierNodeType() : NodeType(NodeType::Type::QUALIFIER, "", 1, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
+            Node render(Renderer& renderer, const Node& node, Variable store) const override { return Node(); }
+        };
+        struct WildcardQualifierNodeType : QualifierNodeType {
+            WildcardQualifierNodeType() { }
+            Node render(Renderer& renderer, const Node& node, Variable store) const override { return Node(); }
+        };
+
+        FilterNodeType(string symbol, int minArguments = -1, int maxArguments = -1, bool allowsWildcardQualifiers = false, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : NodeType(NodeType::Type::FILTER, symbol, -1, optimization), minArguments(minArguments), maxArguments(maxArguments), allowsWildcardQualifiers(allowsWildcardQualifiers) { }
 
         Node getOperand(Renderer& renderer, const Node& node, Variable store) const;
         Node getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const;
@@ -266,6 +277,7 @@ namespace Liquid {
         UnknownFilterNode unknownFilterNodeType;
         ArrayLiteralNode arrayLiteralNodeType;
         ContextBoundaryNode contextBoundaryNodeType;
+        FilterNodeType::WildcardQualifierNodeType filterWildcardQualifierNodeType;
 
         const NodeType* getConcatenationNodeType() const { return &concatenationNodeType; }
         const NodeType* getOutputNodeType() const { return &outputNodeType; }
@@ -276,6 +288,7 @@ namespace Liquid {
         const NodeType* getUnknownFilterNodeType() const { return &unknownFilterNodeType; }
         const NodeType* getArrayLiteralNodeType() const { return &arrayLiteralNodeType; }
         const NodeType* getContextBoundaryNodeType() const { return &contextBoundaryNodeType; }
+        const NodeType* getFilterWildcardQualifierNodeType() const { return &filterWildcardQualifierNodeType; }
 
         NodeType* registerType(unique_ptr<NodeType> type) {
             NodeType* value = type.get();
