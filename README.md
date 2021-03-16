@@ -3,9 +3,9 @@
 
 Install with:
 
-```
-    sudo apt-get -y install git build-essential g++ cmake
-    git clone https://github.com/adamharrison/liquid-cpp.git && cd liquid-cpp && mkdir -p build && cd build && cmake .. && make -j 4 && sudo make install
+```bash
+sudo apt-get -y install git build-essential g++ cmake
+git clone https://github.com/adamharrison/liquid-cpp.git && cd liquid-cpp && mkdir -p build && cd build && cmake .. && make -j 4 && sudo make install
 ```
 
 Build with: `g++ program.cpp -lliquid`
