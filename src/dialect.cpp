@@ -165,7 +165,12 @@ namespace Liquid {
                     target += 2;
                 }
             }
-            node.children.resize(target + (node.children.size() % 2));
+            if (node.children.size() % 2)
+                node = move(*node.children[node.children.size()-1].get());
+            else if (target == 0)
+                node = Node();
+            else
+                node.children.resize(target + (node.children.size() % 2));
             return true;
         }
 
@@ -800,12 +805,19 @@ namespace Liquid {
             return Variant(op2.variant.isTruthy(renderer.context.falsiness));
         }
 
-        bool optimize(Optimizer& optimizer, Node& node, Variable store) {
+        bool optimize(Optimizer& optimizer, Node& node, Variable store) const override {
             if (
                 (!node.children[0].get()->type && !node.children[0].get()->variant.isTruthy(optimizer.renderer.context.falsiness)) ||
                 (!node.children[1].get()->type && !node.children[1].get()->variant.isTruthy(optimizer.renderer.context.falsiness))
             ) {
                 node = Variant(false);
+                return true;
+            }
+            if (
+                (!node.children[0].get()->type && node.children[0].get()->variant.isTruthy(optimizer.renderer.context.falsiness)) &&
+                (!node.children[1].get()->type && node.children[1].get()->variant.isTruthy(optimizer.renderer.context.falsiness))
+            ) {
+                node = Variant(true);
                 return true;
             }
             return false;
@@ -822,12 +834,19 @@ namespace Liquid {
             return Variant(op2.variant.isTruthy(renderer.context.falsiness));
         }
 
-        bool optimize(Optimizer& optimizer, Node& node, Variable store) {
+        bool optimize(Optimizer& optimizer, Node& node, Variable store) const override {
             if (
                 (!node.children[0].get()->type && node.children[0].get()->variant.isTruthy(optimizer.renderer.context.falsiness)) ||
                 (!node.children[1].get()->type && node.children[1].get()->variant.isTruthy(optimizer.renderer.context.falsiness))
             ) {
                 node = Variant(true);
+                return true;
+            }
+            if (
+                (!node.children[0].get()->type && !node.children[0].get()->variant.isTruthy(optimizer.renderer.context.falsiness)) &&
+                (!node.children[1].get()->type && !node.children[1].get()->variant.isTruthy(optimizer.renderer.context.falsiness))
+            ) {
+                node = Variant(false);
                 return true;
             }
             return false;

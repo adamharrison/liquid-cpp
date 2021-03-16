@@ -1001,15 +1001,23 @@ TEST(sanity, unparser) {
     registeredType->userRenderFunction = +[](LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) { };
     getContext().registerType(move(registeredType));
 
-    /*FILE* file = fopen("/tmp/test", "rb");
+    CPPVariable theme, hash;
+    theme["name"] = "Supply";
+    hash["theme"] = move(theme);
+
+
+
+    FILE* file = fopen("/tmp/test", "rb");
     fseek(file, 0, SEEK_END);
     size_t size = ftell(file);
     fseek(file, 0, SEEK_SET);
     string buffer;
     buffer.resize(size);
     fread(&buffer[0], size, 1, file);
-    sleep(10);
-    fprintf(stderr, "WAT: %s\n", getParser().unparse(getParser().parse(buffer, "test")).data());*/
+    ast = getParser().parse(buffer, "test");
+    getOptimizer().optimize(ast, hash);
+    sleep(5);
+    fprintf(stderr, "WAT: %s\n", getParser().unparse(ast).data());
 }
 
 int main(int argc, char **argv) {
