@@ -155,7 +155,7 @@ namespace Liquid {
             string englishDefault;
 
             Exception(const vector<Parser::Error>& errors) : parserErrors(errors) {
-                englishDefault = Parser::Error::english(parserErrors[0]).c_str();
+                englishDefault = Parser::Error::english(parserErrors[errors.size()-1]).c_str();
             }
             Exception(const Lexer::Error& error) : lexerError(error) {
                 englishDefault = Lexer::Error::english(lexerError);
@@ -194,6 +194,10 @@ namespace Liquid {
         Node parse(const string& str, const std::string& file = "") {
             return parse(str.data(), str.size(), file);
         }
+
+        // Unparses the tree into text. Useful when used with optimization.
+        void unparse(const Node& node, std::string& target, Parser::State state = Parser::State::NODE);
+        std::string unparse(const Node& node) { std::string target; unparse(node, target); return target; }
     };
 }
 

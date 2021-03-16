@@ -100,6 +100,7 @@ namespace Liquid {
         void assign(double f) { clear(); this->f = f; type = LIQUID_VARIABLE_TYPE_FLOAT; }
         void assign(const string& s) { clear(); new(&this->s) string(); this->s = s; type = LIQUID_VARIABLE_TYPE_STRING; }
         void assign(const char* s) { assign(string(s)); }
+        void assign(std::nullptr_t) { clear(); }
         void assign(const vector<unique_ptr<CPPVariable>>& a) {
             clear();
             new(&this->a) vector<unique_ptr<CPPVariable>>();
@@ -187,6 +188,7 @@ namespace Liquid {
 
         CPPVariable& operator = (const std::string& s) { assign(s); return *this; }
         CPPVariable& operator = (const char* s) { assign(std::string(s)); return *this; }
+        CPPVariable& operator = (std::nullptr_t) { assign(nullptr); return *this; }
         CPPVariable& operator = (double f) { assign(f); return *this; }
         CPPVariable& operator = (bool b) { assign(b); return *this; }
         CPPVariable& operator = (long long i) { assign(i); return *this; }

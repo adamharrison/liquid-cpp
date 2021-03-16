@@ -82,6 +82,14 @@ int liquidCompilerDisassembleProgram(LiquidCompiler compiler, LiquidProgram prog
     return copied;
 }
 
+int liquidParserUnparseTemplate(LiquidParser parser, LiquidTemplate tmpl, char* buffer, size_t maxSize) {
+    string unparse = static_cast<Parser*>(parser.parser)->unparse(*static_cast<Node*>(tmpl.ast));
+    size_t copied = std::min(maxSize, unparse.size());
+    strncpy(buffer, unparse.data(), copied);
+    unparse[copied-1] = 0;
+    return copied;
+}
+
 void liquidFreeProgram(LiquidProgram program) {
     delete static_cast<Program*>(program.program);
 }

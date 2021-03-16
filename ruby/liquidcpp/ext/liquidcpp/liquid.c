@@ -615,6 +615,21 @@ VALUE method_liquidCParserParseArgument(int argc, VALUE* argv, VALUE self) {
 
 
 
+VALUE method_liquidCParserUnparseTemplate(VALUE self, VALUE incomingTemplate) {
+    LiquidParser* parser;
+    LiquidTemplate* tmpl;
+    char buffer[100*1024];
+    int size;
+
+    TypedData_Get_Struct(self, LiquidParser, &liquidCParser_type, parser);
+    TypedData_Get_Struct(incomingTemplate, LiquidTemplate, &liquidCTemplate_type, tmpl);
+
+    size = liquidParserUnparseTemplate(*parser, *tmpl, buffer, sizeof(buffer));
+    return rb_str_new(buffer, size);
+}
+
+
+
 VALUE method_liquidCParserWarnings(VALUE self) {
     LiquidParser* parser;
     LiquidParserWarning warning;
@@ -891,6 +906,7 @@ void Init_liquidcpp() {
     rb_define_method(liquidCParser, "parseTemplate", method_liquidCParserParseTemplate, -1);
     rb_define_method(liquidCParser, "parseArgument", method_liquidCParserParseArgument, -1);
     rb_define_method(liquidCParser, "parseAppropriate", method_liquidCParserParseAppropriate, -1);
+    rb_define_method(liquidCParser, "unparseTemplate", method_liquidCParserUnparseTemplate, 1);
     rb_define_method(liquidCParser, "warnings", method_liquidCParserWarnings, 0);
 
 	rb_define_alloc_func(liquidCRenderer, liquidCRenderer_alloc);

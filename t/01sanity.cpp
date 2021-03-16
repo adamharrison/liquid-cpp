@@ -79,6 +79,9 @@ TEST(sanity, subtraction) {
     std::string str;
 
     ast = getParser().parse("asdbfsdf {{ -a }} b");
+
+    fprintf(stderr, "PROGRAM:\n%s\n", getCompiler().disassemble(getCompiler().compile(ast)).data());
+
     str = getRenderer().render(ast, variable);
     ASSERT_EQ(str, "asdbfsdf -3 b");
 
@@ -480,12 +483,34 @@ TEST(sanity, optimizer) {
     Node ast;
     std::string str;
 
-    internal["c"] = "D";
-
-    hash["a"] = internal;
-
     const NodeType* ifNode = getContext().getTagType("if");
     bool atLeastOne = false;
+
+    hash["a"] = 0;
+
+    ast = getParser().parse("{% if a %}{{ a.b }}{% elsif b == 1 %}d{% else %}c{% endif %}");
+
+    ast.walk([ifNode, &atLeastOne](const Node& node) {
+        if (node.type == ifNode)
+            atLeastOne = true;
+    });
+    ASSERT_TRUE(atLeastOne);
+
+    atLeastOne = false;
+    getOptimizer().optimize(ast, hash);
+    ast.walk([ifNode, &atLeastOne](const Node& node) {
+        if (node.type == ifNode)
+            atLeastOne = true;
+    });
+
+    ASSERT_TRUE(atLeastOne);
+
+
+
+
+
+    internal["c"] = "D";
+    hash["a"] = internal;
 
     ast = getParser().parse("{% if a %}{{ a.b }}{% endif %}");
 
@@ -512,6 +537,10 @@ TEST(sanity, optimizer) {
 
     str = getRenderer().render(ast, hash);
     ASSERT_EQ(str, "C");
+
+
+
+    hash["a"] = nullptr;
 }
 
 TEST(sanity, composite) {
@@ -677,8 +706,8 @@ TEST(sanity, malicious) {
     Node ast;
     std::string str;
 
-    ast = getParser().parse("{{ nil | default: a: 2 | sort | json }}");
-    str = getRenderer().render(ast, hash);
+    /*ast = getParser().parse("{{ nil | default: a: 2 | sort | json }}");
+    str = getRenderer().render(ast, hash);*/
 
 
     ASSERT_ANY_THROW(ast = getParser().parse("{% assign a = (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((( %}"));
@@ -920,6 +949,68 @@ TEST(sanity, web) {
 }
 
 #endif
+
+
+TEST(sanity, unparser) {
+    CPPVariable variable;
+    variable["a"] = 3;
+    Node ast;
+
+    ast = getParser().parse("{{ 'asdlkhsdjgasjlk.product.test' | t }}");
+    ASSERT_EQ(getParser().unparse(ast), "{{ \"asdlkhsdjgasjlk.product.test\" | t }}");
+
+
+    ast = getParser().parse("{% if theme.name == \"Test1\" %}1{% elsif theme.name contains \"Test2\" %}3{% endif %}");
+    ASSERT_EQ(getParser().unparse(ast), "{% if theme.name == \"Test1\" %}1{% elsif theme.name contains \"Test2\" %}3{% endif %}");
+
+
+    ast = getParser().parse("{% if theme.name contains 'Brooklyn' %}\
+        productContainer = document.querySelector('.template-collection .grid, .template-search .grid .grid-uniform');\
+    {% elsif theme.name contains 'Narrative' %}\
+        productContainer = document.querySelector('.template-collection .grid:nth-child(2), .template-search .grid');\
+    {% elsif theme.name contains 'Minimal' %}\
+        productContainer = document.querySelector('.template-collection .grid .grid, .template-collection .grid .grid-uniform, .template-search .grid .grid');\
+    {% elsif theme.name contains 'Venture' %}\
+        productContainer = document.querySelector('.template-collection #MainContent .grid--uniform, .template-search #MainContent .grid--uniform');\
+    {% elsif theme.name contains 'Boundless' %}\
+        productContainer = document.querySelector('.template-collection .collection-grid, .template-search .search-template-section .grid--uniform');\
+    {% elsif theme.name contains 'Debut' %}\
+        productContainer = document.querySelector('#Collection .grid, .template-search #MainContent ul');\
+    {% endif %}");
+
+    ASSERT_EQ(getParser().unparse(ast), "{% if theme.name contains \"Brooklyn\" %}\
+        productContainer = document.querySelector('.template-collection .grid, .template-search .grid .grid-uniform');\
+    {% elsif theme.name contains \"Narrative\" %}\
+        productContainer = document.querySelector('.template-collection .grid:nth-child(2), .template-search .grid');\
+    {% elsif theme.name contains \"Minimal\" %}\
+        productContainer = document.querySelector('.template-collection .grid .grid, .template-collection .grid .grid-uniform, .template-search .grid .grid');\
+    {% elsif theme.name contains \"Venture\" %}\
+        productContainer = document.querySelector('.template-collection #MainContent .grid--uniform, .template-search #MainContent .grid--uniform');\
+    {% elsif theme.name contains \"Boundless\" %}\
+        productContainer = document.querySelector('.template-collection .collection-grid, .template-search .search-template-section .grid--uniform');\
+    {% elsif theme.name contains \"Debut\" %}\
+        productContainer = document.querySelector('#Collection .grid, .template-search #MainContent ul');\
+    {% endif %}");
+
+    ast = getParser().parse("asdflkjsdlkhjgkea  sdjlkfasjlkdhgkjhgjlk {{ a }} {% if a > 15 %} {% endif %}");
+    string target = getParser().unparse(ast);
+    //auto str = getRenderer().render(ast, variable);
+    ASSERT_EQ(target, "asdflkjsdlkhjgkea  sdjlkfasjlkdhgkjhgjlk {{ a }} {% if a > 15 %} {% endif %}");
+
+    std::unique_ptr<NodeType> registeredType = make_unique<TagNodeType>(TagNodeType::Composition::ENCLOSED, "stylesheet", 0, 1, LIQUID_OPTIMIZATION_SCHEME_NONE);
+    registeredType->userRenderFunction = +[](LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) { };
+    getContext().registerType(move(registeredType));
+
+    /*FILE* file = fopen("/tmp/test", "rb");
+    fseek(file, 0, SEEK_END);
+    size_t size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    string buffer;
+    buffer.resize(size);
+    fread(&buffer[0], size, 1, file);
+    sleep(10);
+    fprintf(stderr, "WAT: %s\n", getParser().unparse(getParser().parse(buffer, "test")).data());*/
+}
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

@@ -79,9 +79,13 @@ namespace Liquid {
     }
 
     Node NodeType::getChild(Renderer& renderer, const Node& node, Variable store, int idx) const {
-        if (idx >= (int)node.children.size())
-            return Node();
-        return renderer.retrieveRenderedNode(*node.children[idx].get(), store);
+        if (renderer.mode == Renderer::ExecutionMode::INTERPRETER) {
+            return static_cast<Interpreter&>(renderer).getStack(-1 - (idx+1));
+        } else {
+            if (idx >= (int)node.children.size())
+                return Node();
+            return renderer.retrieveRenderedNode(*node.children[idx].get(), store);
+        }
     }
     int NodeType::getChildCount(const Node& node) const {
         return node.children.size();

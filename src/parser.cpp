@@ -255,11 +255,11 @@ namespace Liquid {
                 }
             } break;
             case Parser::State::ARGUMENT: {
-                if (strncmp(str, "true", len) == 0)
+                if (len == 4 && strncmp(str, "true", len) == 0)
                     return parser.pushNode(move(make_unique<Node>(Variant(true))));
-                else if (strncmp(str, "false", len) == 0)
+                else if (len == 5 && strncmp(str, "false", len) == 0)
                     return parser.pushNode(move(make_unique<Node>(Variant(false))));
-                else if (strncmp(str, "null", len) == 0 || strncmp(str, "nil", len) == 0)
+                else if ((len == 4 && (strncmp(str, "null", len) == 0)) || (len == 3 && strncmp(str, "nil", len) == 0))
                     return parser.pushNode(move(make_unique<Node>(Variant(nullptr))));
                 auto& lastNode = parser.nodes.back();
                 if (lastNode->type && (lastNode->type->type == NodeType::Type::VARIABLE || lastNode->type->type == NodeType::Type::DOT_FILTER) && !lastNode->children.back().get()) {
@@ -305,11 +305,14 @@ namespace Liquid {
                         if (parser.filterState == Parser::EFilterState::NAME) {
                             parser.filterState = Parser::EFilterState::COLON;
                             const FilterNodeType* op = context.getFilterType(opName);
-                            if (!op) {
+                            bool unknown = !op;
+                            if (unknown) {
                                 parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_FILTER, opName));
                                 op = static_cast<const FilterNodeType*>(context.getUnknownFilterNodeType());
                             }
                             auto operatorNode = make_unique<Node>(op);
+                            if (unknown)
+                                operatorNode->children.push_back(make_unique<Node>(Variant(opName)));
                             auto& parentNode = parser.nodes[parser.nodes.size()-2];
                             assert(parentNode->type);
                             unique_ptr<Node> variableNode = move(parser.nodes.back());
@@ -597,5 +600,161 @@ namespace Liquid {
         node.children.push_back(std::move(nodes.back()));
         nodes.clear();
         return node;
+    }
+
+    void Parser::unparse(const Node& node, string& target, Parser::State state) {
+        if (node.type) {
+            switch (node.type->type) {
+                case Liquid::NodeType::Type::TAG: {
+                    const TagNodeType* tagNodeType = static_cast<const TagNodeType*>(node.type);
+                    if (tagNodeType->composition == Liquid::TagNodeType::Composition::FREE) {
+                        target.append("{% ");
+                        target.append(tagNodeType->symbol);
+                        bool latch = false;
+                        for (auto& child : node.children[0]->children) {
+                            target.push_back(' ');
+                            if (latch)
+                                target.push_back(',');
+                            unparse(*child.get(), target, Parser::State::ARGUMENT);
+                            latch = true;
+                        }
+                        target.append(" %}");
+                    } else {
+                        const TagNodeType* tagNodeType = static_cast<const TagNodeType*>(node.type);
+                        target.append("{% ");
+                        target.append(tagNodeType->symbol);
+                        bool latch = false;
+                        for (auto& child : node.children[0]->children) {
+                            target.push_back(' ');
+                            if (latch)
+                                target.push_back(',');
+                            unparse(*child.get(), target, Parser::State::ARGUMENT);
+                            latch = true;
+                        }
+                        target.append(" %}");
+                        for (size_t i = 1; i < node.children.size(); ++i)
+                            unparse(*node.children[i].get(), target, Parser::State::NODE);
+                        target.append("{% end");
+                        target.append(tagNodeType->symbol);
+                        target.append(" %}");
+                    }
+                } break;
+                case Liquid::NodeType::Type::GROUP:
+                    target.append("(");
+                    unparse(*node.children[0].get(), target, Parser::State::ARGUMENT);
+                    target.append(")");
+                break;
+                case Liquid::NodeType::GROUP_DEREFERENCE:
+                    target.append("[");
+                    unparse(*node.children[0].get(), target, Parser::State::ARGUMENT);
+                    target.append("]");
+                break;
+                case Liquid::NodeType::Type::OUTPUT:
+                    target.append("{{ ");
+                    unparse(*node.children[0]->children[0].get(), target, Parser::State::ARGUMENT);
+                    target.append(" }}");
+                break;
+                case Liquid::NodeType::Type::OPERATOR: {
+                    const OperatorNodeType* operatorNodeType = static_cast<const OperatorNodeType*>(node.type);
+                    if (operatorNodeType == context.getConcatenationNodeType()) {
+                        for (auto& child : node.children)
+                            unparse(*child.get(), target, Parser::State::NODE);
+                    } else {
+                        switch (operatorNodeType->arity) {
+                            case OperatorNodeType::Arity::UNARY:
+                                target.append(operatorNodeType->symbol);
+                                unparse(*node.children[0].get(), target, Parser::State::ARGUMENT);
+                            break;
+                            case OperatorNodeType::Arity::BINARY:
+                                unparse(*node.children[0].get(), target, Parser::State::ARGUMENT);
+                                target.push_back(' ');
+                                target.append(operatorNodeType->symbol);
+                                target.push_back(' ');
+                                unparse(*node.children[1].get(), target, Parser::State::ARGUMENT);
+                            break;
+                            default:
+                                assert(false);
+                            break;
+                        }
+                    }
+                } break;
+                case Liquid::NodeType::Type::VARIABLE:
+                    for (size_t i = 0; i < node.children.size(); ++i) {
+                        if (i > 0) {
+                            string result;
+                            unparse(*node.children[i].get(), result, Parser::State::ARGUMENT);
+                            if (node.children[i]->type || result[0] == '"' || result[0] == '\'') {
+                                if (result.size() > 0 && !node.children[i]->type && result.find_first_of("\"'", 1) == result.size()-1) {
+                                    target.push_back('.');
+                                    target.append(result, 1, result.size()-2);
+                                } else {
+                                    target.push_back('[');
+                                    target.append(result);
+                                    target.push_back(']');
+                                }
+                            } else {
+                                target.push_back('.');
+                                target.append(result);
+                            }
+                        } else {
+                            assert(node.children[0]->variant.type == Variant::Type::STRING);
+                            target.append(node.children[0]->variant.s);
+                        }
+                    }
+                break;
+                case Liquid::NodeType::Type::FILTER: {
+                    const FilterNodeType* filterNodeType = static_cast<const FilterNodeType*>(node.type);
+                    int offset = 0;
+                    if (filterNodeType == context.getUnknownFilterNodeType()) {
+                        offset = 1;
+                        unparse(*node.children[offset].get(), target, Parser::State::ARGUMENT);
+                        target.append(" | ");
+                        target.append(node.children[0].get()->variant.s);
+                    } else {
+                        unparse(*node.children[offset].get(), target, Parser::State::ARGUMENT);
+                        target.append(" | ");
+                        target.append(filterNodeType->symbol);
+                    }
+                    if (node.children[offset+1]->children.size() > 0) {
+                        target.append(":");
+                        for (size_t i = 0; i < node.children[1]->children.size(); ++i) {
+                            if (i > 0)
+                                target.append(", ");
+                            unparse(*node.children[1]->children[i].get(), target, Parser::State::ARGUMENT);
+                        }
+                    }
+                } break;
+                case Liquid::NodeType::Type::CONTEXTUAL:
+                    unparse(*node.children[1].get(), target, state);
+                break;
+                default:
+                    assert(false);
+                break;
+            }
+        } else {
+            if (state == Parser::State::NODE) {
+                target.append(node.getString());
+            } else {
+                switch (node.variant.type) {
+                    case Variant::Type::STRING: {
+                        target.push_back('"');
+                        size_t start = 0;
+                        while (true) {
+                            size_t i = node.variant.s.find('"', start);
+                            if (i == string::npos)
+                                break;
+                            target.append(node.variant.s, start, i - start);
+                            target.push_back('\\');
+                            start = i;
+                        }
+                        target.append(node.variant.s, start, node.variant.s.size() - start);
+                        target.push_back('"');
+                    } break;
+                    default:
+                        target.append(node.getString());
+                    break;
+                }
+            }
+        }
     }
 }

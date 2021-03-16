@@ -184,6 +184,7 @@ extern "C" {
     LiquidTemplate liquidParserParseTemplate(LiquidParser parser, const char* buffer, size_t size, const char* file, LiquidLexerError* lexer, LiquidParserError* error);
     LiquidTemplate liquidParserParseArgument(LiquidParser parser, const char* buffer, size_t size, LiquidLexerError* lexer, LiquidParserError* error);
     LiquidTemplate liquidParserParseAppropriate(LiquidParser parser, const char* buffer, size_t size, const char* file, LiquidLexerError* lexer, LiquidParserError* error);
+
     void liquidFreeTemplate(LiquidTemplate tmpl);
 
     LiquidOptimizer liquidCreateOptimizer(LiquidRenderer renderer);
@@ -195,6 +196,7 @@ extern "C" {
     LiquidProgram liquidCompilerCompileTemplate(LiquidCompiler compiler, LiquidTemplate tmpl);
     void liquidFreeProgram(LiquidProgram program);
     int liquidCompilerDisassembleProgram(LiquidCompiler compiler, LiquidProgram program, char* buffer, size_t maxSize);
+    int liquidParserUnparseTemplate(LiquidParser parser, LiquidTemplate tmpl, char* buffer, size_t maxSize);
 
     LiquidProgramRender liquidRendererRunProgram(LiquidRenderer renderer, void* variableStore, LiquidProgram program, LiquidRendererError* error);
     LiquidTemplateRender liquidRendererRenderTemplate(LiquidRenderer renderer, void* variableStore, LiquidTemplate tmpl, LiquidRendererError* error);

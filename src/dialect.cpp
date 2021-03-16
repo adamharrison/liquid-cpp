@@ -144,13 +144,28 @@ namespace Liquid {
                 return true;
             }
             // Loop through the elsifs and elses, and anything that's true, run the next concatenation.
+            // If it's false, prune it from the list.
+            size_t target = 0;
             for (size_t i = 2; i < node.children.size()-1; i += 2) {
-                if (!node.children[i+1].get()->type && node.children[i+1].get()->variant.isTruthy(optimizer.renderer.context.falsiness)) {
-                    unique_ptr<Node> ptr = move(node.children[i+1]);
-                    node = move(*ptr.get());
-                    return true;
+                if (!node.children[i].get()->type) {
+                    bool truthy = node.children[i].get()->variant.isTruthy(optimizer.renderer.context.falsiness);
+                    if (INVERSE)
+                        truthy = !truthy;
+                    if (truthy) {
+                        unique_ptr<Node> ptr = move(node.children[i+1]);
+                        node = move(*ptr.get());
+                        return true;
+                    }
+                } else {
+                    if (target == 0)
+                        node.children[target] = move(node.children[i]->children[0]);
+                    else
+                        node.children[target] = move(node.children[i]);
+                    node.children[target+1] = move(node.children[i+1]);
+                    target += 2;
                 }
             }
+            node.children.resize(target + (node.children.size() % 2));
             return true;
         }
 
@@ -643,7 +658,7 @@ namespace Liquid {
         UnaryMinusOperatorNode() : OperatorNodeType("-", Arity::UNARY, 10, Fixness::PREFIX) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Node op1 = getChild(renderer, node, store, 0);
             if (op1.variant.type == Variant::Type::INT)
                 return Variant(op1.variant.i * -1);
             if (op1.variant.type == Variant::Type::FLOAT)
