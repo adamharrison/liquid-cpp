@@ -6,10 +6,12 @@
 #include <liquid/liquid.h>
 
 int main(int argc, char* argv[]) {
-    Liquid::Context context(Liquid::Context::EDialects::PERMISSIVE_STANDARD_DIALECT);
     Liquid::CPPVariable store;
     store["a"] = 10;
-    std::cout << Liquid::Renderer(context).render(Liquid::Parser(context).parse("{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}"), store) << endl;
+    std::string tmpl = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
+
+    Liquid::Context context(Liquid::Context::EDialects::PERMISSIVE_STANDARD_DIALECT);
+    std::cout << Liquid::Renderer(context).render(Liquid::Parser(context).parse(tmpl), store) << endl;
     return 0;
 }
 ```
