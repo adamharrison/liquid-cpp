@@ -761,6 +761,7 @@ TEST(sanity, clang) {
 
     liquidFreeTemplate(tmpl);
     liquidFreeCompiler(compiler);
+    liquidFreeOptimizer(optimizer);
     liquidFreeRenderer(renderer);
     liquidFreeParser(parser);
     liquidFreeContext(context);

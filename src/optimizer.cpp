@@ -3,6 +3,10 @@
 
 namespace Liquid {
 
+    Optimizer::Optimizer(Renderer& renderer) : renderer(renderer) {
+        renderer.currentRenderingDepth = 0;
+    }
+
     void Optimizer::optimize(Node& ast, Variable store) {
         bool hasAnyNonRendered = false;
         if (!ast.type || ast.type->optimization == LIQUID_OPTIMIZATION_SCHEME_SHIELD)

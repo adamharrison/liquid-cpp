@@ -10,7 +10,7 @@ namespace Liquid {
     struct Optimizer {
         Renderer& renderer;
 
-        Optimizer(Renderer& renderer) : renderer(renderer) { }
+        Optimizer(Renderer& renderer);
         void optimize(Node& ast, Variable store);
     };
 }

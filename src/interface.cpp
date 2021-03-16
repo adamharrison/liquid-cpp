@@ -28,8 +28,7 @@ void liquidImplementPermissiveStandardDialect(LiquidContext context) {
 #endif
 
 LiquidRenderer liquidCreateRenderer(LiquidContext context) {
-    Interpreter* interpreter = new Interpreter(*static_cast<Context*>(context.context));
-    interpreter->variableResolver = LiquidVariableResolver {
+    return LiquidRenderer({ new Interpreter(*static_cast<Context*>(context.context), {
         .getType = +[](LiquidRenderer renderer, void* variable) { return LIQUID_VARIABLE_TYPE_NIL; },
         .getBool = +[](LiquidRenderer renderer, void* variable, bool* target) { return false; },
         .getTruthy = +[](LiquidRenderer renderer, void* variable) { return false; },
@@ -54,8 +53,7 @@ LiquidRenderer liquidCreateRenderer(LiquidContext context) {
         .createClone = +[](LiquidRenderer renderer, void* value) { return (void*)NULL; },
         .freeVariable = +[](LiquidRenderer renderer, void* value) { },
         .compare = +[](void* a, void* b) { return 0; }
-    };
-    return LiquidRenderer({ interpreter });
+    }) });
 }
 
 void liquidFreeRenderer(LiquidRenderer renderer) {
