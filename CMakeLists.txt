@@ -21,7 +21,7 @@ target_link_libraries( liquid )
 FILE(GLOB HSources src/*.h)
 include(GNUInstallDirs)
 
-add_definitions(-DLIQUID_INCLUDE_WEB_DIALECT -DLIQUID_INCLUDE_RAPIDJSON_VARIABLE)
+# add_definitions(-DLIQUID_INCLUDE_WEB_DIALECT -DLIQUID_INCLUDE_RAPIDJSON_VARIABLE)
 
 install(TARGETS liquid DESTINATION lib)
 install(FILES ${HSources} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/liquid)

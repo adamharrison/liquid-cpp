@@ -1,11 +1,12 @@
 #include "renderer.h"
 #include "context.h"
+#include "cppvariable.h"
 
 namespace Liquid {
     struct Context;
 
     Renderer::Renderer(const Context& context) : context(context) {
-        memset(&variableResolver, 0, sizeof(LiquidVariableResolver));
+        variableResolver = CPPVariableResolver();
     }
 
     Renderer::Renderer(const Context& context, LiquidVariableResolver variableResolver) : context(context), variableResolver(variableResolver) {

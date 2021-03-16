@@ -190,7 +190,7 @@ namespace Liquid {
         Node parseAppropriate(const char* buffer, size_t len, const std::string& file = "");
         Node parseAppropriate(const std::string& str, const std::string& file = "") { return parseAppropriate(str.data(), str.size()); }
 
-        Node parse(const char* buffer, size_t len, const std::string& file);
+        Node parse(const char* buffer, size_t len, const std::string& file = "");
         Node parse(const string& str, const std::string& file = "") {
             return parse(str.data(), str.size(), file);
         }

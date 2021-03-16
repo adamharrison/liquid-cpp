@@ -360,6 +360,14 @@ namespace Liquid {
 
         void optimize(Node& ast, Variable store);
 
+        enum EDialects {
+            NO_DIALECT                      = 0,
+            STRICT_STANDARD_DIALECT         = 1,
+            PERMISSIVE_STANDARD_DIALECT     = 2,
+            WEB_DIALECT                     = 4
+
+        };
+        Context(int dialects = NO_DIALECT);
     };
 }
 

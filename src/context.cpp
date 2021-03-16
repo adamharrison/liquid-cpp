@@ -1,6 +1,7 @@
 #include "context.h"
 #include "optimizer.h"
 #include "compiler.h"
+#include "dialect.h"
 
 namespace Liquid {
 
@@ -141,4 +142,17 @@ namespace Liquid {
         return true;
     }
 
+    Context::Context(int dialects) {
+        if (dialects & STRICT_STANDARD_DIALECT)
+            StandardDialect::implementStrict(*this);
+        else if (dialects & PERMISSIVE_STANDARD_DIALECT)
+            StandardDialect::implementStrict(*this);
+        else if (dialects & WEB_DIALECT) {
+            #ifdef LIQUID_INCLUDE_WEB_DIALECT
+                WebDialect::implement(*this);
+            #else
+                assert(false);
+            #endif
+        }
+    }
 }

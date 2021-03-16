@@ -28,7 +28,34 @@ void liquidImplementPermissiveStandardDialect(LiquidContext context) {
 #endif
 
 LiquidRenderer liquidCreateRenderer(LiquidContext context) {
-    return LiquidRenderer({ new Interpreter(*static_cast<Context*>(context.context)) });
+    Interpreter* interpreter = new Interpreter(*static_cast<Context*>(context.context));
+    interpreter->variableResolver = LiquidVariableResolver {
+        .getType = +[](LiquidRenderer renderer, void* variable) { return LIQUID_VARIABLE_TYPE_NIL; },
+        .getBool = +[](LiquidRenderer renderer, void* variable, bool* target) { return false; },
+        .getTruthy = +[](LiquidRenderer renderer, void* variable) { return false; },
+        .getString = +[](LiquidRenderer renderer, void* variable, char* target) { return false; },
+        .getStringLength = +[](LiquidRenderer renderer, void* variable) { return 0LL; },
+        .getInteger = +[](LiquidRenderer renderer, void* variable, long long* target) { return false; },
+        .getFloat = +[](LiquidRenderer renderer, void* variable, double* target) { return false; },
+        .getDictionaryVariable = +[](LiquidRenderer renderer, void* variable, const char* key, void** target) { return false; },
+        .getArrayVariable = +[](LiquidRenderer renderer, void* variable, long long idx, void** target) { return false; },
+        .iterate = +[](LiquidRenderer renderer, void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) { return false; },
+        .getArraySize = +[](LiquidRenderer renderer, void* variable) { return 0LL; },
+        .setDictionaryVariable = +[](LiquidRenderer renderer, void* variable, const char* key, void* target) { return (void*)NULL; },
+        .setArrayVariable = +[](LiquidRenderer renderer, void* variable, long long idx, void* target) { return (void*)NULL; },
+        .createHash = +[](LiquidRenderer renderer) { return (void*)NULL; },
+        .createArray = +[](LiquidRenderer renderer) { return (void*)NULL; },
+        .createFloat = +[](LiquidRenderer renderer, double value) { return (void*)NULL; },
+        .createBool = +[](LiquidRenderer renderer, bool value) { return (void*)NULL; },
+        .createInteger = +[](LiquidRenderer renderer, long long value) { return (void*)NULL; },
+        .createString = +[](LiquidRenderer renderer, const char* str) { return (void*)NULL; },
+        .createPointer = +[](LiquidRenderer renderer, void* value) { return (void*)NULL; },
+        .createNil = +[](LiquidRenderer renderer) { return (void*)NULL; },
+        .createClone = +[](LiquidRenderer renderer, void* value) { return (void*)NULL; },
+        .freeVariable = +[](LiquidRenderer renderer, void* value) { },
+        .compare = +[](void* a, void* b) { return 0; }
+    };
+    return LiquidRenderer({ interpreter });
 }
 
 void liquidFreeRenderer(LiquidRenderer renderer) {

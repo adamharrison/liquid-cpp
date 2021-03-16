@@ -1,4 +1,20 @@
 
+## Quickstart
+
+```c++
+#include <iostream>
+#include <liquid/liquid.h>
+
+int main(int argc, char* argv[]) {
+    Liquid::Context context(Liquid::Context::EDialects::PERMISSIVE_STANDARD_DIALECT);
+    Liquid::CPPVariable store;
+    store["a"] = 10;
+    std::cout << Liquid::Renderer(context).render(Liquid::Parser(context).parse("{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}"), store) << endl;
+    return 0;
+}```
+
+Build with: `g++ program.cpp -lliquid`
+
 ## Introduction
 
 A fully featured C++17 parser, renderer and optimizer for [Liquid](https://shopify.github.io/liquid/); Shopify's templating language. It's designed to provide official support for using liquid in the following languages:
@@ -39,7 +55,8 @@ It should also compile on Windows, Mac, and Linux easily.
 
 ### Independent
 
-It should have basically no dependencies, other than the C++ standard library itself.
+It should have basically no dependencies, other than the C++ standard library itself. There is a small dependency of `libcrypto` if you compile the `Web` dialect, but it is not included
+by default.
 
 ### Conformance
 
@@ -47,7 +64,7 @@ It should pass all Shopify's test suites, and act exactly as Shopify liquid, if 
 
 ### Insanity at the Edges
 
-That being said, the deficiencies of the Shopify implementation shouldn't hold it back. It should be extremely easy to toggle extra feaatures;
+That being said, the deficiencies of the Shopify implementation shouldn't hold it back. It should be extremely easy to toggle extra features;
 and a single call should permit `permissive` liquid, which allows for things like expression evaluation in all contexts. All things associated
 with the ruby version of Liquid, like global state, and whatnot, should exist purely as a façade pattern in a standalone Ruby module, which
 requires an underlying ruby module that implements the more modular, sane version.
@@ -66,7 +83,7 @@ Building the library is easy; so long as you have the appropriate build-system; 
 
 It can be built and installed like so, from the main directory:
 
-```mkdir -p build && cd build && cmake .. && make && sudo make install/strip```
+```mkdir -p build && cd build && cmake .. && make && sudo make install```
 
 Eventually, I'll have a .deb that can be downloaded from somewhere for Ubuntu distros, but that's not quite up yet.
 
@@ -75,10 +92,10 @@ Eventually, I'll have a .deb that can be downloaded from somewhere for Ubuntu di
 The C++ library, which is built with the normal Makefile can be linked in as a static library. Will eventually be available as a header-only library.
 
 ```c++
-#include <cstdio>
+#include <iostream>
 #include <liquid/liquid.h>
 
-int(int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
     // The liquid context represents all registered tags, operators, filters, and a way to resolve variables.
     Liquid::Context context;
     // Very few of the bits of liquid are part of the 'core'; instead, they are implemented as dialects. In order to
@@ -99,17 +116,17 @@ int(int argc, char* argv[]) {
     const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
     // Throws an exception if there's a fatal parsing error. Liquid accepts quite a lot by default, so normally this'll be fine.
     // You can query a vector of errors under `parser.errors`.
-    Liquid::Node ast = parser.parseFile(exampleFile, sizeof(exampleFile)-1);
+    Liquid::Node ast = parser.parse(exampleFile, sizeof(exampleFile)-1);
     // Initialize a renderer. These should be thread-local. One renderer can render many templates.
     // Register the standard, out of the box variable implementation that lets us pass a type union'd variant that can hold either a long long, double, pointer, string, vector, or unordered_map<string, ...> .
-    Liquid::Renderer renderer(context, CPPVariableResolver());
+    Liquid::Renderer renderer(context, Liquid::CPPVariableResolver());
 
     Liquid::CPPVariable store;
     store["a"] = 10;
 
     std::string result = renderer.render(ast, store);
-    // Should output "123423"
-    fprintf(stdout, "%s\n", result.data());
+    // Should output `123423`
+    std::coud << result << std::endl;
     return 0;
 }
 ```
@@ -121,10 +138,11 @@ This program should be linked with `-lliquid`.
 The following program below is analogous to the one above, only using the external C interface.
 
 ```c
+
 #include <stdio.h>
 #include <liquid/liquid.h>
 
-int(int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
     LiquidContext context = liquidCreateContext();
     liquidImplementPermissiveStandardDialect(context);
 
@@ -132,7 +150,7 @@ int(int argc, char* argv[]) {
     const char exampleFile[] = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
     LiquidLexerError lexerError;
     LiquidParserError parserError;
-    LiquidTemplate tmpl = liquidParserParseTemplate(parser, examplesFile, sizeof(exampleFile)-1, NULL, &lexerError, &parserError);
+    LiquidTemplate tmpl = liquidParserParseTemplate(parser, exampleFile, sizeof(exampleFile)-1, NULL, &lexerError, &parserError);
     if (lexerError.type) {
         char buffer[512];
         liquidGetLexerErrorMessage(lexerError, buffer, sizeof(buffer));
@@ -158,7 +176,16 @@ int(int argc, char* argv[]) {
 
     // Use something that works with your language here; as resolved by the LiquidVariableResolver above.
     void* variableStore = NULL;
-    LiquidTemplateRender result = liquidRenderTemplate(renderer, variableStore, tmpl);
+    LiquidRendererError rendererError;
+    LiquidTemplateRender result = liquidRendererRenderTemplate(renderer, variableStore, tmpl, &rendererError);
+    if (rendererError.type) {
+        char buffer[512];
+        liquidGetRendererErrorMessage(rendererError, buffer, sizeof(buffer));
+        fprintf(stderr, "Renderer Error: %s\n", buffer);
+        exit(-1);
+    }
+
+    // Should output `sdfjkshdfjkhsdf`.
     fprintf(stdout, "%s\n", liquidTemplateRenderGetBuffer(result));
 
     // All resources, unless otherwise specified, must be free explicitly.
@@ -171,7 +198,7 @@ int(int argc, char* argv[]) {
 }
 ```
 
-This program should be linked with `-lliquid -lstdc++`.
+This program should be linked with `-lliquid -lstdc++ -lm`.
 
 #### Ruby
 
@@ -188,7 +215,7 @@ Currently the package isn't uploaded on rubygems, so it has to be build manually
 There're two ways to get the ruby library working. You can use the OO way, which mirrors the C++ API.
 
 ```ruby
-require 'liquidc'
+require 'liquidcpp'
 context = LiquidCPP.new()
 parser = LiquidCPP::Parser.new(context)
 renderer = LiquidCPP::Renderer.new(context)
@@ -269,6 +296,8 @@ This is what I'm aiming for at any rate.
 * Built-in optimizer that will do things like loop unrolling, conditional elimiation, etc..
 * Togglable extra features, such as real operators, parentheses, etc..
 * Ability to set limits on memory consumed, and time spent rendering.
+* Ability to partially render content, then spit back out the remaining liquid that genreated it, based on an AST tree.
+* UTF-8 aware.
 
 ### Partial
 
@@ -277,14 +306,13 @@ This is what I'm aiming for at any rate.
 
 ### TODO
 
-* Ability to partially render content, then spit back out the remaining liquid that genreated it.
 * General polish pass to clean up reundant code, and ensure consistency across the C, C++, Perl and Ruby APIs.
 
 ## License
 
 ### MIT License
 
-Copyright 2020 Adam Harrison
+Copyright 2021 Adam Harrison
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
