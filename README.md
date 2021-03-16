@@ -1,6 +1,15 @@
 
 ## Quickstart
 
+Install with:
+
+```
+    sudo apt-get -y install git build-essential g++ cmake
+    git clone https://github.com/adamharrison/liquid-cpp.git && cd liquid-cpp && mkdir -p build && cd build && cmake .. && make -j 4 && sudo make install
+```
+
+Build with: `g++ program.cpp -lliquid`
+
 ```c++
 #include <iostream>
 #include <liquid/liquid.h>
@@ -11,12 +20,10 @@ int main(int argc, char* argv[]) {
     std::string tmpl = "{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}";
 
     Liquid::Context context(Liquid::Context::EDialects::PERMISSIVE_STANDARD_DIALECT);
-    std::cout << Liquid::Renderer(context).render(Liquid::Parser(context).parse(tmpl), store) << endl;
+    std::cout << Liquid::Renderer(context).render(Liquid::Parser(context).parse(tmpl), store) << std::endl;
     return 0;
 }
 ```
-
-Build with: `g++ program.cpp -lliquid`
 
 ## Introduction
 
@@ -52,7 +59,7 @@ It should be at least an order of magnitude faster than Ruby liquid, preferably 
 
 ### Portable
 
-It should be dead-easy to implement a new language for the parser, which means a really robust and easy-to-use C interface that can access most, if not all parts of the system.
+It should be dead-easy to implement liquid for a new programming language, which means a really robust and easy-to-use C interface that can access most, if not all parts of the system.
 
 It should also compile on Windows, Mac, and Linux easily.
 
@@ -74,7 +81,7 @@ requires an underlying ruby module that implements the more modular, sane versio
 
 ## Status
 
-In development. Mostly stable. **VM/Compiler/Interpreter, should not be used in production code, yet, though the rest of the library can be.**
+In development. Mostly stable. **VM/Compiler/Interpreter, should not be used in production code, yet, though the rest of the library probably can be, though I make no guarantees.**
 
 Basic memory audits of the core have been done with valgrind, and leaks have been closed. A more extensive battery of tests is required to determine if there's actually any undefined behaviour or further leaks.
 
@@ -122,6 +129,7 @@ int main(int argc, char* argv[]) {
     Liquid::Node ast = parser.parse(exampleFile, sizeof(exampleFile)-1);
     // Initialize a renderer. These should be thread-local. One renderer can render many templates.
     // Register the standard, out of the box variable implementation that lets us pass a type union'd variant that can hold either a long long, double, pointer, string, vector, or unordered_map<string, ...> .
+    // All renders should be thread local.
     Liquid::Renderer renderer(context, Liquid::CPPVariableResolver());
 
     Liquid::CPPVariable store;
@@ -129,7 +137,7 @@ int main(int argc, char* argv[]) {
 
     std::string result = renderer.render(ast, store);
     // Should output `123423`
-    std::coud << result << std::endl;
+    std::cout << result << std::endl;
     return 0;
 }
 ```
