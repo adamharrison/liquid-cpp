@@ -1,7 +1,7 @@
 
 ## Quickstart
 
-Install with:
+Install with (on Debian/Ubuntu-like systems):
 
 ```bash
 sudo apt-get -y install git build-essential g++ cmake
