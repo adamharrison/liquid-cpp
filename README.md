@@ -1,6 +1,8 @@
 
 ## Quickstart
 
+Build with: `g++ program.cpp -lliquid`
+
 ```c++
 #include <iostream>
 #include <liquid/liquid.h>
@@ -13,7 +15,6 @@ int main(int argc, char* argv[]) {
     return 0;
 }```
 
-Build with: `g++ program.cpp -lliquid`
 
 ## Introduction
 
