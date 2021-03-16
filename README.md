@@ -230,13 +230,13 @@ require 'liquidcpp'
 context = LiquidCPP.new()
 parser = LiquidCPP::Parser.new(context)
 renderer = LiquidCPP::Renderer.new(context)
-template = parser.parse("{% if a %}asdfghj {{ a }}{% endif %}")
+template = parser.parseTemplate("{% if a %}asdfghj {{ a }}{% endif %}")
 puts renderer.render({ "a" => 1 }, template)
 ```
 
 Or, alternatively, one can use the "drop in replacement" module, which wraps all this, which will register the exact same constructs as the normal `liquid` gem.
 The advantage of this is that by simply replacing your require statements, you should be able to use your existing code; but it'll be close to an order of magnitude
-faster.
+faster. The gem is currently under construction, and may not match exact Shopify gem behaviour in all circumstances.
 
 ```ruby
 require 'liquidcpp-dir'
