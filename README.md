@@ -3,18 +3,8 @@
 
 Build with: `g++ program.cpp -lliquid`
 
-```c++
-#include <iostream>
-#include <liquid/liquid.h>
 
-int main(int argc, char* argv[]) {
-    Liquid::Context context(Liquid::Context::EDialects::PERMISSIVE_STANDARD_DIALECT);
-    Liquid::CPPVariable store;
-    store["a"] = 10;
-    std::cout << Liquid::Renderer(context).render(Liquid::Parser(context).parse("{% if a > 1 %}123423{% else %}sdfjkshdfjkhsdf{% endif %}"), store) << endl;
-    return 0;
-}```
-
+Test?
 
 ## Introduction
 
