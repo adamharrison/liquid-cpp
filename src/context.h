@@ -227,7 +227,7 @@ namespace Liquid {
         };
 
         struct UnknownFilterNode : FilterNodeType {
-            UnknownFilterNode() : FilterNodeType("", -1, -1) { }
+            UnknownFilterNode() : FilterNodeType("", -1, -1, true, LIQUID_OPTIMIZATION_SCHEME_NONE) { }
 
             Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 if (renderer.logUnknownFilters)

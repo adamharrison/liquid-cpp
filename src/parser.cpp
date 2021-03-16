@@ -745,6 +745,7 @@ namespace Liquid {
                                 break;
                             target.append(node.variant.s, start, i - start);
                             target.push_back('\\');
+                            target.push_back('"');
                             start = i+1;
                         }
                         target.append(node.variant.s, start, node.variant.s.size() - start);
