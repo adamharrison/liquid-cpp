@@ -768,16 +768,16 @@ VALUE method_liquidC_registerDotFilter(VALUE self, VALUE symbol, VALUE optimizat
 
 
 void Init_liquidcpp() {
-	VALUE liquidC, liquidCRenderer, liquidCOptimizer, liquidCParser, liquidCCompiler, liquidCError;
-	liquidC = rb_define_class("LiquidCPP", rb_cData);
-	liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cData);
-	liquidCOptimizer = rb_define_class_under(liquidC, "Optimizer", rb_cData);
-	liquidCTemplate = rb_define_class_under(liquidC, "Template", rb_cData);
-	liquidCParser = rb_define_class_under(liquidC, "Parser", rb_cData);
-	liquidCCompiler = rb_define_class_under(liquidC, "Compiler", rb_cData);
-	liquidCProgram = rb_define_class_under(liquidC, "Program", rb_cData);
+    VALUE liquidC, liquidCRenderer, liquidCOptimizer, liquidCParser, liquidCCompiler, liquidCError;
+    liquidC = rb_define_class("LiquidCPP", rb_cData);
+    liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cData);
+    liquidCOptimizer = rb_define_class_under(liquidC, "Optimizer", rb_cData);
+    liquidCTemplate = rb_define_class_under(liquidC, "Template", rb_cData);
+    liquidCParser = rb_define_class_under(liquidC, "Parser", rb_cData);
+    liquidCCompiler = rb_define_class_under(liquidC, "Compiler", rb_cData);
+    liquidCProgram = rb_define_class_under(liquidC, "Program", rb_cData);
 
-	liquidCError = rb_define_class_under(liquidC, "Error", rb_eStandardError);
+    liquidCError = rb_define_class_under(liquidC, "Error", rb_eStandardError);
     rb_define_attr(liquidCError, "type", 1, 0);
     rb_define_attr(liquidCError, "line", 1, 0);
     rb_define_attr(liquidCError, "column", 1, 0);
@@ -786,21 +786,21 @@ void Init_liquidcpp() {
     rb_define_attr(liquidCError, "file", 1, 0);
     rb_define_method(liquidCError, "initialize", liquidCError_m_initialize, 6);
 
-	liquidCParserError = rb_define_class_under(liquidCParser, "Error", liquidCError);
-	liquidCRendererError = rb_define_class_under(liquidCRenderer, "Error", rb_eStandardError);
+    liquidCParserError = rb_define_class_under(liquidCParser, "Error", liquidCError);
+    liquidCRendererError = rb_define_class_under(liquidCRenderer, "Error", rb_eStandardError);
 
-	rb_define_alloc_func(liquidC, liquidC_alloc);
-	rb_define_method(liquidC, "initialize", liquidC_m_initialize, -1);
-	rb_define_const(liquidC, "OPTIMIZATION_SCHEME_NONE", LL2NUM(LIQUID_OPTIMIZATION_SCHEME_NONE));
-	rb_define_const(liquidC, "OPTIMIZATION_SCHEME_FULL", LL2NUM(LIQUID_OPTIMIZATION_SCHEME_FULL));
-	rb_define_method(liquidC, "registerTag", method_liquidC_registerTag, 6);
-	rb_define_const(liquidC, "TAG_TYPE_ENCLOSING", LL2NUM(LIQUID_TAG_TYPE_ENCLOSING));
-	rb_define_const(liquidC, "TAG_TYPE_FREE", LL2NUM(LIQUID_TAG_TYPE_FREE));
-	rb_define_method(liquidC, "registerFilter", method_liquidC_registerFilter, 5);
+    rb_define_alloc_func(liquidC, liquidC_alloc);
+    rb_define_method(liquidC, "initialize", liquidC_m_initialize, -1);
+    rb_define_const(liquidC, "OPTIMIZATION_SCHEME_NONE", LL2NUM(LIQUID_OPTIMIZATION_SCHEME_NONE));
+    rb_define_const(liquidC, "OPTIMIZATION_SCHEME_FULL", LL2NUM(LIQUID_OPTIMIZATION_SCHEME_FULL));
+    rb_define_method(liquidC, "registerTag", method_liquidC_registerTag, 6);
+    rb_define_const(liquidC, "TAG_TYPE_ENCLOSING", LL2NUM(LIQUID_TAG_TYPE_ENCLOSING));
+    rb_define_const(liquidC, "TAG_TYPE_FREE", LL2NUM(LIQUID_TAG_TYPE_FREE));
+    rb_define_method(liquidC, "registerFilter", method_liquidC_registerFilter, 5);
     rb_define_method(liquidC, "registerOperator", method_liquidC_registerOperator, 4);
     rb_define_method(liquidC, "registerDotFilter", method_liquidC_registerDotFilter, 3);
 
-	rb_define_alloc_func(liquidCParser, liquidCParser_alloc);
+    rb_define_alloc_func(liquidCParser, liquidCParser_alloc);
     rb_define_method(liquidCParser, "initialize", liquidCParser_m_initialize, 1);
     rb_define_method(liquidCParser, "parseTemplate", method_liquidCParserParseTemplate, -1);
     rb_define_method(liquidCParser, "parseArgument", method_liquidCParserParseArgument, -1);
@@ -808,7 +808,7 @@ void Init_liquidcpp() {
     rb_define_method(liquidCParser, "unparseTemplate", method_liquidCParserUnparseTemplate, 1);
     rb_define_method(liquidCParser, "warnings", method_liquidCParserWarnings, 0);
 
-	rb_define_alloc_func(liquidCRenderer, liquidCRenderer_alloc);
+    rb_define_alloc_func(liquidCRenderer, liquidCRenderer_alloc);
     rb_define_method(liquidCRenderer, "initialize", liquidCRenderer_m_initialize, 1);
     rb_define_method(liquidCRenderer, "setStrictVariables", liquidCRendererSetStrictVariables, 1);
     rb_define_method(liquidCRenderer, "setStrictFilters", liquidCRendererSetStrictFilters, 1);
@@ -825,8 +825,8 @@ void Init_liquidcpp() {
     rb_define_method(liquidCCompiler, "decompileProgram", method_liquidCCompiler_decompile, 1);
 
     rb_define_alloc_func(liquidCProgram, liquidCProgram_alloc);
-	rb_define_method(liquidCProgram, "initialize", liquidCProgram_m_initialize, 1);
+    rb_define_method(liquidCProgram, "initialize", liquidCProgram_m_initialize, 1);
 
-	rb_define_alloc_func(liquidCTemplate, liquidCTemplate_alloc);
-	rb_define_method(liquidCTemplate, "initialize", liquidCTemplate_m_initialize, 1);
+    rb_define_alloc_func(liquidCTemplate, liquidCTemplate_alloc);
+    rb_define_method(liquidCTemplate, "initialize", liquidCTemplate_m_initialize, 1);
 }
