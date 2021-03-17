@@ -428,16 +428,29 @@ namespace Liquid {
             return *this;
         }
 
+        // This is more complicated, because of the case where you move one of your children into yourself.
         Node& operator = (Node&& n) {
-            if (type)
-                children.~vector<unique_ptr<Node>>();
-            if (n.type) {
-                new(&children) vector<unique_ptr<Node>>();
-                children = move(n.children);
+            if (type) {
+                if (!n.type) {
+                    Variant v = move(n.variant);
+                    type = n.type;
+                    children.~vector<unique_ptr<Node>>();
+                    new(&variant) Variant(move(v));
+                } else {
+                    type = n.type;
+                    children = move(n.children);
+                }
             } else {
-                new(&variant) Variant(move(n.variant));
+                if (type)
+                    children.~vector<unique_ptr<Node>>();
+                if (n.type) {
+                    new(&children) vector<unique_ptr<Node>>();
+                    children = move(n.children);
+                } else {
+                    new(&variant) Variant(move(n.variant));
+                }
+                type = n.type;
             }
-            type = n.type;
             return *this;
         }
 

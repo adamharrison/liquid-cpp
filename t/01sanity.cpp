@@ -957,6 +957,29 @@ TEST(sanity, unparser) {
     variable["a"] = 3;
     Node ast;
 
+
+    /*std::unique_ptr<NodeType> registeredType = make_unique<TagNodeType>(TagNodeType::Composition::ENCLOSED, "stylesheet", 0, 1, LIQUID_OPTIMIZATION_SCHEME_NONE);
+    registeredType->userRenderFunction = +[](LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) { };
+    getContext().registerType(move(registeredType));
+
+    CPPVariable theme, hash;
+    theme["name"] = "Minimal";
+    hash["theme"] = move(theme);
+
+    FILE* file = fopen("/tmp/test.liquid", "rb");
+    fseek(file, 0, SEEK_END);
+    size_t size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    string buffer;
+    buffer.resize(size);
+    fread(&buffer[0], size, 1, file);
+    ast = getParser().parse(buffer, "test");
+    getOptimizer().optimize(ast, hash);
+//    sleep(5);
+    fprintf(stderr, "WAT: %s\n", getParser().unparse(ast).data());
+    exit(0);*/
+
+
     ast = getParser().parse("{{ 'asdlkhsdjgasjlk.product.test' | t }}");
     ASSERT_EQ(getParser().unparse(ast), "{{ \"asdlkhsdjgasjlk.product.test\" | t }}");
 
@@ -1001,25 +1024,6 @@ TEST(sanity, unparser) {
     //auto str = getRenderer().render(ast, variable);
     ASSERT_EQ(target, "asdflkjsdlkhjgkea  sdjlkfasjlkdhgkjhgjlk {{ a }} {% if a > 15 %} {% endif %}");
 
-    /* std::unique_ptr<NodeType> registeredType = make_unique<TagNodeType>(TagNodeType::Composition::ENCLOSED, "stylesheet", 0, 1, LIQUID_OPTIMIZATION_SCHEME_NONE);
-    registeredType->userRenderFunction = +[](LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) { };
-    getContext().registerType(move(registeredType));
-
-    CPPVariable theme, hash;
-    theme["name"] = "Supply";
-    hash["theme"] = move(theme);
-
-    FILE* file = fopen("/tmp/test", "rb");
-    fseek(file, 0, SEEK_END);
-    size_t size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    string buffer;
-    buffer.resize(size);
-    fread(&buffer[0], size, 1, file);
-    ast = getParser().parse(buffer, "test");
-    getOptimizer().optimize(ast, hash);
-    sleep(5);
-    fprintf(stderr, "WAT: %s\n", getParser().unparse(ast).data());*/
 }
 
 int main(int argc, char **argv) {

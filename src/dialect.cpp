@@ -146,9 +146,10 @@ namespace Liquid {
             // Loop through the elsifs and elses, and anything that's true, run the next concatenation.
             // If it's false, prune it from the list.
             size_t target = 0;
-            for (size_t i = 2; i < node.children.size()-1; i += 2) {
-                if (!node.children[i].get()->type) {
-                    bool truthy = node.children[i].get()->variant.isTruthy(optimizer.renderer.context.falsiness);
+            for (size_t i = 2; i < node.children.size()-2; i += 2) {
+                Node& argumentNode = *node.children[i]->children[0]->children[0].get();
+                if (!argumentNode.type) {
+                    bool truthy = argumentNode.variant.isTruthy(optimizer.renderer.context.falsiness);
                     if (INVERSE)
                         truthy = !truthy;
                     if (truthy) {
@@ -165,10 +166,10 @@ namespace Liquid {
                     target += 2;
                 }
             }
-            if (node.children.size() % 2)
-                node = move(*node.children[node.children.size()-1].get());
-            else if (target == 0)
-                node = Node();
+            const TagNodeType* nodeType = static_cast<const TagNodeType*>(node.type);
+            auto it = nodeType->intermediates.find("else");
+            if (target == 0)
+                node = node.children[node.children.size()-2].get()->type == it->second.get() ? move(*node.children[node.children.size()-1].get()) : Node();
             else
                 node.children.resize(target + (node.children.size() % 2));
             return true;
