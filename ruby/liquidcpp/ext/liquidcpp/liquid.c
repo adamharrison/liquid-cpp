@@ -181,57 +181,17 @@ static int liquidCcompare(void* a, void* b) {
     return NUM2INT(result);
 }
 
-// Type boilerplate.
+
 
 void liquidC_free(void* data) {
     if (((LiquidCRubyContext*)data)->context.context)
         liquidFreeContext(((LiquidCRubyContext*)data)->context);
     free(data);
 }
-void liquidCParser_free(void* data) {
-    if (((LiquidParser*)data)->parser)
-        liquidFreeParser(*((LiquidParser*)data));
-    free(data);
-}
-void liquidCRenderer_free(void* data) {
-    if (((LiquidRenderer*)data)->renderer)
-        liquidFreeRenderer(*((LiquidRenderer*)data));
-    free(data);
-}
-void liquidCTemplate_free(void* data) {
-    if (((LiquidTemplate*)data)->ast)
-        liquidFreeTemplate(*((LiquidTemplate*)data));
-    free(data);
-}
-void liquidCOptimizer_free(void* data) {
-    if (((LiquidOptimizer*)data)->optimizer)
-        liquidFreeOptimizer(*((LiquidOptimizer*)data));
-    free(data);
-}
-void liquidCCompiler_free(void* data) {
-    if (((LiquidCompiler*)data)->compiler)
-        liquidFreeCompiler(*((LiquidCompiler*)data));
-    free(data);
-}
-void liquidCProgram_free(void* data) {
-    if (((LiquidProgram*)data)->program)
-        liquidFreeProgram(*((LiquidProgram*)data));
-    free(data);
-}
-
 void liquidC_mark(void* self) {
     rb_gc_mark(((LiquidCRubyContext*)self)->registeredFunctionArray);
 }
-
-size_t liquidCOptimizer_size(const void* data) { return sizeof(LiquidOptimizer); }
-size_t liquidCTemplate_size(const void* data) { return sizeof(LiquidTemplate); }
 size_t liquidC_size(const void* data) { return sizeof(LiquidCRubyContext); }
-size_t liquidCParser_size(const void* data) { return sizeof(LiquidParser); }
-size_t liquidCRenderer_size(const void* data) { return sizeof(LiquidRenderer); }
-size_t liquidCCompiler_size(const void* data) { return sizeof(LiquidCompiler); }
-size_t liquidCProgram_size(const void* data) { return sizeof(LiquidProgram); }
-
-
 static const rb_data_type_t liquidC_type = {
     .wrap_struct_name = "LiquidC",
     .function = {
@@ -243,105 +203,44 @@ static const rb_data_type_t liquidC_type = {
     .flags = RUBY_TYPED_FREE_IMMEDIATELY
 };
 
-static const rb_data_type_t liquidCRenderer_type = {
-    .wrap_struct_name = "Renderer",
-    .function = {
-            .dmark = NULL,
-            .dfree = liquidCRenderer_free,
-            .dsize = liquidCRenderer_size,
-    },
-    .data = NULL,
-    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
-};
-
-static const rb_data_type_t liquidCParser_type = {
-    .wrap_struct_name = "Parser",
-    .function = {
-            .dmark = NULL,
-            .dfree = liquidCParser_free,
-            .dsize = liquidCParser_size,
-    },
-    .data = NULL,
-    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
-};
-
-static const rb_data_type_t liquidCTemplate_type = {
-    .wrap_struct_name = "Template",
-    .function = {
-            .dmark = NULL,
-            .dfree = liquidCTemplate_free,
-            .dsize = liquidCTemplate_size,
-    },
-    .data = NULL,
-    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
-};
-static const rb_data_type_t liquidCOptimizer_type = {
-    .wrap_struct_name = "Optimizer",
-    .function = {
-            .dmark = NULL,
-            .dfree = liquidCOptimizer_free,
-            .dsize = liquidCOptimizer_size,
-    },
-    .data = NULL,
-    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
-};
-static const rb_data_type_t liquidCCompiler_type = {
-    .wrap_struct_name = "Compiler",
-    .function = {
-            .dmark = NULL,
-            .dfree = liquidCCompiler_free,
-            .dsize = liquidCCompiler_size,
-    },
-    .data = NULL,
-    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
-};
-static const rb_data_type_t liquidCProgram_type = {
-    .wrap_struct_name = "Program",
-    .function = {
-            .dmark = NULL,
-            .dfree = liquidCProgram_free,
-            .dsize = liquidCProgram_size,
-    },
-    .data = NULL,
-    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
-};
-
 VALUE liquidC_alloc(VALUE self) {
     LiquidCRubyContext* data = (LiquidCRubyContext*)malloc(sizeof(LiquidCRubyContext));
     data->context.context = NULL;
     data->registeredFunctionArray = rb_ary_new();
     return TypedData_Wrap_Struct(self, &liquidC_type, data);
 }
-VALUE liquidCParser_alloc(VALUE self) {
-    LiquidParser* data = (LiquidParser*)malloc(sizeof(LiquidParser));
-    data->parser = NULL;
-    return TypedData_Wrap_Struct(self, &liquidCParser_type, data);
+
+// Type boilerplate.
+#define LIQUID_STRUCT_BOILERPLATE(class, internal)\
+void liquidC##class##_free(void* data) {\
+    if (((Liquid##class*)data)->internal)\
+        liquidFree##class(*((Liquid##class*)data));\
+    free(data);\
+}\
+size_t liquidC##class##_size(const void* data) { return sizeof(Liquid##class); }\
+static const rb_data_type_t liquidC##class##_type = {\
+    .wrap_struct_name = #class,\
+    .function = {\
+            .dmark = NULL,\
+            .dfree = liquidC##class##_free,\
+            .dsize = liquidC##class##_size,\
+    },\
+    .data = NULL,\
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY,\
+};\
+VALUE liquidC##class##_alloc(VALUE self) {\
+    Liquid##class* data = (Liquid##class*)malloc(sizeof(Liquid##class));\
+    data->internal = NULL;\
+    return TypedData_Wrap_Struct(self, &liquidC##class##_type, data);\
 }
-VALUE liquidCRenderer_alloc(VALUE self) {
-    LiquidRenderer* data = (LiquidRenderer*)malloc(sizeof(LiquidRenderer));
-    data->renderer = NULL;
-    return TypedData_Wrap_Struct(self, &liquidCRenderer_type, data);
-}
-VALUE liquidCTemplate_alloc(VALUE self) {
-    LiquidTemplate* data = (LiquidTemplate*)malloc(sizeof(LiquidTemplate));
-    data->ast = NULL;
-    return TypedData_Wrap_Struct(self, &liquidCTemplate_type, data);
-}
-VALUE liquidCOptimizer_alloc(VALUE self) {
-    LiquidOptimizer* data = (LiquidOptimizer*)malloc(sizeof(LiquidOptimizer));
-    data->optimizer = NULL;
-    return TypedData_Wrap_Struct(self, &liquidCOptimizer_type, data);
-}
-VALUE liquidCCompiler_alloc(VALUE self) {
-    LiquidCompiler* data = (LiquidCompiler*)malloc(sizeof(LiquidCompiler));
-    data->compiler = NULL;
-    return TypedData_Wrap_Struct(self, &liquidCCompiler_type, data);
-}
-VALUE liquidCProgram_alloc(VALUE self) {
-    LiquidProgram* data = (LiquidProgram*)malloc(sizeof(LiquidProgram));
-    data->program = NULL;
-    return TypedData_Wrap_Struct(self, &liquidCProgram_type, data);
-}
+
+
+LIQUID_STRUCT_BOILERPLATE(Parser, parser);
+LIQUID_STRUCT_BOILERPLATE(Renderer, renderer);
+LIQUID_STRUCT_BOILERPLATE(Template, ast);
+LIQUID_STRUCT_BOILERPLATE(Optimizer, optimizer);
+LIQUID_STRUCT_BOILERPLATE(Compiler, compiler);
+LIQUID_STRUCT_BOILERPLATE(Program, program);
 
 // Actual implementations.
 VALUE liquidC_m_initialize(int argc, VALUE* argv, VALUE self) {
