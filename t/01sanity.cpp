@@ -479,12 +479,13 @@ TEST(sanity, filters) {
 
 
 TEST(sanity, optimizer) {
-    CPPVariable hash, internal;
+    CPPVariable hash, internal, settings;
     Node ast;
     std::string str;
 
     const NodeType* ifNode = getContext().getTagType("if");
     bool atLeastOne = false;
+
 
     hash["a"] = 0;
 
@@ -953,7 +954,7 @@ TEST(sanity, web) {
 
 
 TEST(sanity, unparser) {
-    CPPVariable variable;
+    CPPVariable variable, hash, theme;
     variable["a"] = 3;
     Node ast;
 
@@ -962,7 +963,6 @@ TEST(sanity, unparser) {
     registeredType->userRenderFunction = +[](LiquidRenderer renderer, LiquidNode node, void* variableStore, void* data) { };
     getContext().registerType(move(registeredType));
 
-    CPPVariable theme, hash;
     theme["name"] = "Minimal";
     hash["theme"] = move(theme);
 
@@ -995,9 +995,9 @@ TEST(sanity, unparser) {
         productContainer = document.querySelector('.template-collection .grid, .template-search .grid .grid-uniform');\
     {% elsif theme.name contains 'Narrative' %}\
         productContainer = document.querySelector('.template-collection .grid:nth-child(2), .template-search .grid');\
-    {% elsif theme.name contains 'Minimal' %}\
+    {% elsif theme.name contains 'Minimal' -%}\
         productContainer = document.querySelector('.template-collection .grid .grid, .template-collection .grid .grid-uniform, .template-search .grid .grid');\
-    {% elsif theme.name contains 'Venture' %}\
+    {%- elsif theme.name contains 'Venture' %}\
         productContainer = document.querySelector('.template-collection #MainContent .grid--uniform, .template-search #MainContent .grid--uniform');\
     {% elsif theme.name contains 'Boundless' %}\
         productContainer = document.querySelector('.template-collection .collection-grid, .template-search .search-template-section .grid--uniform');\
@@ -1009,15 +1009,19 @@ TEST(sanity, unparser) {
         productContainer = document.querySelector('.template-collection .grid, .template-search .grid .grid-uniform');\
     {% elsif theme.name contains \"Narrative\" %}\
         productContainer = document.querySelector('.template-collection .grid:nth-child(2), .template-search .grid');\
-    {% elsif theme.name contains \"Minimal\" %}\
-        productContainer = document.querySelector('.template-collection .grid .grid, .template-collection .grid .grid-uniform, .template-search .grid .grid');\
-    {% elsif theme.name contains \"Venture\" %}\
+    {% elsif theme.name contains \"Minimal\" %}productContainer = document.querySelector('.template-collection .grid .grid, .template-collection .grid .grid-uniform, .template-search .grid .grid');{% elsif theme.name contains \"Venture\" %}\
         productContainer = document.querySelector('.template-collection #MainContent .grid--uniform, .template-search #MainContent .grid--uniform');\
     {% elsif theme.name contains \"Boundless\" %}\
         productContainer = document.querySelector('.template-collection .collection-grid, .template-search .search-template-section .grid--uniform');\
     {% elsif theme.name contains \"Debut\" %}\
         productContainer = document.querySelector('#Collection .grid, .template-search #MainContent ul');\
     {% endif %}");
+
+    theme["name"] = "Minimal";
+    hash["theme"] = move(theme);
+    getOptimizer().optimize(ast, hash);
+
+    ASSERT_EQ(getParser().unparse(ast), "productContainer = document.querySelector('.template-collection .grid .grid, .template-collection .grid .grid-uniform, .template-search .grid .grid');");
 
     ast = getParser().parse("asdflkjsdlkhjgkea  sdjlkfasjlkdhgkjhgjlk {{ a }} {% if a > 15 %} {% endif %}");
     string target = getParser().unparse(ast);

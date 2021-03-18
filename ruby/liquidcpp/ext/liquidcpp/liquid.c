@@ -1,4 +1,5 @@
 #include <ruby.h>
+#include <ruby/encoding.h>
 #include <liquid/liquid.h>
 
 // Global definitions.
@@ -360,7 +361,7 @@ VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
     LiquidTemplateRender templateResult;
     LiquidProgramRender programResult;
     char buffer[512];
-    int j;
+    int j, enc;
     bool program;
     Check_Type(stash, T_HASH);
     TypedData_Get_Struct(self, LiquidRenderer, &liquidCRenderer_type, liquidRenderer);
@@ -384,6 +385,8 @@ VALUE method_liquidCTemplateRender(VALUE self, VALUE stash, VALUE tmpl) {
         str = rb_str_new(liquidTemplateRenderGetBuffer(templateResult), liquidTemplateRenderGetSize(templateResult));
         liquidFreeTemplateRender(templateResult);
     }
+    enc = rb_enc_find_index("UTF-8");
+    rb_enc_associate_index(str, enc);
     return str;
 }
 
@@ -518,13 +521,17 @@ VALUE method_liquidCParserUnparseTemplate(VALUE self, VALUE incomingTemplate) {
     LiquidParser* parser;
     LiquidTemplate* tmpl;
     char buffer[100*1024];
-    int size;
+    int size, enc;
+    VALUE str;
 
     TypedData_Get_Struct(self, LiquidParser, &liquidCParser_type, parser);
     TypedData_Get_Struct(incomingTemplate, LiquidTemplate, &liquidCTemplate_type, tmpl);
 
     size = liquidParserUnparseTemplate(*parser, *tmpl, buffer, sizeof(buffer));
-    return rb_str_new(buffer, size);
+    str = rb_str_new(buffer, size);
+    enc = rb_enc_find_index("UTF-8");
+    rb_enc_associate_index(str, enc);
+    return str;
 }
 
 
@@ -619,13 +626,17 @@ VALUE method_liquidCCompiler_decompile(VALUE self, VALUE incomingProgram) {
     LiquidCompiler* compiler;
     LiquidProgram* program;
     char buffer[100*1024];
-    int size;
+    int size, enc;
+    VALUE str;
 
     TypedData_Get_Struct(self, LiquidCompiler, &liquidCCompiler_type, compiler);
     TypedData_Get_Struct(incomingProgram, LiquidProgram, &liquidCProgram_type, program);
 
     size = liquidCompilerDisassembleProgram(*compiler, *program, buffer, sizeof(buffer));
-    return rb_str_new(buffer, size);
+    str = rb_str_new(buffer, size);
+    enc = rb_enc_find_index("UTF-8");
+    rb_enc_associate_index(str, enc);
+    return str;
 }
 
 VALUE liquidCProgram_m_initialize(VALUE self, VALUE incomingProgram) {

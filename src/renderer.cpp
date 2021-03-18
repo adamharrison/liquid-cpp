@@ -141,8 +141,6 @@ namespace Liquid {
     }
 
     Variant Renderer::parseVariant(Variable variable) {
-        if (!variable.exists())
-            return Variant();
         ELiquidVariableType type = variableResolver.getType(*this, variable);
         switch (type) {
             case LIQUID_VARIABLE_TYPE_OTHER:
@@ -225,30 +223,34 @@ namespace Liquid {
         }
     }
 
-    Variable Renderer::getVariable(const Node& node, Variable store, size_t offset) {
+    pair<bool, Variable> Renderer::getVariable(const Node& node, Variable store, size_t offset) {
         Variable storePointer = store;
-        for (size_t i = offset; i < node.children.size(); ++i) {
+        bool valid = true;
+        for (size_t i = offset; valid && i < node.children.size(); ++i) {
             auto& link = node.children[i];
             auto node = retrieveRenderedNode(*link.get(), store);
             switch (node.variant.type) {
                 case Variant::Type::INT:
-                    if (!variableResolver.getArrayVariable(*this, storePointer, node.variant.i, storePointer))
+                    if (!variableResolver.getArrayVariable(*this, storePointer, node.variant.i, storePointer)) {
                         storePointer = Variable({ nullptr });
+                        valid = false;
+                    }
                 break;
                 case Variant::Type::STRING: {
-                    if (!variableResolver.getDictionaryVariable(*this, storePointer, node.variant.s.data(), storePointer))
+                    if (!variableResolver.getDictionaryVariable(*this, storePointer, node.variant.s.data(), storePointer)) {
                         storePointer = Variable({ nullptr });
+                        valid = false;
+                    }
                 } break;
                 default:
                     storePointer = Variable({ nullptr });
+                    valid = false;
                 break;
             }
-            if (!storePointer.pointer)
-                break;
         }
-        if (logUnknownVariables && !storePointer.exists())
+        if (logUnknownVariables && !valid)
             pushUnknownVariableWarning(node, offset, store);
-        return storePointer;
+        return { valid, storePointer };
     }
 
     bool Renderer::setVariable(const Node& node, Variable store, Variable value, size_t offset) {

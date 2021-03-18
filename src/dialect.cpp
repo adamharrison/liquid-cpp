@@ -76,11 +76,11 @@ namespace Liquid {
             auto& argumentNode = node.children.front();
             auto& variableNode = argumentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable targetVariable = renderer.getVariable(*variableNode.get(), store);
-                if (targetVariable.exists()) {
+                auto targetVariable = renderer.getVariable(*variableNode.get(), store);
+                if (targetVariable.first) {
                     long long i = -1;
-                    if (renderer.variableResolver.getInteger(renderer, targetVariable,&i))
-                        renderer.setVariable(*variableNode.get(), targetVariable, renderer.variableResolver.createInteger(renderer, i+1));
+                    if (renderer.variableResolver.getInteger(renderer, targetVariable.second,&i))
+                        renderer.setVariable(*variableNode.get(), targetVariable.second, renderer.variableResolver.createInteger(renderer, i+1));
                 }
             }
             return Node();
@@ -94,11 +94,11 @@ namespace Liquid {
             auto& argumentNode = node.children.front();
             auto& variableNode = argumentNode->children.front();
             if (variableNode->type->type == NodeType::VARIABLE) {
-                Variable targetVariable = renderer.getVariable(*variableNode.get(), store);
-                if (targetVariable.exists()) {
+                auto targetVariable = renderer.getVariable(*variableNode.get(), store);
+                if (targetVariable.first) {
                     long long i = -1;
-                    if (renderer.variableResolver.getInteger(renderer, targetVariable,&i))
-                        renderer.setVariable(*variableNode.get(), targetVariable, renderer.variableResolver.createInteger(renderer, i-1));
+                    if (renderer.variableResolver.getInteger(renderer, targetVariable.second,&i))
+                        renderer.setVariable(*variableNode.get(), targetVariable.second, renderer.variableResolver.createInteger(renderer, i-1));
                 }
             }
             return Node();
@@ -146,7 +146,9 @@ namespace Liquid {
             // Loop through the elsifs and elses, and anything that's true, run the next concatenation.
             // If it's false, prune it from the list.
             size_t target = 0;
-            for (size_t i = 2; i < node.children.size()-2; i += 2) {
+            const TagNodeType* nodeType = static_cast<const TagNodeType*>(node.type);
+            auto it = nodeType->intermediates.find("else");
+            for (size_t i = 2; i < node.children.size() && node.children[i].get()->type != it->second.get(); i += 2) {
                 Node& argumentNode = *node.children[i]->children[0]->children[0].get();
                 if (!argumentNode.type) {
                     bool truthy = argumentNode.variant.isTruthy(optimizer.renderer.context.falsiness);
@@ -166,8 +168,6 @@ namespace Liquid {
                     target += 2;
                 }
             }
-            const TagNodeType* nodeType = static_cast<const TagNodeType*>(node.type);
-            auto it = nodeType->intermediates.find("else");
             if (target == 0)
                 node = node.children[node.children.size()-2].get()->type == it->second.get() ? move(*node.children[node.children.size()-1].get()) : Node();
             else
@@ -502,7 +502,7 @@ namespace Liquid {
             } else {
                 renderer.pushInternalDrop(variableName, { &forLoopContext, +[](Renderer& renderer, const Node& node, Variable store, void* data)->Node {
                     ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);
-                    return Variant(renderer.getVariable(node, Variable(forLoopContext.variable), 1));
+                    return Variant(renderer.getVariable(node, Variable(forLoopContext.variable), 1).second);
                 } });
                 resolver.iterate(renderer, result.variant.v, +[](void* variable, void* data) {
                     ForLoopContext& forLoopContext = *static_cast<ForLoopContext*>(data);

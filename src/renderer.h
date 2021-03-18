@@ -152,7 +152,7 @@ namespace Liquid {
 
 
 
-        Variable getVariable(const Node& node, Variable store, size_t offset = 0);
+        std::pair<bool, Variable> getVariable(const Node& node, Variable store, size_t offset = 0);
         bool setVariable(const Node& node, Variable store, Variable value, size_t offset = 0);
 
         const LiquidVariableResolver& getVariableResolver() const { return variableResolver; }

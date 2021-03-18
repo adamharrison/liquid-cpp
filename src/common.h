@@ -59,8 +59,6 @@ namespace Liquid {
         operator void** () { return &pointer; }
 
         Variable& operator = (void* pointer) { this->pointer = pointer; return *this; }
-
-        bool exists() const { return pointer; }
     };
 
     enum EFalsiness {

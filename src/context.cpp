@@ -11,10 +11,10 @@ namespace Liquid {
     }
 
     bool Context::VariableNode::optimize(Optimizer& optimizer, Node& node, Variable store) const {
-        Variable storePointer = optimizer.renderer.getVariable(node, store);
-        if (!storePointer.exists())
+        auto storePointer = optimizer.renderer.getVariable(node, store);
+        if (!storePointer.first)
             return false;
-        node = Node(optimizer.renderer.parseVariant(storePointer));
+        node = Node(optimizer.renderer.parseVariant(storePointer.second));
         return true;
     }
 

@@ -251,10 +251,10 @@ namespace Liquid {
                         return result;
                     return Node(renderer.parseVariant(result.variant.v));
                 } else {
-                    Variable storePointer = renderer.getVariable(node, store);
-                    if (!storePointer.exists())
+                    auto variableInfo = renderer.getVariable(node, store);
+                    if (!variableInfo.first)
                         return Node();
-                    return Node(renderer.parseVariant(storePointer));
+                    return Node(renderer.parseVariant(variableInfo.second));
                 }
             }
 
