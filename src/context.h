@@ -181,7 +181,7 @@ namespace Liquid {
         };
 
         struct OutputNode : ContextualNodeType {
-            OutputNode() : ContextualNodeType(Type::OUTPUT) { }
+            OutputNode() : ContextualNodeType(Type::OUTPUT, "", -1, LIQUID_OPTIMIZATION_SCHEME_FULL) { }
 
             Node render(Renderer& renderer, const Node& node, Variable store) const override {
                 assert(node.children.size() == 1);
