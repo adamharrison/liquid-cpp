@@ -1028,6 +1028,11 @@ TEST(sanity, unparser) {
     //auto str = getRenderer().render(ast, variable);
     ASSERT_EQ(target, "asdflkjsdlkhjgkea  sdjlkfasjlkdhgkjhgjlk {{ a }} {% if a > 15 %} {% endif %}");
 
+
+    ast = getParser().parse("asdflkjsdlkhjgkea  sdjlkfasjlkdhgkjhgjlk {{ a[\"a\"] }} {% if a > 15 %} {% endif %}");
+    target = getParser().unparse(ast);
+    //auto str = getRenderer().render(ast, variable);
+    ASSERT_EQ(target, "asdflkjsdlkhjgkea  sdjlkfasjlkdhgkjhgjlk {{ a[\"a\"] }} {% if a > 15 %} {% endif %}");
 }
 
 int main(int argc, char **argv) {

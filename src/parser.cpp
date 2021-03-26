@@ -688,9 +688,11 @@ namespace Liquid {
                                     target.push_back('.');
                                     target.append(result, 1, result.size()-2);
                                 } else {
-                                    target.push_back('[');
+                                    if (result[0] != '[')
+                                        target.push_back('[');
                                     target.append(result);
-                                    target.push_back(']');
+                                    if (result[0] != '[')
+                                        target.push_back(']');
                                 }
                             } else {
                                 target.push_back('.');
@@ -716,7 +718,7 @@ namespace Liquid {
                         target.append(filterNodeType->symbol);
                     }
                     if (node.children[offset+1]->children.size() > 0) {
-                        target.append(":");
+                        target.append(": ");
                         for (size_t i = 0; i < node.children[1]->children.size(); ++i) {
                             if (i > 0)
                                 target.append(", ");
