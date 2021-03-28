@@ -204,6 +204,9 @@ namespace Liquid {
                     return (*it)->type->render(renderer, *it->get(), store);
                 return *it->get();
             }
+
+
+            void compile(Compiler& compiler, const Node& node) const override;
         };
 
         // These are purely for parsing purpose, and should not make their way to the rednerer.

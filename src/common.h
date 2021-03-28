@@ -76,6 +76,7 @@ namespace Liquid {
             FLOAT,
             INT,
             STRING,
+            STRING_VIEW,
             ARRAY,
             VARIABLE,
             POINTER
@@ -90,6 +91,10 @@ namespace Liquid {
             void* p;
             Variable v;
             vector<Variant> a;
+            struct {
+                const char* view;
+                size_t len;
+            };
         };
         Type type;
 
@@ -98,12 +103,14 @@ namespace Liquid {
         Variant(const Variant& v) : type(v.type) {
             switch (type) {
                 case Type::STRING:
-                    new(&s) std::string;
-                    s = v.s;
+                    new(&s) std::string(v.s);
                 break;
                 case Type::ARRAY:
-                    new(&a) std::vector<Variant>();
-                    a = v.a;
+                    new(&a) std::vector<Variant>(v.a);
+                break;
+                case Type::STRING_VIEW:
+                    view = v.view;
+                    len = v.len;
                 break;
                 case Type::BOOL:
                     b = v.b;
@@ -127,12 +134,14 @@ namespace Liquid {
         Variant(Variant&& v) : type(v.type) {
             switch (type) {
                 case Type::STRING:
-                    new(&s) std::string;
-                    s = std::move(v.s);
+                    new(&s) std::string(std::move(v.s));
                 break;
                 case Type::ARRAY:
-                    new(&a) vector<Variant>();
-                    a = std::move(v.a);
+                    new(&a) vector<Variant>(std::move(v.a));
+                break;
+                case Type::STRING_VIEW:
+                    view = v.view;
+                    len = v.len;
                 break;
                 case Type::BOOL:
                     b = v.b;
@@ -159,6 +168,7 @@ namespace Liquid {
         Variant(const std::string& s) : s(s), type(Type::STRING) { }
         Variant(std::string&& s) : s(std::move(s)), type(Type::STRING) { }
         Variant(const char* s) : s(s), type(Type::STRING) { }
+        Variant(const char* view, size_t len) : view(view), len(len), type(Type::STRING_VIEW) { }
         Variant(Variable v) : v(v), type(Type::VARIABLE) { }
         Variant(void* p) : p(p), type(p ? Type::POINTER : Type::NIL) { }
         Variant(std::nullptr_t) : p(nullptr), type(Type::NIL) { }
@@ -220,6 +230,10 @@ namespace Liquid {
                     }
                     a = v.a;
                 break;
+                case Type::STRING_VIEW:
+                    view = v.view;
+                    len = v.len;
+                break;
                 default:
                     f = v.f;
                 break;
@@ -248,6 +262,10 @@ namespace Liquid {
                         new(&a) vector<Variant>();
                     }
                     a = move(v.a);
+                break;
+                case Type::STRING_VIEW:
+                    view = v.view;
+                    len = v.len;
                 break;
                 default:
                     f = v.f;
@@ -284,6 +302,8 @@ namespace Liquid {
             switch (type) {
                 case Type::STRING:
                     return s;
+                case Type::STRING_VIEW:
+                    return string(view, len);
                 case Type::FLOAT: {
                     // We can't use to_string because that'll add an annoying amount of unecesarry 0s after the decimal point.
                     char buffer[512];
@@ -307,6 +327,8 @@ namespace Liquid {
                     return (long long)f;
                 case Type::STRING:
                     return atoll(s.c_str());
+                case Type::STRING_VIEW:
+                    return atoll(view);
                 default:
                     return 0;
             }
@@ -320,6 +342,8 @@ namespace Liquid {
                     return f;
                 case Type::STRING:
                     return atof(s.c_str());
+                case Type::STRING_VIEW:
+                    return atof(view);
                 default:
                     return 0.0;
             }
@@ -330,6 +354,8 @@ namespace Liquid {
             switch (type) {
                 case Type::STRING:
                     return std::hash<string>{}(s);
+                case Type::STRING_VIEW:
+                    return std::hash<string>{}(getString());
                 case Type::INT:
                     return std::hash<long long>{}(i);
                 case Type::ARRAY:
@@ -357,6 +383,9 @@ namespace Liquid {
                     if (v.type == Type::STRING)
                         return s < v.s;
                     return s < v.getString();
+                break;
+                case Type::STRING_VIEW:
+                    return v.getString() < string(view, len);
                 break;
                 default:
                     return p < v.p;

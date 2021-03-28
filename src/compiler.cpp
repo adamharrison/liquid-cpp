@@ -613,6 +613,9 @@ namespace Liquid {
                 memcpy(reg.buffer, node.variant.s.data(), node.variant.s.size());
                 reg.buffer[node.variant.s.size()] = 0;
             break;
+            case Variant::Type::STRING_VIEW:
+                assert(false);
+            break;
             case Variant::Type::BOOL:
                 reg.type = Register::Type::BOOL;
                 reg.b = node.variant.b;
@@ -672,6 +675,10 @@ namespace Liquid {
                     memcpy(registers[target].buffer, &code[operand+sizeof(unsigned int)], length);
                     registers[target].buffer[length] = 0;
                 } break;
+                case OP_MOV: {
+                    operand = *((long long*)instructionPointer); instructionPointer += 2;
+                    registers[operand] = registers[target];
+                } break;
                 case OP_MOVBOOL: {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
                     registers[target].type = Register::Type::BOOL;
@@ -716,7 +723,7 @@ namespace Liquid {
                 break;
                 case OP_CALL: {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
-                    unsigned int argCount = *(unsigned int*)(stackPointer - sizeof(unsigned int) * 2);
+                    unsigned int argCount = *(unsigned int*)(stackPointer - sizeof(unsigned int) * 3);
                     pushRegister(registers[0], ((NodeType*)operand)->render(*this, node, store));
                     popStack(argCount+1);
                 } break;
@@ -893,11 +900,11 @@ namespace Liquid {
 
 
     void OperatorNodeType::compile(Compiler& compiler, const Node& node) const {
-        compiler.freeRegister = 0;
-        for (auto& child : node.children) {
-            compiler.compileBranch(*child.get());
-            compiler.add(OP_PUSH, compiler.freeRegister - 1);
-            compiler.freeRegister = 1;
+        int freeRegister = compiler.freeRegister;
+        for (auto it = node.children.rbegin(); it != node.children.rend(); ++it) {
+            compiler.compileBranch(**it);
+            compiler.add(OP_PUSH, freeRegister);
+            compiler.freeRegister = freeRegister;
         }
         compiler.add(OP_MOVINT, compiler.freeRegister, node.children.size());
         compiler.add(OP_PUSH, compiler.freeRegister);
@@ -949,9 +956,10 @@ namespace Liquid {
             it->second.back().first(compiler, it->second.back().second);
         } else {
             for (size_t i = 0; i < node.children.size(); ++i) {
+                compiler.freeRegister = 0;
                 compiler.compileBranch(*node.children[i].get());
                 compiler.add(OP_RESOLVE, 0x0, target);
-                if (i < node.children.size() -1) {
+                if (i < node.children.size() - 1) {
                     compiler.add(OP_MOV, 0x0, 0x1);
                     target = 0x1;
                 }
@@ -970,6 +978,14 @@ namespace Liquid {
             compiler.add(OP_PUSH, compiler.freeRegister);
             compiler.add(OP_CALL, 0x0, (long long)this);
             compiler.freeRegister = 1;
+        } else
+            userCompileFunction(LiquidCompiler{&compiler}, LiquidNode{const_cast<Node*>(&node)}, userData);
+    }
+
+    void Context::PassthruNode::compile(Compiler& compiler, const Node& node) const {
+        if (!userCompileFunction) {
+            for (auto& child : node.children)
+                compiler.compileBranch(*child.get());
         } else
             userCompileFunction(LiquidCompiler{&compiler}, LiquidNode{const_cast<Node*>(&node)}, userData);
     }
