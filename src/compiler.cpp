@@ -183,6 +183,7 @@ namespace Liquid {
             case OP_DIV:
             case OP_PUSH:
             case OP_MOVNIL:
+            case OP_INVERT:
                 return false;
             default:
                 return true;
@@ -237,6 +238,8 @@ namespace Liquid {
                 return "OP_RESOLVE";
             case OP_ITERATE:
                 return "OP_ITERATE";
+            case OP_INVERT:
+                return "OP_INVERT";
             case OP_EXIT:
                 return "OP_EXIT";
         }
@@ -450,8 +453,12 @@ namespace Liquid {
                     if (idx == i)
                         return Node(string(localPointer, len));
                 } break;
+                case Register::Type::VARIABLE: {
+                    localPointer -= sizeof(unsigned int) + sizeof(void*);
+                    if (idx == i)
+                        return Node(Variable(localPointer));
+                } break;
                 case Register::Type::EXTRA_LONG_STRING:
-                case Register::Type::VARIABLE:
                     assert(false);
                 break;
             }
@@ -767,7 +774,7 @@ namespace Liquid {
                                 reg.type = Register::Type::NIL;
                             break;
                             case LIQUID_VARIABLE_TYPE_STRING: {
-                                reg.type = Register::Type::FLOAT;
+                                reg.type = Register::Type::SHORT_STRING;
                                 long long length = variableResolver.getStringLength(LiquidRenderer { this }, var);
                                 assert(length < SHORT_STRING_SIZE);
                                 reg.length = (unsigned char)length;
@@ -810,6 +817,32 @@ namespace Liquid {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
                     unsigned int len = *(unsigned int*)&code[operand];
                     callback((const char*)&code[operand+sizeof(unsigned int)], len, data);
+                } break;
+                case OP_INVERT: {
+                    bool isTrue = false;
+                    switch (registers[target].type) {
+                        case Register::Type::INT:
+                            isTrue = registers[target].i;
+                        break;
+                        case Register::Type::BOOL:
+                            isTrue = registers[target].b;
+                        break;
+                        case Register::Type::SHORT_STRING:
+                            isTrue = registers[target].length > 0;
+                        break;
+                        case Register::Type::NIL:
+                            isTrue = false;
+                        break;
+                        case Register::Type::FLOAT:
+                            isTrue = registers[target].f;
+                        break;
+                        case Register::Type::LONG_STRING:
+                        case Register::Type::EXTRA_LONG_STRING:
+                        case Register::Type::VARIABLE:
+                        break;
+                    }
+                    registers[target].type = Register::Type::BOOL;
+                    registers[target].b = !isTrue;
                 } break;
                 case OP_OUTPUT:
                     // This could potentially be made *way* more efficient.
@@ -856,30 +889,30 @@ namespace Liquid {
                     }
                 break;
                 case OP_JMPFALSE: {
-                    bool shouldJump = false;
+                    bool isTrue = true;
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
                     switch (registers[target].type) {
                         case Register::Type::INT:
-                            shouldJump = registers[target].i;
+                            isTrue = registers[target].i;
                         break;
                         case Register::Type::BOOL:
-                            shouldJump = registers[target].b;
+                            isTrue = registers[target].b;
                         break;
                         case Register::Type::SHORT_STRING:
-                            shouldJump = registers[target].length > 0;
+                            isTrue = registers[target].length > 0;
                         break;
                         case Register::Type::NIL:
-                            shouldJump = false;
+                            isTrue = false;
                         break;
                         case Register::Type::FLOAT:
-                            shouldJump = registers[target].f;
+                            isTrue = registers[target].f;
                         break;
                         case Register::Type::LONG_STRING:
                         case Register::Type::EXTRA_LONG_STRING:
                         case Register::Type::VARIABLE:
                         break;
                     }
-                    if (!shouldJump)
+                    if (!isTrue)
                         instructionPointer = reinterpret_cast<const unsigned int*>(&code[operand]);
                 } break;
                 case OP_EXIT:

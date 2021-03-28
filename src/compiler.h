@@ -40,6 +40,7 @@ namespace Liquid {
         OP_CALL,        // Calls the function specified with the amount of arugments on the stack.
         OP_RESOLVE,     // Resovles the named variable in the register and places it into the same register. Operand is either 0x0, for the top-level context, or a register, which contains the context for the next deference.,
         OP_ITERATE,     // Iterates through the variable in the specified register, and pops the value into 0x0. If iteration is over, JMPs to the specified instruction.
+        OP_INVERT,      // Coerces to a boolean
         OP_EXIT         // Quits the program.
     };
 

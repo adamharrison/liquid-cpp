@@ -135,7 +135,6 @@ TEST(sanity, parenthesis) {
     CPPVariable variable;
     variable["a"] = 3;
     auto ast = getParser().parse("asdbfsdf {{ a - (1 + 2) }} b");
-    fprintf(stderr, "PROGRAM:\n%s\n", getCompiler().disassemble(getCompiler().compile(ast)).data());
     auto str = getInterpreter().renderTemplate(getCompiler().compile(ast), variable);
     ASSERT_EQ(str, "asdbfsdf 0 b");
 }

@@ -182,6 +182,8 @@ namespace Liquid {
                     compiler.compileBranch(*node.children[i+1].get());
                 } else {
                     compiler.compileBranch(*node.children[i].get()->children[0].get());
+                    if (INVERSE)
+                        compiler.add(OP_INVERT, 0x0);
                     int conditionalFalseJump = compiler.add(OP_JMPFALSE, 0x0, 0x0);
                     compiler.compileBranch(*node.children[i+1].get());
                     endJumps.push_back(compiler.add(OP_JMP, 0x0, 0x0));
@@ -651,8 +653,8 @@ namespace Liquid {
         ModuloOperatorNode() : OperatorNodeType("%", Arity::BINARY, 10) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+            Node op1 = getOperand(renderer, node, store, 0);
+            Node op2 = getOperand(renderer, node, store, 1);
             long long divisor = op2.variant.getInt();
             if (divisor == 0)
                 return Node();
@@ -691,8 +693,8 @@ namespace Liquid {
         bool operate(A a, B b) const { return Function()(a, b); }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+            Node op1 = getOperand(renderer, node, store, 0);
+            Node op2 = getOperand(renderer, node, store, 1);
             switch (op1.variant.type) {
                 case Variant::Type::INT:
                     switch (op2.variant.type) {
@@ -733,8 +735,8 @@ namespace Liquid {
         bool operate(A a, B b) const { return Function()(a, b); }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+            Node op1 = getOperand(renderer, node, store, 0);
+            Node op2 = getOperand(renderer, node, store, 1);
 
             if (op2.variant.type == Variant::Type::NIL)
                 return Node(operate(op1.variant.type, Variant::Type::NIL));
@@ -799,10 +801,10 @@ namespace Liquid {
         AndOperatorNode() : OperatorNodeType("and", Arity::BINARY, 1, Fixness::INFIX, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Node op1 = getOperand(renderer, node, store, 0);
             if (!op1.variant.isTruthy(renderer.context.falsiness))
                 return Variant(false);
-            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+            Node op2 = getOperand(renderer, node, store, 1);
             return Variant(op2.variant.isTruthy(renderer.context.falsiness));
         }
 
@@ -828,10 +830,10 @@ namespace Liquid {
         OrOperatorNode() : OperatorNodeType("or", Arity::BINARY, 1, Fixness::INFIX, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Node op1 = getOperand(renderer, node, store, 0);
             if (op1.variant.isTruthy(renderer.context.falsiness))
                 return Variant(true);
-            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+            Node op2 = getOperand(renderer, node, store, 1);
             return Variant(op2.variant.isTruthy(renderer.context.falsiness));
         }
 
@@ -859,8 +861,8 @@ namespace Liquid {
         ContainsOperatorNode() : OperatorNodeType("contains", Arity::BINARY, 2) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+            Node op1 = getOperand(renderer, node, store, 0);
+            Node op2 = getOperand(renderer, node, store, 1);
 
             if (op2.variant.type != Variant::Type::STRING)
                 return Node();
@@ -883,8 +885,8 @@ namespace Liquid {
         RangeOperatorNode() : OperatorNodeType("..", Arity::BINARY, 10) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
-            Node op2 = renderer.retrieveRenderedNode(*node.children[1].get(), store);
+            Node op1 = getOperand(renderer, node, store, 0);
+            Node op2 = getOperand(renderer, node, store, 1);
             // Requires integers.
             if (op1.variant.type != Variant::Type::INT || op2.variant.type != Variant::Type::INT)
                 return Node();
