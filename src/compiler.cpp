@@ -176,14 +176,11 @@ namespace Liquid {
             case OP_EXIT:
             case OP_OUTPUT:
             case OP_INC:
-            case OP_ADD:
-            case OP_SUB:
-            case OP_MUL:
-            case OP_MOD:
-            case OP_DIV:
+            case OP_DEC:
             case OP_PUSH:
             case OP_MOVNIL:
             case OP_INVERT:
+            case OP_EQL:
                 return false;
             default:
                 return true;
@@ -212,16 +209,10 @@ namespace Liquid {
                 return "OP_POP";
             case OP_INC:
                 return "OP_INC";
-            case OP_ADD:
-                return "OP_ADD";
-            case OP_SUB:
-                return "OP_SUB";
-            case OP_MUL:
-                return "OP_MUL";
-            case OP_MOD:
-                return "OP_MOD";
-            case OP_DIV:
-                return "OP_DIV";
+            case OP_DEC:
+                return "OP_DEC";
+            case OP_EQL:
+                return "OP_EQL";
             case OP_OUTPUT:
                 return "OP_OUTPUT";
             case OP_OUTPUTMEM:
@@ -614,6 +605,9 @@ namespace Liquid {
                 reg.type = Register::Type::FLOAT;
                 reg.f = node.variant.f;
             break;
+            case Variant::Type::NIL:
+                reg.type = Register::Type::NIL;
+            break;
             case Variant::Type::STRING:
                 reg.type = Register::Type::SHORT_STRING;
                 assert(node.variant.s.size() < SHORT_STRING_SIZE);
@@ -627,7 +621,6 @@ namespace Liquid {
                 reg.type = Register::Type::BOOL;
                 reg.b = node.variant.b;
             break;
-            case Variant::Type::NIL:
             case Variant::Type::ARRAY:
             case Variant::Type::POINTER:
             case Variant::Type::VARIABLE:
@@ -704,14 +697,44 @@ namespace Liquid {
                 case OP_MOVNIL: {
                     registers[target].type = Register::Type::NIL;
                 } break;
+                case OP_EQL: {
+                    bool isEqual = false;
+                    if (registers[target].type == registers[0].type) {
+                        switch (registers[0].type) {
+                            case Register::Type::INT:
+                                isEqual = registers[target].i == registers[0].i;
+                            break;
+                            case Register::Type::SHORT_STRING:
+                                isEqual = registers[target].length == registers[0].length && strncmp(registers[target].buffer, registers[0].buffer, registers[0].length) == 0;
+                            break;
+                            case Register::Type::NIL:
+                                isEqual = true;
+                            break;
+                            case Register::Type::BOOL:
+                                isEqual = registers[target].b == registers[0].b;
+                            break;
+                            case Register::Type::FLOAT:
+                                isEqual = registers[target].f == registers[0].f;
+                            break;
+                            case Register::Type::VARIABLE:
+                                isEqual = registers[target].pointer == registers[0].pointer;
+                            break;
+                            case Register::Type::LONG_STRING:
+                            case Register::Type::EXTRA_LONG_STRING:
+                                assert(false);
+                            break;
+                        }
+                    }
+                    registers[0].type = Register::Type::BOOL;
+                    registers[0].b = isEqual;
+                } break;
                 case OP_INC: {
                     if (registers[target].type == Register::Type::INT)
                         ++registers[target].i;
                 } break;
-                case OP_SUB: {
-                    assert(registers[target].type == Register::Type::INT);
-                    assert(registers[0].type == Register::Type::INT);
-                    registers[0].i -= registers[target].i;
+                case OP_DEC: {
+                    if (registers[target].type == Register::Type::INT)
+                        --registers[target].i;
                 } break;
                 case OP_STACK: {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;

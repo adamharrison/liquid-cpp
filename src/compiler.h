@@ -27,11 +27,8 @@ namespace Liquid {
         OP_PUSH,        // Pushes the operand onto the stack, from the specified register.
         OP_POP,         // Moves the stack point back to the preivous variable.
         OP_INC,         // Increments the targeted register.
-        OP_ADD,         // Takes the targeted register, and adds it to the return register.
-        OP_SUB,         // Takes the targeted register, and sub it to the return register.
-        OP_MUL,         // Takes the targeted register, and multplies it to the return register.
-        OP_MOD,         // Takes the targeted register, and mods it to the return register.
-        OP_DIV,         // Takes the targeted register, and divs it to the return register.
+        OP_DEC,         // Decrements the targeted register.
+        OP_EQL,         // Checks whether the register is equal to 0x0.
         OP_OUTPUT,      // Takes the return register, and appends it to the selected output buffer.
         OP_OUTPUTMEM,   // Takes the targeted memory address, and appends it to the selected output buffer. Optimized version of OP_OUTPUT to reduce copying.
         OP_ASSIGN,      // Assigning a variable from the contents of the return register to the specified operand. If 0x0 to the gloabl vairable context.

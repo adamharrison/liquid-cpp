@@ -298,6 +298,33 @@ namespace Liquid {
             }
             return Node();
         }
+
+        void compile(Compiler& compiler, const Node& node) const override {
+            assert(node.children.size() >= 2 && node.children.front()->type->type == NodeType::Type::ARGUMENTS);
+            auto& arguments = node.children.front();
+            compiler.compileBranch(*arguments->children.front().get());
+            compiler.add(OP_MOV, 0x0, 0x1);
+            compiler.freeRegister = 0;
+            vector<int> outsideJmps;
+            int lastJmp = -1;
+            auto whenNodeType = intermediates.find("when")->second.get();
+            for (size_t i = 2; i < node.children.size()-1; i += 2) {
+                if (lastJmp != -1)
+                    compiler.modify(lastJmp, OP_JMPFALSE, 0x0, compiler.currentOffset());
+                if (node.children[i]->type == whenNodeType) {
+                    compiler.freeRegister = 0;
+                    compiler.compileBranch(*node.children[i]->children[0].get());
+                    compiler.add(OP_EQL, 0x1);
+                    lastJmp = compiler.add(OP_JMPFALSE, 0x0, 0x0);
+                    compiler.compileBranch(*node.children[i+1].get());
+                    outsideJmps.push_back(compiler.add(OP_JMP, 0x0, 0x0));
+                } else {
+                    compiler.compileBranch(*node.children[i+1].get());
+                }
+            }
+            for (int i : outsideJmps)
+                compiler.modify(i, OP_JMP, 0x0, compiler.currentOffset());
+        }
     };
 
     struct ForNode : TagNodeType {
@@ -574,7 +601,7 @@ namespace Liquid {
                 compiler.add(OP_INC, 0x0);
                 compiler.add(OP_POP, 0x0, 0x1);
                 compiler.add(OP_PUSH, 0x0);
-                int entryPoint = compiler.add(OP_SUB, 0x1);
+                int entryPoint = compiler.add(OP_DEC, 0x1);
                 compiler.modify(entryPointJmp, OP_JMP, 0x0, entryPoint);
                 int endLoopJmp = compiler.add(OP_JMPFALSE, 0x0, 0x0);
                 compiler.compileBranch(*node.children[1].get());
