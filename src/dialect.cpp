@@ -596,17 +596,17 @@ namespace Liquid {
                     return 0;
                 });
                 int entryPointJmp = compiler.add(OP_JMP, 0x0, 0x0);
-                int topLoop = compiler.add(OP_STACK, 0x0, -1);
-                compiler.add(OP_STACK, 0x1, -2);
-                compiler.add(OP_INC, 0x0);
+                int topLoop = compiler.add(OP_STACK, 0x1, -1);
+                compiler.add(OP_STACK, 0x0, -2);
+                compiler.add(OP_INC, 0x1);
                 compiler.add(OP_POP, 0x0, 0x1);
-                compiler.add(OP_PUSH, 0x0);
-                int entryPoint = compiler.add(OP_DEC, 0x1);
+                compiler.add(OP_PUSH, 0x1);
+                int entryPoint = compiler.add(OP_EQL, 0x1);
                 compiler.modify(entryPointJmp, OP_JMP, 0x0, entryPoint);
-                int endLoopJmp = compiler.add(OP_JMPFALSE, 0x0, 0x0);
+                int endLoopJmp = compiler.add(OP_JMPTRUE, 0x0, 0x0);
                 compiler.compileBranch(*node.children[1].get());
                 compiler.add(OP_JMP, 0x0, topLoop);
-                compiler.modify(endLoopJmp, OP_JMPFALSE, 0x0, compiler.currentOffset());
+                compiler.modify(endLoopJmp, OP_JMPTRUE, 0x0, compiler.currentOffset());
                 compiler.addPop(2);
             }
         }

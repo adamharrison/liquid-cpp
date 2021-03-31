@@ -61,6 +61,12 @@ namespace Liquid {
         bool startOutputBlock(bool suppress) { return true; }
         bool endOutputBlock(bool suppress) { return true; }
 
+        bool newline() {
+            ++line;
+            column = 0;
+            return true;
+        }
+
         bool literal(const char* str, size_t len) { return true; }
         bool string(const char* str, size_t len) { return true; }
         bool integer(long long i) { return true; }
@@ -162,11 +168,13 @@ namespace Liquid {
             return start;
         }
 
-        const char* nextBoundary(const char* offset, const char* end) {
+        const char* nextBoundary(const char* offset, const char* end, bool lexNewline = false) {
             while (offset < end) {
                 int size = isWhitespace(offset, end);
                 if (size == 0)
                     return offset;
+                if (lexNewline && size == 1 && *offset == '\n')
+                    static_cast<T*>(this)->newline();
                 offset += size;
             }
             return offset;
@@ -202,8 +210,7 @@ namespace Liquid {
                     case State::INITIAL:
                         switch (str[offset]) {
                             case '\n': {
-                                ++line;
-                                column = 0;
+                                static_cast<T*>(this)->newline();
                             } break;
                             case '{': {
                                 if (offset > 0 && str[offset-1] == '{') {
@@ -256,7 +263,7 @@ namespace Liquid {
                     break;
                     case State::OUTPUT:
                     case State::CONTROL: {
-                        offset = (size_t)(nextBoundary(&str[offset], end) - str);
+                        offset = (size_t)(nextBoundary(&str[offset], end, true) - str);
                         size_t startOfWord = offset, endOfWord;
                         int bytes = 1;
                         bool isNumber = true;
@@ -285,15 +292,16 @@ namespace Liquid {
                                     }
                                 } break;
                                 case '\n':
-                                    ++line;
-                                    column = 0;
                                     ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                    static_cast<T*>(this)->newline();
                                     processComplete = true;
+                                    ++offset;
                                 break;
                                 case ' ':
                                 case '\t':
                                     ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
                                     processComplete = true;
+                                    ++offset;
                                 break;
                                 case '-':
                                     // Special case: when this is NOT followed by a space, and it's part of a word, this is treated as part of a literal.
@@ -422,7 +430,9 @@ namespace Liquid {
                     case State::RAW: {
                         // Go until the next raw tag;
                         do {
-                            if (str[offset] == '}' && str[offset-1] == '%') {
+                            if (str[offset] == '\n') {
+                                static_cast<T*>(this)->newline();
+                            } else if (str[offset] == '}' && str[offset-1] == '%') {
                                 size_t target = offset - 2;
                                 if (str[target] == '-')
                                     --target;

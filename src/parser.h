@@ -92,8 +92,12 @@ namespace Liquid {
         enum class State {
             NODE,
             ARGUMENT,
-            // An error state that only occurs when
-            IGNORE_UNTIL_BLOCK_END
+            // An error state that only occurs when we need to basically ignore everything until we get out of argument context.
+            // Alows us to continue to parse, even if one tag is messed up.
+            IGNORE_UNTIL_BLOCK_END,
+            // Specifically for the {% liquid %} *rolls eyes*.
+            LIQUID_NODE,
+            LIQUID_ARGUMENT
         };
         enum class EFilterState {
             UNSET,
@@ -127,10 +131,14 @@ namespace Liquid {
             Parser& parser;
             typedef Liquid::Lexer<Lexer> SUPER;
 
+            bool newline();
             bool literal(const char* str, size_t len);
             bool dot();
             bool colon();
             bool comma();
+
+            bool endOutputContext();
+            bool endTagContext();
 
             bool startOutputBlock(bool suppress);
             bool endOutputBlock(bool suppress);

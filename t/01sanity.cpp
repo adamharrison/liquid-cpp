@@ -266,6 +266,27 @@ TEST(sanity, casestatement) {
     ASSERT_EQ(str, "7");
 }
 
+TEST(sanity, liquidtag) {
+    CPPVariable hash;
+    Node ast;
+    std::string str;
+    hash["b"] = 2;
+
+    // I cannot believe that this is how they do it. Literally they treat newlines as special whitespace, rather than
+    // actually doing a proper parse and disambiguating based on keywords. I rolled my eyes so hard; they probably actually used a regex.
+    ast = getParser().parse("{% liquid\n\
+    case b\n\
+        when 1\n\
+            echo '3'\n\
+        when 2\n\
+            echo '7'\n\
+        else\n\
+            echo '8'\n\
+    endcase %}");
+    str = renderTemplate(ast, hash);
+    ASSERT_EQ(str, "7");
+}
+
 TEST(sanity, assignments) {
     CPPVariable variable, hash;
     hash["b"] = 2;

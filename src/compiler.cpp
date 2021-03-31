@@ -223,6 +223,8 @@ namespace Liquid {
                 return "OP_JMP";
             case OP_JMPFALSE:
                 return "OP_JMPFALSE";
+            case OP_JMPTRUE:
+                return "OP_JMPTRUE";
             case OP_CALL:
                 return "OP_CALL";
             case OP_RESOLVE:
@@ -354,6 +356,7 @@ namespace Liquid {
             switch (instruction) {
                 case OP_JMP:
                 case OP_JMPFALSE:
+                case OP_JMPTRUE:
                 case OP_ITERATE:
                     *((long long*)&program.code[i]) += program.codeOffset;
                 break;
@@ -665,7 +668,8 @@ namespace Liquid {
         while (true) {
             instruction = *instructionPointer++;
             target = instruction >> 8;
-            switch (instruction & 0xFF) {
+            OPCode opCode = (OPCode)(instruction & 0xFF);
+            switch (opCode) {
                 case OP_MOVSTR: {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
                     unsigned int length = *(unsigned int*)&code[operand];
@@ -890,17 +894,19 @@ namespace Liquid {
                             callback(buffer, len, data);
                         } break;
                         case Register::Type::VARIABLE: {
-                            long long len = variableResolver.getStringLength(LiquidRenderer { this }, registers[target].pointer);
-                            if (len > 0) {
-                                if (len < 4096) {
-                                    char buffer[4096];
-                                    variableResolver.getString(LiquidRenderer { this }, registers[target].pointer, buffer);
-                                    callback(buffer, len, data);
-                                } else {
-                                    vector<char> buffer;
-                                    buffer.resize(len);
-                                    variableResolver.getString(LiquidRenderer { this }, registers[target].pointer, &buffer[0]);
-                                    callback(buffer.data(), len, data);
+                            if (registers[target].pointer) {
+                                long long len = variableResolver.getStringLength(LiquidRenderer { this }, registers[target].pointer);
+                                if (len > 0) {
+                                    if (len < 4096) {
+                                        char buffer[4096];
+                                        variableResolver.getString(LiquidRenderer { this }, registers[target].pointer, buffer);
+                                        callback(buffer, len, data);
+                                    } else {
+                                        vector<char> buffer;
+                                        buffer.resize(len);
+                                        variableResolver.getString(LiquidRenderer { this }, registers[target].pointer, &buffer[0]);
+                                        callback(buffer.data(), len, data);
+                                    }
                                 }
                             }
                         } break;
@@ -911,7 +917,8 @@ namespace Liquid {
                         break;
                     }
                 break;
-                case OP_JMPFALSE: {
+                case OP_JMPTRUE: {
+                case OP_JMPFALSE:
                     bool isTrue = true;
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
                     switch (registers[target].type) {
@@ -930,12 +937,16 @@ namespace Liquid {
                         case Register::Type::FLOAT:
                             isTrue = registers[target].f;
                         break;
+                        case Register::Type::VARIABLE:
+                            isTrue = registers[target].pointer;
+                        break;
                         case Register::Type::LONG_STRING:
                         case Register::Type::EXTRA_LONG_STRING:
-                        case Register::Type::VARIABLE:
                         break;
                     }
-                    if (!isTrue)
+                    if (opCode == OP_JMPFALSE)
+                        isTrue = !isTrue;
+                    if (isTrue)
                         instructionPointer = reinterpret_cast<const unsigned int*>(&code[operand]);
                 } break;
                 case OP_EXIT:
