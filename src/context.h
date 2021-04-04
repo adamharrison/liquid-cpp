@@ -9,6 +9,13 @@ namespace Liquid {
 
     struct Renderer;
 
+    struct LiteralType {
+        string symbol;
+        Variant value;
+
+        LiteralType(string symbol, Variant value) : symbol(symbol), value(value) { }
+    };
+
     struct ContextualNodeType : NodeType {
         ContextualNodeType(NodeType::Type type, const std::string& symbol = "", int maxChildren = -1, LiquidOptimizationScheme scheme = LIQUID_OPTIMIZATION_SCHEME_NONE) : NodeType(type, symbol, maxChildren, scheme) { }
 
@@ -37,8 +44,10 @@ namespace Liquid {
 
     struct TagNodeType : ContextualNodeType {
         enum class Composition {
+            FREE,
             ENCLOSED,
-            FREE
+            // When a tag needs to be like {% raw %} or {% comment %}, will take the entirety of its contents as a literal.
+            LEXING_HALT
         };
 
         // This is insanely stupid.
@@ -270,6 +279,7 @@ namespace Liquid {
         unordered_map<string, unique_ptr<NodeType>> binaryOperatorTypes;
         unordered_map<string, unique_ptr<NodeType>> filterTypes;
         unordered_map<string, unique_ptr<NodeType>> dotFilterTypes;
+        unordered_map<string, unique_ptr<LiteralType>> literalTypes;
 
         ConcatenationNode concatenationNodeType;
         OutputNode outputNodeType;
@@ -326,7 +336,12 @@ namespace Liquid {
             }
             return value;
         }
-        template <class T> NodeType* registerType() { return registerType(make_unique<T>()); }
+        LiteralType* registerType(unique_ptr<LiteralType> type) {
+            LiteralType* value = type.get();
+            literalTypes[type->symbol] = move(type);
+            return value;
+        }
+        template <class T> T* registerType() { return static_cast<T*>(registerType(make_unique<T>())); }
 
         const TagNodeType* getTagType(string symbol) const {
             auto it = tagTypes.find(symbol);
@@ -359,6 +374,13 @@ namespace Liquid {
             if (it == dotFilterTypes.end())
                 return nullptr;
             return static_cast<DotFilterNodeType*>(it->second.get());
+        }
+
+        const LiteralType* getLiteralType(string symbol) const {
+            auto it = literalTypes.find(symbol);
+            if (it == literalTypes.end())
+                return nullptr;
+            return static_cast<LiteralType*>(it->second.get());
         }
 
         void optimize(Node& ast, Variable store);

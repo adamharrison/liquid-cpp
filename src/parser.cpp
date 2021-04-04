@@ -238,7 +238,7 @@ namespace Liquid {
                             std::string typeName = std::string(&str[3], len - 3);
                             const TagNodeType* type = static_cast<const TagNodeType*>(SUPER::context.getTagType(typeName));
 
-                            if (!type || type->composition != TagNodeType::Composition::ENCLOSED) {
+                            if (!type || type->composition == TagNodeType::Composition::FREE) {
                                 parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_TAG, std::string(str, len)));
                                 return false;
                             }
@@ -258,14 +258,14 @@ namespace Liquid {
                                 return parser.pushNode(make_unique<Node>(context.getOutputNodeType()), true) && parser.pushNode(make_unique<Node>(context.getArgumentsNodeType()), true);
                             }
 
-                            const NodeType* type = SUPER::context.getTagType(typeName);
+                            const TagNodeType* type = SUPER::context.getTagType(typeName);
                             if (!type && parser.nodes.size() > 0) {
                                 for (auto it = parser.nodes.rbegin(); it != parser.nodes.rend(); ++it) {
                                     if ((*it)->type && (*it)->type->type == NodeType::Type::TAG) {
                                         auto& intermediates = static_cast<const TagNodeType*>((*it)->type)->intermediates;
                                         auto it = intermediates.find(typeName);
                                         if (it != intermediates.end()) {
-                                            type = it->second.get();
+                                            type = static_cast<TagNodeType*>(it->second.get());
                                             // Pop off the concatenation node, and apply this as the next arugment in the parent node.
                                             parser.popNode();
                                             parser.blockType = Parser::EBlockType::INTERMEDIATE;
@@ -278,12 +278,15 @@ namespace Liquid {
                                 parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_TAG, typeName));
                                 return false;
                             }
+                            if (type->composition == TagNodeType::Composition::LEXING_HALT)
+                                beginHalt(typeName.c_str(), typeName.size());
                             parser.state = parser.state == Parser::State::LIQUID_NODE ? Parser::State::LIQUID_ARGUMENT : Parser::State::ARGUMENT;
                             return parser.pushNode(std::make_unique<Node>(type), true) && parser.pushNode(std::make_unique<Node>(context.getArgumentsNodeType()), true);
                         }
                     } break;
                     case SUPER::State::OUTPUT:
-                    case SUPER::State::RAW:
+                    case SUPER::State::HALT:
+                    case SUPER::State::CONTROL_HALT:
                     case SUPER::State::INITIAL:
                         assert(parser.nodes.back()->type == SUPER::context.getConcatenationNodeType());
                         parser.nodes.back()->children.push_back(std::make_unique<Node>(std::string(str, len)));
@@ -292,16 +295,13 @@ namespace Liquid {
             } break;
             case Parser::State::LIQUID_ARGUMENT:
             case Parser::State::ARGUMENT: {
-                if (len == 4 && strncmp(str, "true", len) == 0)
-                    return parser.pushNode(move(make_unique<Node>(Variant(true))));
-                else if (len == 5 && strncmp(str, "false", len) == 0)
-                    return parser.pushNode(move(make_unique<Node>(Variant(false))));
-                else if ((len == 4 && (strncmp(str, "null", len) == 0)) || (len == 3 && strncmp(str, "nil", len) == 0))
-                    return parser.pushNode(move(make_unique<Node>(Variant(nullptr))));
+                std::string opName = std::string(str, len);
+                const LiteralType* type = SUPER::context.getLiteralType(opName);
+                if (type)
+                    return parser.pushNode(make_unique<Node>(type->value));
                 auto& lastNode = parser.nodes.back();
                 if (lastNode->type && (lastNode->type->type == NodeType::Type::VARIABLE || lastNode->type->type == NodeType::Type::DOT_FILTER) && !lastNode->children.back().get()) {
                     // Check for dot filters.
-                    std::string opName = std::string(str, len);
                     const DotFilterNodeType* op = context.getDotFilterType(opName);
                     if (op) {
                         lastNode->children.pop_back();
@@ -448,6 +448,7 @@ namespace Liquid {
 
 
     bool Parser::Lexer::startOutputBlock(bool suppress) {
+        SUPER::startOutputBlock(suppress);
         parser.state = Parser::State::ARGUMENT;
         return parser.pushNode(make_unique<Node>(context.getOutputNodeType()), true) && parser.pushNode(make_unique<Node>(context.getArgumentsNodeType()), true);
     }
@@ -530,6 +531,7 @@ namespace Liquid {
         if (!endOutputContext())
             return false;
         parser.state = Parser::State::NODE;
+        SUPER::endOutputBlock(suppress);
         return true;
     }
 
@@ -579,6 +581,7 @@ namespace Liquid {
             return false;
         parser.state = Parser::State::NODE;
         parser.blockType = Parser::EBlockType::NONE;
+        SUPER::endControlBlock(suppress);
         return true;
     }
 

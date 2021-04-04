@@ -14,8 +14,9 @@ namespace Liquid {
 
         enum class State {
             INITIAL,
-            RAW,
+            HALT,
             CONTROL,
+            CONTROL_HALT,
             OUTPUT
         };
 
@@ -58,8 +59,14 @@ namespace Liquid {
         size_t line;
         State state;
 
-        bool startOutputBlock(bool suppress) { return true; }
-        bool endOutputBlock(bool suppress) { return true; }
+        bool startOutputBlock(bool suppress) {
+            state = State::OUTPUT;
+            return true;
+        }
+        bool endOutputBlock(bool suppress) {
+            state = State::INITIAL;
+            return true;
+        }
 
         bool newline() {
             ++line;
@@ -77,11 +84,25 @@ namespace Liquid {
         bool startVariableDereference() { return true; }
         bool endVariableDereference() { return true; }
 
-        bool startControlBlock(bool suppress) { return true; }
-        bool endControlBlock(bool suppress) { return true; }
+        bool startControlBlock(bool suppress) {
+            state = State::CONTROL;
+            return true;
+        }
+        bool endControlBlock(bool suppress) {
+            state = state == State::CONTROL_HALT ? State::HALT : State::INITIAL;
+            return true;
+        }
 
         bool openParenthesis() { return true; }
         bool closeParenthesis() { return true; }
+
+        std::string halt;
+        bool beginHalt(const char* str, size_t len) {
+            halt = std::string(str, len);
+            state = State::CONTROL_HALT;
+            return true;
+        }
+        bool endHalt() { halt.clear(); return true; }
 
         bool isWhitespace(char c) { return isspace(c); }
         bool isWhitespace(unsigned int c) {
@@ -226,7 +247,6 @@ namespace Liquid {
                                             static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial - 1);
                                         ongoing = static_cast<T*>(this)->startOutputBlock(false);
                                     }
-                                    state = State::OUTPUT;
                                 }
                             } break;
                             case '%': {
@@ -244,25 +264,15 @@ namespace Liquid {
 
                                     // Check for the raw tag. This is a special lexing halter.
                                     i = (size_t)(nextBoundary(&str[offset+1], end) - str);
-                                    if (i < size - 4 && strncmp("raw", &str[i], 3) == 0) {
-                                        i = (size_t)(nextBoundary(&str[i+4], end) - str);
-                                        if (i < size && str[i] == '-')
-                                            ++i;
-                                        if (i >= size - 2 || str[i] != '%' || str[i+1] != '}')
-                                            return Lexer::Error(*this, Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END);
-                                        lastInitial = i+2;
-                                        state = State::RAW;
-                                    } else {
-                                        ongoing = static_cast<T*>(this)->startControlBlock(false);
-                                        state = State::CONTROL;
-                                    }
+                                    ongoing = static_cast<T*>(this)->startControlBlock(false);
                                 }
                             } break;
                         }
                         ++offset;
                     break;
                     case State::OUTPUT:
-                    case State::CONTROL: {
+                    case State::CONTROL:
+                    case State::CONTROL_HALT: {
                         offset = (size_t)(nextBoundary(&str[offset], end, true) - str);
                         size_t startOfWord = offset, endOfWord;
                         int bytes = 1;
@@ -359,10 +369,9 @@ namespace Liquid {
                                     }
                                 break;
                                 case '}': {
-                                    if (state == State::CONTROL) {
+                                    if (state == State::CONTROL ||  state == State::CONTROL_HALT) {
                                         if (str[offset-1] == '%') {
                                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - (str[offset-2] == '-' ? 2 : 1), isNumber, hasPoint) && static_cast<T*>(this)->endControlBlock(str[offset-2] == '-');
-                                            state = State::INITIAL;
                                             if (str[offset-2] == '-')
                                                 offset = (size_t)(nextBoundary(&str[offset+1], end) - str);
                                             else
@@ -373,7 +382,6 @@ namespace Liquid {
                                     } else {
                                         if (str[offset-1] == '}') {
                                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - (str[offset-2] == '-' ? 2 : 1), isNumber, hasPoint) && static_cast<T*>(this)->endOutputBlock(str[offset-2] == '-');
-                                            state = State::INITIAL;
                                             if (str[offset-2] == '-')
                                                 offset = (size_t)(nextBoundary(&str[offset+1], end) - str);
                                             else
@@ -427,18 +435,19 @@ namespace Liquid {
                         if (offset == size && !processComplete)
                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
                     } break;
-                    case State::RAW: {
+                    case State::HALT: {
                         // Go until the next raw tag;
                         do {
                             if (str[offset] == '\n') {
                                 static_cast<T*>(this)->newline();
                             } else if (str[offset] == '}' && str[offset-1] == '%') {
-                                size_t target = offset - 2;
+                                size_t target = offset - 2, tagStart;
                                 if (str[target] == '-')
                                     --target;
                                 target = (size_t)(previousBoundary(str, &str[target]) - str);
-                                if (strncmp("endraw", &str[target-5], 6) == 0) {
-                                    target = (size_t)(previousBoundary(str, &str[target-6]) - str);
+                                tagStart = target-(halt.size()+2);
+                                if (strncmp("end", &str[tagStart], 3) == 0 && strncmp(halt.data(), &str[tagStart+3], halt.size()) == 0) {
+                                    target = (size_t)(previousBoundary(str, &str[target-(halt.size()+3)]) - str);
                                     bool hasSuppressed = str[target-1] == '-';
                                     if (hasSuppressed)
                                         --target;
@@ -447,6 +456,7 @@ namespace Liquid {
                                         if (target - lastInitial - 1 > 0)
                                             static_cast<T*>(this)->literal(&str[lastInitial], target - lastInitial + 1);
                                         state = State::INITIAL;
+                                        ongoing = static_cast<T*>(this)->startControlBlock(false) && static_cast<T*>(this)->literal(&str[tagStart], halt.size() + 3) && static_cast<T*>(this)->endControlBlock(false);
                                         ++offset;
                                         if (hasSuppressed)
                                             offset = (size_t)(nextBoundary(&str[offset], end) - str);
@@ -456,8 +466,8 @@ namespace Liquid {
                                 }
                             }
                         } while (++offset < size);
-                        if (state == State::RAW)
-                            return Lexer::Error(*this, Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END, "raw");
+                        if (state == State::HALT)
+                            return Lexer::Error(*this, Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END, halt);
                     } break;
                 }
             }

@@ -50,9 +50,9 @@ Optimizer& getOptimizer() {
 
 string renderTemplate(const Node& ast, Variable variable) {
     // Whether these tests run on the interpreter or on the renderer.
-    //return getRenderer().render(ast, variable);
-    fprintf(stderr, "DISASSEMBLY: \n%s\n", getCompiler().disassemble(getCompiler().compile(ast)).data());
-    return getInterpreter().renderTemplate(getCompiler().compile(ast), variable);
+    return getRenderer().render(ast, variable);
+    //fprintf(stderr, "DISASSEMBLY: \n%s\n", getCompiler().disassemble(getCompiler().compile(ast)).data());
+    //return getInterpreter().renderTemplate(getCompiler().compile(ast), variable);
 }
 
 TEST(sanity, literal) {
@@ -145,12 +145,22 @@ TEST(sanity, parenthesis) {
     ASSERT_EQ(str, "asdbfsdf 0 b");
 }
 
-TEST(sanity, raw) {
+TEST(sanity, lexingHalts) {
     CPPVariable variable;
     variable["a"] = 3;
     auto ast = getParser().parse("asdbfsdf {% raw %}{{ a - (1 + 2) }}{% endraw %} b");
     auto str = renderTemplate(ast, variable);
     ASSERT_EQ(str, "asdbfsdf {{ a - (1 + 2) }} b");
+
+    ast = getParser().parse("asdbfsdf {% comment %}{{ a - (1 + 2) }}{% endcomment %} b");
+    str = renderTemplate(ast, variable);
+    ASSERT_EQ(getParser().errors.size(), 0);
+    ASSERT_EQ(str, "asdbfsdf  b");
+
+    ast = getParser().parse("asdbfsdf {% comment %}{{ a - (1 + 2) dfghfhdfgh}}{% endcomment %} b");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf  b");
 }
 
 

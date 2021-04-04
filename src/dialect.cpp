@@ -130,9 +130,21 @@ namespace Liquid {
         }
     };
 
-    struct CommentNode : EnclosedNodeType {
-        CommentNode() : EnclosedNodeType("comment", 0, 0, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
+    struct CommentNode : TagNodeType {
+        CommentNode() : TagNodeType(Composition::LEXING_HALT, "comment", 0, 0, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const override { return Node(); }
+        void compile(Compiler& compiler, const Node& node) const override { }
+    };
+
+    struct RawNode : TagNodeType {
+        RawNode() : TagNodeType(Composition::LEXING_HALT, "raw", 0, 0, LIQUID_OPTIMIZATION_SCHEME_PARTIAL) { }
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
+            return renderer.retrieveRenderedNode(*node.children[1].get(), store);
+        }
+        void compile(Compiler& compiler, const Node& node) const override {
+            int offset = compiler.add(node.children[1]->variant.s.data(), node.children[1]->variant.s.size());
+            compiler.add(OP_OUTPUTMEM, 0x0, offset);
+        }
     };
 
     template <bool INVERSE>
@@ -2021,6 +2033,11 @@ namespace Liquid {
         }
     };
 
+    struct TrueLiteral : LiteralType { TrueLiteral() : LiteralType("true", Variant(true)) { } };
+    struct FalseLiteral : LiteralType { FalseLiteral() : LiteralType("false", Variant(false)) { } };
+    struct NullLiteral : LiteralType { NullLiteral() : LiteralType("null", Variant(nullptr)) { } };
+    struct NilLiteral : LiteralType { NilLiteral() : LiteralType("nil", Variant(nullptr)) { } };
+
     template <class T>
     void registerStandardDialectFilters(T& context) {
 
@@ -2097,7 +2114,7 @@ namespace Liquid {
         context.registerType<ForNode::ContinueNode>();
 
         // Variable tags.
-        TagNodeType* assignNode = static_cast<TagNodeType*>(globalAssignsOnly ? context.registerType<AssignNode<false>>() : context.registerType<AssignNode<true>>());
+        TagNodeType* assignNode = globalAssignsOnly ? static_cast<TagNodeType*>(context.registerType<AssignNode<false>>()) : static_cast<TagNodeType*>(context.registerType<AssignNode<true>>());
 
         context.registerType<CaptureNode>();
         context.registerType<IncrementNode>();
@@ -2105,6 +2122,7 @@ namespace Liquid {
 
         // Other tags.
         context.registerType<CommentNode>();
+        context.registerType<RawNode>();
 
         // Standard set of operators.
         if (assignConditionalOperatorsOnly) {
@@ -2157,5 +2175,10 @@ namespace Liquid {
         context.registerType<SizeDotFilterNode>();
         context.registerType<FirstDotFilterNode>();
         context.registerType<LastDotFilterNode>();
+
+        context.registerType<TrueLiteral>();
+        context.registerType<FalseLiteral>();
+        context.registerType<NullLiteral>();
+        context.registerType<NilLiteral>();
     }
 }
