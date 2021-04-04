@@ -52,6 +52,19 @@ namespace Liquid {
             }
             return true;
         }
+
+        void compile(Compiler& compiler, const Node& node) const override {
+            auto& argumentNode = node.children.front();
+            auto& assignmentNode = argumentNode->children.front();
+            auto& variableNode = assignmentNode->children.front();
+            auto& valueNode = assignmentNode->children.back();
+            compiler.compileBranch(*valueNode.get());
+            compiler.add(OP_MOV, 0x0, 0x2);
+            compiler.add(OP_MOVNIL, 0x1);
+            compiler.compileBranch(*variableNode.get());
+            // The last instruction should be RESOLVE here, on 0x0. We take that instruction, and overwrite it with an ASSIGN, which will assign 0x0 to the targeted register.
+            compiler.modify(compiler.currentOffset() - (sizeof(int) + sizeof(long long)), OP_ASSIGN, 0x1, 0x2);
+        }
     };
 
 
@@ -66,6 +79,18 @@ namespace Liquid {
                 renderer.setVariable(*variableNode.get(), store, targetVariable);
             }
             return Node();
+        }
+
+        void compile(Compiler& compiler, const Node& node) const override {
+            auto& argumentNode = node.children.front();
+            auto& variableNode = argumentNode->children.front();
+            compiler.add(OP_PUSHBUFFER, 0x0);
+            compiler.compileBranch(*node.children[1].get());
+            compiler.add(OP_POPBUFFER, 0x2);
+            compiler.add(OP_MOVNIL, 0x1);
+            compiler.compileBranch(*variableNode.get());
+            // The last instruction should be RESOLVE here, on 0x0. We take that instruction, and overwrite it with an ASSIGN, which will assign 0x0 to the targeted register.
+            compiler.modify(compiler.currentOffset() - (sizeof(int) + sizeof(long long)), OP_ASSIGN, 0x1, 0x2);
         }
     };
 
@@ -181,7 +206,12 @@ namespace Liquid {
                 if (node.children[i]->type->symbol == "else") {
                     compiler.compileBranch(*node.children[i+1].get());
                 } else {
-                    compiler.compileBranch(*node.children[i].get()->children[0].get());
+                    compiler.freeRegister = 0;
+                    // Obviously child 0 is arguments, but subsequent children are tags, so we want to bypass arguments in both cases.
+                    compiler.compileBranch(i == 0 ?
+                        *node.children[i].get()->children[0].get() :
+                        *node.children[i].get()->children[0].get()->children[0].get()
+                    );
                     if (INVERSE)
                         compiler.add(OP_INVERT, 0x0);
                     int conditionalFalseJump = compiler.add(OP_JMPFALSE, 0x0, 0x0);
@@ -313,7 +343,7 @@ namespace Liquid {
                     compiler.modify(lastJmp, OP_JMPFALSE, 0x0, compiler.currentOffset());
                 if (node.children[i]->type == whenNodeType) {
                     compiler.freeRegister = 0;
-                    compiler.compileBranch(*node.children[i]->children[0].get());
+                    compiler.compileBranch(*node.children[i]->children[0]->children[0].get());
                     compiler.add(OP_EQL, 0x1);
                     lastJmp = compiler.add(OP_JMPFALSE, 0x0, 0x0);
                     compiler.compileBranch(*node.children[i+1].get());
@@ -693,7 +723,7 @@ namespace Liquid {
         UnaryMinusOperatorNode() : OperatorNodeType("-", Arity::UNARY, 10, Fixness::PREFIX) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            Node op1 = getChild(renderer, node, store, 0);
+            Node op1 = getOperand(renderer, node, store, 0);
             if (op1.variant.type == Variant::Type::INT)
                 return Variant(op1.variant.i * -1);
             if (op1.variant.type == Variant::Type::FLOAT)
@@ -706,7 +736,7 @@ namespace Liquid {
         UnaryNegationOperatorNode() : OperatorNodeType("!", Arity::UNARY, 15, Fixness::PREFIX) { }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            Node op1 = renderer.retrieveRenderedNode(*node.children[0].get(), store);
+            Node op1 = getOperand(renderer, node, store, 0);
             return Variant(!op1.variant.isTruthy(renderer.context.falsiness));
         }
     };

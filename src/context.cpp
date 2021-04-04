@@ -29,7 +29,7 @@ namespace Liquid {
 
     Node OperatorNodeType::getOperand(Renderer& renderer, const Node& node, Variable store, int idx) const {
         if (renderer.mode == Renderer::ExecutionMode::INTERPRETER) {
-            return static_cast<Interpreter&>(renderer).getStack(-1 - (idx+1));
+            return static_cast<Interpreter&>(renderer).getStack(-1 - idx);
         } else {
             return renderer.retrieveRenderedNode(*node.children[idx].get(), store);
         }
@@ -38,8 +38,7 @@ namespace Liquid {
 
     Node FilterNodeType::getOperand(Renderer& renderer, const Node& node, Variable store) const {
         if (renderer.mode == Renderer::ExecutionMode::INTERPRETER) {
-            int argCount = static_cast<Interpreter&>(renderer).getStack(-1).variant.i;
-            return static_cast<Interpreter&>(renderer).getStack(-(argCount + 1));
+            return static_cast<Interpreter&>(renderer).getStack(-1);
         } else {
             return renderer.retrieveRenderedNode(*node.children[0].get(), store);
         }

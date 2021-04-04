@@ -28,7 +28,7 @@ void liquidImplementPermissiveStandardDialect(LiquidContext context) {
 #endif
 
 LiquidRenderer liquidCreateRenderer(LiquidContext context) {
-    return LiquidRenderer({ new Interpreter(*static_cast<Context*>(context.context), {
+    Interpreter* interpreter = new Interpreter(*static_cast<Context*>(context.context), {
         .getType = +[](LiquidRenderer renderer, void* variable) { return LIQUID_VARIABLE_TYPE_NIL; },
         .getBool = +[](LiquidRenderer renderer, void* variable, bool* target) { return false; },
         .getTruthy = +[](LiquidRenderer renderer, void* variable) { return false; },
@@ -53,7 +53,10 @@ LiquidRenderer liquidCreateRenderer(LiquidContext context) {
         .createClone = +[](LiquidRenderer renderer, void* value) { return (void*)NULL; },
         .freeVariable = +[](LiquidRenderer renderer, void* value) { },
         .compare = +[](void* a, void* b) { return 0; }
-    }) });
+    });
+    // So that we pre-allocate things.
+    interpreter->buffers.push(string());
+    return LiquidRenderer({ interpreter });
 }
 
 void liquidFreeRenderer(LiquidRenderer renderer) {
@@ -87,14 +90,6 @@ void liquidFreeCompiler(LiquidCompiler compiler) {
     delete (Compiler*)compiler.compiler;
 }
 
-void liquidCreateInterpreter(LiquidContext context) {
-
-}
-
-void liquidFreeInterpreter(LiquidInterpreter interpreter) {
-    delete (Interpreter*)interpreter.interpreter;
-}
-
 LiquidProgram liquidCompilerCompileTemplate(LiquidCompiler compiler, LiquidTemplate tmpl) {
     return LiquidProgram({ new Program(move(static_cast<Compiler*>(compiler.compiler)->compile(*static_cast<Node*>(tmpl.ast)))) });
 }
@@ -123,17 +118,17 @@ LiquidProgramRender liquidRendererRunProgram(LiquidRenderer renderer, void* vari
     if (error)
         error->type = LIQUID_RENDERER_ERROR_TYPE_NONE;
 
-    static_cast<Interpreter*>(renderer.renderer)->buffer.clear();
+    Interpreter* interpreter = static_cast<Interpreter*>(renderer.renderer);
+    interpreter->buffers.top().clear();
     try {
-        static_cast<Interpreter*>(renderer.renderer)->renderTemplate(*static_cast<Program*>(program.program), Variable({ variableStore }), +[](const char* chunk, size_t len, void* data) {
-            static_cast<Interpreter*>(data)->buffer.append(chunk, len);
+        interpreter->renderTemplate(*static_cast<Program*>(program.program), Variable({ variableStore }), +[](const char* chunk, size_t len, void* data) {
         }, renderer.renderer);
     } catch (Renderer::Exception& exp) {
         if (error)
             *error = exp.rendererError;
         return { nullptr, 0 };
     }
-    return { static_cast<Interpreter*>(renderer.renderer)->buffer.data(), static_cast<Interpreter*>(renderer.renderer)->buffer.size() };
+    return { interpreter->buffers.top().data(), interpreter->buffers.top().size() };
 }
 
 

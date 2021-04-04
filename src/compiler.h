@@ -2,6 +2,7 @@
 #define LIQUIDCOMPILER_H
 
 #include <vector>
+#include <stack>
 #include <unordered_map>
 #include <string>
 
@@ -31,7 +32,7 @@ namespace Liquid {
         OP_EQL,         // Checks whether the register is equal to 0x0.
         OP_OUTPUT,      // Takes the return register, and appends it to the selected output buffer.
         OP_OUTPUTMEM,   // Takes the targeted memory address, and appends it to the selected output buffer. Optimized version of OP_OUTPUT to reduce copying.
-        OP_ASSIGN,      // Assigning a variable from the contents of the return register to the specified operand. If 0x0 to the gloabl vairable context.
+        OP_ASSIGN,      // Assigning a variable specified in the target register. Key is at 0x0, and value is at the operand register.
         OP_JMP,         // Unconditional jump.
         OP_JMPFALSE,    // Jumps to the instruction if primary register is false.
         OP_JMPTRUE,     // Jumps to the instruction if the priamry register is true.
@@ -39,6 +40,8 @@ namespace Liquid {
         OP_RESOLVE,     // Resovles the named variable in the register and places it into the same register. Operand is either 0x0, for the top-level context, or a register, which contains the context for the next deference.,
         OP_ITERATE,     // Iterates through the variable in the specified register, and pops the value into 0x0. If iteration is over, JMPs to the specified instruction.
         OP_INVERT,      // Coerces to a boolean
+        OP_PUSHBUFFER,  // Pushes a buffer onto to the buffer stack, with the contents of the target register.
+        OP_POPBUFFER,   // Pops a buffer off the buffer stack, flushing the contents of the buffer to the target register.
         OP_EXIT         // Quits the program.
     };
 
@@ -129,14 +132,14 @@ namespace Liquid {
         static constexpr int TOTAL_REGISTERS = 4;
         static constexpr int MAX_FRAMES = 128;
 
-        string buffer;
+        stack<string> buffers;
 
         Register registers[TOTAL_REGISTERS];
         const unsigned int* instructionPointer;
         char* stackPointer;
 
         int frames[MAX_FRAMES];
-        char stack[STACK_SIZE];
+        char stackBlock[STACK_SIZE];
 
         Interpreter(const Context& context);
         Interpreter(const Context& context, LiquidVariableResolver resolver);
@@ -148,6 +151,8 @@ namespace Liquid {
         void popStack(int i);
         void pushStack(Register& reg);
         void pushRegister(Register& reg, const Node& node);
+        void pushRegister(Register& reg, const string& str);
+        void pushRegister(Register& reg, string&& str);
 
         bool run(const unsigned char* code, Variable store, void (*callback)(const char* chunk, size_t len, void* data), void* data, const unsigned char* iteration = nullptr);
 

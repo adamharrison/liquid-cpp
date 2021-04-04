@@ -50,8 +50,9 @@ Optimizer& getOptimizer() {
 
 string renderTemplate(const Node& ast, Variable variable) {
     // Whether these tests run on the interpreter or on the renderer.
-    return getRenderer().render(ast, variable);
-    // return getInterpreter().renderTemplate(getCompiler().compile(ast), variable);
+    //return getRenderer().render(ast, variable);
+    fprintf(stderr, "DISASSEMBLY: \n%s\n", getCompiler().disassemble(getCompiler().compile(ast)).data());
+    return getInterpreter().renderTemplate(getCompiler().compile(ast), variable);
 }
 
 TEST(sanity, literal) {
@@ -83,15 +84,15 @@ TEST(sanity, subtraction) {
     Node ast;
     std::string str;
 
+    ast = getParser().parse("asdbfsdf {{ -a }} b");
+    str = renderTemplate(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf -3 b");
+
     ast = getParser().parse("asdbfsdf {{ a - 1 + 2 }} b");
     str = renderTemplate(ast, variable);
     ASSERT_EQ(str, "asdbfsdf 4 b");
 
 
-    ast = getParser().parse("asdbfsdf {{ -a }} b");
-
-    str = renderTemplate(ast, variable);
-    ASSERT_EQ(str, "asdbfsdf -3 b");
 
 }
 
@@ -203,6 +204,12 @@ TEST(sanity, ifstatement) {
     std::string str;
     hash["b"] = 2;
 
+
+    variable["a"] = "test";
+    ast = getParser().parse("a{% if a == \"test2\" %}1{% elsif a == \"test\" %}2{% endif %} b");
+    str = renderTemplate(ast, variable);
+    ASSERT_EQ(str, "a2 b");
+
     variable["a"] = "test";
     ast = getParser().parse("a{% if a == \"test2\" %}1{% else %}5{% endif %} b");
     str = renderTemplate(ast, variable);
@@ -294,6 +301,11 @@ TEST(sanity, assignments) {
     Node ast;
     std::string str;
 
+
+    ast = getParser().parse("{% capture d %}{{ 1 + 3 }}sdfsdfsdf{% endcapture %}dddd{{ d }}ggggg");
+    str = renderTemplate(ast, hash);
+    ASSERT_EQ(str, "dddd4sdfsdfsdfggggg");
+
     ast = getParser().parse("{% assign a = 1 %} {{ a }}");
     CPPVariable copyVariable(variable);
     str = renderTemplate(ast, copyVariable);
@@ -305,9 +317,7 @@ TEST(sanity, assignments) {
     ASSERT_EQ(str, " 3");
 
 
-    ast = getParser().parse("{% capture d %}{{ 1 + 3 }}sdfsdfsdf{% endcapture %}dddd{{ d }}ggggg");
-    str = renderTemplate(ast, copyVariable);
-    ASSERT_EQ(str, "dddd4sdfsdfsdfggggg");
+
 }
 
 TEST(sanity, forloop) {

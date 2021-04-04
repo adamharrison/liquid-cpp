@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <stack>
 #include <string>
 #include <vector>
 #include <memory>
@@ -27,6 +28,8 @@ namespace Liquid {
     using std::make_unique;
     using std::move;
     using std::pair;
+    template<typename T>
+    using stack = std::stack<T>;
 
 
     struct Exception : public std::exception {
