@@ -540,7 +540,7 @@ namespace Liquid {
                         return Variant(forLoopContext->idx+1);
                     if (property == "rindex")
                         return Variant(forLoopContext->length - (forLoopContext->idx+1));
-                    if (property == "index0")
+                    if (property == "rindex0")
                         return Variant(forLoopContext->length - forLoopContext->idx);
                     if (property == "first")
                         return Variant(forLoopContext->idx == 0);
@@ -597,6 +597,9 @@ namespace Liquid {
             const Node& sequence = group.type && group.type->type == NodeType::Type::GROUP ? *group.children[0].get() : group;
 
             if (sequence.type && sequence.type->type == NodeType::Type::VARIABLE) {
+                // First is the variable to iterate over
+                // Then comes the actual loop variable value.
+                // Then comes the index of the loop.
                 compiler.compileBranch(sequence);
                 compiler.addPush(0x0);
                 compiler.add(OP_MOVNIL, 0x0);
@@ -605,9 +608,44 @@ namespace Liquid {
                 compiler.addPush(0x0);
                 compiler.freeRegister = 0;
                 const Node& variable = *node.children[0].get()->children[0]->children[0].get();
-                compiler.addDropFrame(variable.children[0].get()->variant.s, +[](Compiler& compiler, Compiler::DropFrameState& state) {
+                compiler.addDropFrame(variable.children[0].get()->variant.s, +[](Compiler& compiler, Compiler::DropFrameState& state, const Node& node) {
                     int negativeOffset = state.stackPoint - compiler.stackSize;
                     compiler.add(OP_STACK, 0x0, negativeOffset - 2);
+                    return 0;
+                });
+                compiler.addDropFrame("forloop", +[](Compiler& compiler, Compiler::DropFrameState& state, const Node& node) {
+                    int negativeOffset = state.stackPoint - compiler.stackSize;
+
+                    string property;
+                    if (node.type) {
+                        if (node.type->type == NodeType::Type::VARIABLE && node.children.size() == 2 && !node.children[1]->type && node.children[1]->variant.type == Variant::Type::STRING) {
+                            property = node.children[1]->variant.s;
+                        } else if (node.type) {
+                            property = node.type->symbol;
+                        }
+                    }
+                    if (!property.empty()) {
+                        if (property == "index0") {
+                            compiler.add(OP_STACK, 0x0, negativeOffset - 1);
+                            compiler.add(OP_MOVINT, 0x1, 0x1);
+                            compiler.add(OP_SUB, 0x1);
+                        } else if (property == "index") {
+                            compiler.add(OP_STACK, 0x0, negativeOffset - 1);
+                        } else if (property == "rindex") {
+
+                        } else if (property == "rindex0") {
+                        } else if (property == "first") {
+                            compiler.add(OP_STACK, 0x1, negativeOffset - 1);
+                            compiler.add(OP_MOVINT, 0x0, 0x1);
+                            compiler.add(OP_EQL, 0x1);
+                        } else if (property == "last") {
+                            compiler.add(OP_STACK, 0x1, negativeOffset - 1);
+                            compiler.add(OP_STACK, 0x0, negativeOffset - 3);
+                            compiler.add(OP_EQL, 0x1);
+                        } else if (property == "length") {
+
+                        }
+                    }
                     return 0;
                 });
                 // Counter
@@ -617,7 +655,8 @@ namespace Liquid {
                 int iterationInstruction = compiler.add(OP_ITERATE, 0x2, 0x0);
                 compiler.add(OP_POP, 0x0, 0x2);
                 compiler.add(OP_PUSH, 0x0);
-                compiler.add(OP_INC, 0x1);
+                compiler.add(OP_MOVINT, 0x0, 0x1);
+                compiler.add(OP_ADD, 0x1);
                 compiler.add(OP_PUSH, 0x1);
                 compiler.compileBranch(*node.children[1].get());
                 compiler.add(OP_JMP, 0x0, topLoop);
@@ -626,23 +665,24 @@ namespace Liquid {
             } else {
                 assert(sequence.type && sequence.children.size() == 2);
                 compiler.compileBranch(*sequence.children[1].get());
-                compiler.add(OP_INC, compiler.freeRegister - 1);
-                compiler.addPush(compiler.freeRegister - 1);
+                compiler.add(OP_MOVINT, 0x1, 0x1);
+                compiler.add(OP_ADD, 0x1);
+                compiler.addPush(0x0);
                 compiler.compileBranch(*sequence.children[0].get());
-                compiler.addPush(compiler.freeRegister - 1);
-                compiler.freeRegister = 0;
+                compiler.addPush(0x0);
                 const Node& variable = *node.children[0].get()->children[0]->children[0].get();
-                compiler.addDropFrame(variable.children[0].get()->variant.s, +[](Compiler& compiler, Compiler::DropFrameState& state) {
+                compiler.addDropFrame(variable.children[0].get()->variant.s, +[](Compiler& compiler, Compiler::DropFrameState& state, const Node& node) {
                     int negativeOffset = state.stackPoint - compiler.stackSize;
                     compiler.add(OP_STACK, 0x0, negativeOffset - 1);
                     return 0;
                 });
                 int entryPointJmp = compiler.add(OP_JMP, 0x0, 0x0);
-                int topLoop = compiler.add(OP_STACK, 0x1, -1);
-                compiler.add(OP_STACK, 0x0, -2);
-                compiler.add(OP_INC, 0x1);
-                compiler.add(OP_POP, 0x0, 0x1);
-                compiler.add(OP_PUSH, 0x1);
+                int topLoop = compiler.add(OP_STACK, 0x0, -1);
+                compiler.add(OP_MOVINT, 0x1, 1LL);
+                compiler.add(OP_ADD, 0x1);
+                compiler.add(OP_POP, 0x1, 0x1);
+                compiler.add(OP_PUSH, 0x0);
+                compiler.add(OP_STACK, 0x1, -2);
                 int entryPoint = compiler.add(OP_EQL, 0x1);
                 compiler.modify(entryPointJmp, OP_JMP, 0x0, entryPoint);
                 int endLoopJmp = compiler.add(OP_JMPTRUE, 0x0, 0x0);
@@ -1824,6 +1864,18 @@ namespace Liquid {
             }
         }
 
+        void compile(Compiler& compiler, const Node& node) const override {
+            if (node.type && node.children.size() == 1 && node.children[0]->type && node.children[0]->type->type == NodeType::Type::VARIABLE && node.children[0]->children.size() == 1 && !node.children[0]->children[0]->type) {
+                string str = node.children[0]->children[0]->variant.s;
+                auto it = compiler.dropFrames.find(str);
+                if (it != compiler.dropFrames.end() && it->second.size() > 0) {
+                    it->second.back().first(compiler, it->second.back().second, node);
+                    return;
+                }
+            }
+            DotFilterNodeType::compile(compiler, node);
+        }
+
         Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
             Variable v;
             LiquidVariableType type = renderer.variableResolver.getType(renderer, operand);
@@ -2037,6 +2089,7 @@ namespace Liquid {
     struct FalseLiteral : LiteralType { FalseLiteral() : LiteralType("false", Variant(false)) { } };
     struct NullLiteral : LiteralType { NullLiteral() : LiteralType("null", Variant(nullptr)) { } };
     struct NilLiteral : LiteralType { NilLiteral() : LiteralType("nil", Variant(nullptr)) { } };
+    struct BlankLiteral : LiteralType { BlankLiteral() : LiteralType("blank", Variant("")) { } };
 
     template <class T>
     void registerStandardDialectFilters(T& context) {
@@ -2180,5 +2233,6 @@ namespace Liquid {
         context.registerType<FalseLiteral>();
         context.registerType<NullLiteral>();
         context.registerType<NilLiteral>();
+        context.registerType<BlankLiteral>();
     }
 }

@@ -219,7 +219,7 @@ The ruby module uses the C interface to interface with the liquid library.
 
 Currently the package isn't uploaded on rubygems, so it has to be build manually. Luckily; this is easy:
 
-```cd ruby/liquidcpp && rake compile && rake gem && gem install pkg/*.gem && cd - && cd ruby/liquidc-dir && rake compile && rake gem && gem install pkg/*.gem && cd -```
+```cd ruby/liquidcpp && gem install rake-compiler && rake compile && rake gem && gem install pkg/*.gem && cd - && cd ruby/liquidc-dir && rake compile && rake gem && gem install pkg/*.gem && cd -```
 
 ##### Usage
 

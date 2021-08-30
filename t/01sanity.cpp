@@ -524,10 +524,35 @@ TEST(sanity, filters) {
 
 
 
+
+
+struct SchemaNode : TagNodeType {
+    SchemaNode() : TagNodeType(Composition::ENCLOSED, "schema", 1, 1, LIQUID_OPTIMIZATION_SCHEME_FULL) { }
+
+    Node render(Renderer& renderer, const Node& node, Variable store) const override {
+        auto str = renderer.retrieveRenderedNode(*node.children[1].get(), store).getString();
+        //fprintf(stderr, "CONTENTS: %s\n", str.c_str());
+        return Node();
+    }
+};
+
+
 TEST(sanity, optimizer) {
     CPPVariable hash, internal, settings;
     Node ast;
     std::string str;
+
+
+    Context& ctx = getContext();
+    ctx.registerType<SchemaNode>();
+    ast =  getParser().parse("AAA{% if section.settings.enabled %}dfasfsdf{% endif %}{% schema %}{\"settings\":[{\"id\":\"enabled\",\"type\":\"checkbox\",\"default\":true}]}{% endschema %}");
+    internal["enabled"] = true;
+    settings["settings"] = move(internal);
+    hash["section"] = move(settings);
+    getOptimizer().optimize(ast, hash);
+    str = renderTemplate(ast, CPPVariable());
+    ASSERT_STREQ(str.data(), "AAAdfasfsdf");
+
 
     const NodeType* ifNode = getContext().getTagType("if");
     bool atLeastOne = false;
@@ -745,6 +770,9 @@ TEST(sanity, composite) {
     str = renderTemplate(ast, hash);
     ASSERT_EQ(str, "<ul class='search-results'><li><a href='https://test.com'><div class='title'>My Test Thing</div><div class='description'>A description!</div></a></li></ul>");
 
+
+
+
 }
 
 
@@ -794,7 +822,7 @@ TEST(sanity, clang) {
     liquidFreeTemplateRender(result);
 
 
-    LiquidProgram program = liquidCompilerCompileTemplate(compiler, tmpl);
+    /*LiquidProgram program = liquidCompilerCompileTemplate(compiler, tmpl);
 
     char target[10*1024];
     liquidCompilerDisassembleProgram(compiler, program, target, 10*1024);
@@ -804,7 +832,7 @@ TEST(sanity, clang) {
         ASSERT_STREQ(result.str, "asdfjlsjkhgsjlkhglsdfjkgdfhs1fasdfsdf2fasdfsdf3fasdfsdf4fasdfsdf5fasdfsdf6fasdfsdf7fasdfsdf8fasdfsdf9fasdfsdf10fasdfsdf");
     }
 
-    liquidFreeProgram(program);
+    liquidFreeProgram(program);*/
 
     liquidFreeTemplate(tmpl);
     liquidFreeCompiler(compiler);
@@ -815,7 +843,7 @@ TEST(sanity, clang) {
 }
 
 TEST(sanity, vm) {
-    CPPVariable hash = { };
+    /*CPPVariable hash = { };
     Node ast;
     Program program;
     std::string str;
@@ -884,7 +912,7 @@ TEST(sanity, vm) {
         ast = getParser().parse("asdjkfsdhsjkg {{ a | plus: 3 | minus: 5 | times: 6 }}");
         program = getCompiler().compile(ast);
         result = getInterpreter().renderTemplate(program, hash);
-        ASSERT_EQ(result, "asdjkfsdhsjkg -6");
+        ASSERT_EQ(result, "asdjkfsdhsjkg -6");*/
 
 
 

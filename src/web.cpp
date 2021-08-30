@@ -56,6 +56,7 @@ namespace Liquid {
                 if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z'))
                     result += c;
                 else {
+                    result += '%';
                     result += hexDigits[c >> 4];
                     result += hexDigits[c & 0xF];
                 }
@@ -565,7 +566,6 @@ namespace Liquid {
         context.registerType<ScriptTagFilterNode>();
         context.registerType<LinkToFilterNode>();
         context.registerType<HighlightFilterNode>();
-        context.registerType<StylesheetTagFilterNode>();
         context.registerType<NewlineToBrFilterNode>();
 
         #if LIQUID_INCLUDE_RAPIDJSON_VARIABLE

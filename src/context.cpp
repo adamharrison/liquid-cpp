@@ -58,6 +58,8 @@ namespace Liquid {
     }
 
     Node DotFilterNodeType::getOperand(Renderer& renderer, const Node& node, Variable store) const {
+        if (renderer.mode == Renderer::ExecutionMode::INTERPRETER)
+            return static_cast<Interpreter&>(renderer).getStack(-1);
         return renderer.retrieveRenderedNode(*node.children[0].get(), store);
     }
 

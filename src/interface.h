@@ -75,8 +75,8 @@ extern "C" {
     } LiquidOptimizationScheme;
 
     typedef enum ELiquidTagType {
-        LIQUID_TAG_TYPE_ENCLOSING,
-        LIQUID_TAG_TYPE_FREE
+        LIQUID_TAG_TYPE_FREE,
+        LIQUID_TAG_TYPE_ENCLOSING
     } LiquidTagType;
 
     typedef enum ELiquidOperatorArity {

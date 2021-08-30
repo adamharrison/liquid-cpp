@@ -27,9 +27,9 @@ namespace Liquid {
         OP_STACK,       // Pulls the nth item of the stack into a register.
         OP_PUSH,        // Pushes the operand onto the stack, from the specified register.
         OP_POP,         // Moves the stack point back to the preivous variable.
-        OP_INC,         // Increments the targeted register.
-        OP_DEC,         // Decrements the targeted register.
-        OP_EQL,         // Checks whether the register is equal to 0x0.
+        OP_ADD,         // Adds regsiter 0x0 and the target register.
+        OP_SUB,         // Subtracts the target register from 0x0.
+        OP_EQL,         // Checks whether the register is equal to register 0x0.
         OP_OUTPUT,      // Takes the return register, and appends it to the selected output buffer.
         OP_OUTPUTMEM,   // Takes the targeted memory address, and appends it to the selected output buffer. Optimized version of OP_OUTPUT to reduce copying.
         OP_ASSIGN,      // Assigning a variable specified in the target register. Key is at 0x0, and value is at the operand register.
@@ -38,6 +38,7 @@ namespace Liquid {
         OP_JMPTRUE,     // Jumps to the instruction if the priamry register is true.
         OP_CALL,        // Calls the function specified with the amount of arugments on the stack.
         OP_RESOLVE,     // Resovles the named variable in the register and places it into the same register. Operand is either 0x0, for the top-level context, or a register, which contains the context for the next deference.,
+        OP_LENGTH,      // Gets the length of the specified variable held in the target register, and puts it into 0x0.
         OP_ITERATE,     // Iterates through the variable in the specified register, and pops the value into 0x0. If iteration is over, JMPs to the specified instruction.
         OP_INVERT,      // Coerces to a boolean
         OP_PUSHBUFFER,  // Pushes a buffer onto to the buffer stack, with the contents of the target register.
@@ -69,7 +70,7 @@ namespace Liquid {
             int stackPoint;
         };
         int stackSize;
-        typedef int (*DropFrameCallback)(Compiler& compiler, DropFrameState& state);
+        typedef int (*DropFrameCallback)(Compiler& compiler, DropFrameState& state, const Node& node);
         std::unordered_map<std::string, std::vector<std::pair<DropFrameCallback, DropFrameState>>> dropFrames;
 
         void addDropFrame(const std::string& name, DropFrameCallback callback) {

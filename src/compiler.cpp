@@ -26,8 +26,8 @@ namespace Liquid {
         switch (opcode) {
             case OP_EXIT:
             case OP_OUTPUT:
-            case OP_INC:
-            case OP_DEC:
+            case OP_ADD:
+            case OP_SUB:
             case OP_PUSH:
             case OP_MOVNIL:
             case OP_INVERT:
@@ -60,10 +60,12 @@ namespace Liquid {
                 return "OP_PUSH";
             case OP_POP:
                 return "OP_POP";
-            case OP_INC:
-                return "OP_INC";
-            case OP_DEC:
-                return "OP_DEC";
+            case OP_ADD:
+                return "OP_ADD";
+            case OP_SUB:
+                return "OP_SUB";
+            case OP_LENGTH:
+                return "OP_LENGTH";
             case OP_EQL:
                 return "OP_EQL";
             case OP_OUTPUT:
@@ -601,13 +603,13 @@ namespace Liquid {
                     registers[0].type = Register::Type::BOOL;
                     registers[0].b = isEqual;
                 } break;
-                case OP_INC: {
-                    if (registers[target].type == Register::Type::INT)
-                        ++registers[target].i;
+                case OP_ADD: {
+                    if (registers[0].type == Register::Type::INT && registers[target].type == Register::Type::INT)
+                        registers[0].i += registers[target].i;
                 } break;
-                case OP_DEC: {
-                    if (registers[target].type == Register::Type::INT)
-                        --registers[target].i;
+                case OP_SUB: {
+                    if (registers[0].type == Register::Type::INT && registers[target].type == Register::Type::INT)
+                        registers[0].i -= registers[target].i;
                 } break;
                 case OP_STACK: {
                     operand = *((long long*)instructionPointer); instructionPointer += 2;
@@ -940,26 +942,20 @@ namespace Liquid {
     void Context::VariableNode::compile(Compiler& compiler, const Node& node) const {
         long long target = -1;
 
-        string var;
-        for (size_t i = 0; i < node.children.size(); ++i) {
-            if (!var.empty())
-                var.append(".");
-            if (node.children[i]->type || node.children[i]->variant.type != Variant::Type::STRING)
-                break;
-            var.append(node.children[i]->variant.s);
+        if (node.children.size() > 0 && node.children[0]->variant.type == Variant::Type::STRING) {
+            auto it = compiler.dropFrames.find(node.children[0]->variant.s);
+            if (it != compiler.dropFrames.end() && it->second.size() > 0) {
+                it->second.back().first(compiler, it->second.back().second, node);
+                return;
+            }
         }
-        auto it = compiler.dropFrames.find(var);
-        if (it != compiler.dropFrames.end() && it->second.size() > 0) {
-            it->second.back().first(compiler, it->second.back().second);
-        } else {
-            for (size_t i = 0; i < node.children.size(); ++i) {
-                compiler.freeRegister = 0;
-                compiler.compileBranch(*node.children[i].get());
-                compiler.add(OP_RESOLVE, 0x0, target);
-                if (i < node.children.size() - 1) {
-                    compiler.add(OP_MOV, 0x0, 0x1);
-                    target = 0x1;
-                }
+        for (size_t i = 0; i < node.children.size(); ++i) {
+            compiler.freeRegister = 0;
+            compiler.compileBranch(*node.children[i].get());
+            compiler.add(OP_RESOLVE, 0x0, target);
+            if (i < node.children.size() - 1) {
+                compiler.add(OP_MOV, 0x0, 0x1);
+                target = 0x1;
             }
         }
     }

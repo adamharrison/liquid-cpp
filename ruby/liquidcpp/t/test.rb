@@ -28,9 +28,18 @@ json = JSON.parse('{"product":{"id":1}}')
 puts "TEST1: " + renderer.render(json, tmpl)
 
 
-text = renderer.render({ }, parser.parseTemplate("{% enclosingtag i %}{% endenclosingtag %}{% freetag %}"))
+
+text = renderer.render({ }, parser.parseTemplate("{% freetag %}"))
 puts "TEST: " + text
-raise "No warnings." if parser.warnings.size > 0
+raise "No warnings: " + parser.warnings.to_json + "." if parser.warnings.size > 0
+
+text = renderer.render({ }, parser.parseTemplate("{{ \"a\" | test }}"))
+puts "TEST: " + text
+raise "No warnings: " + parser.warnings.to_json + "." if parser.warnings.size > 0
+
+text = renderer.render({ }, parser.parseTemplate("{% enclosingtag i %}{% endenclosingtag %}"))
+puts "TEST: " + text
+raise "No warnings: " + parser.warnings.to_json + "." if parser.warnings.size > 0
 
 
 puts renderer.render({ }, parser.parseTemplate("{% endif %}"))
