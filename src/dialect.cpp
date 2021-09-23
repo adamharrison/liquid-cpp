@@ -1181,7 +1181,8 @@ namespace Liquid {
             if (operand.type) {
                 switch (operand.variant.type) {
                     case Variant::Type::FLOAT:
-                        return Node(std::min(operand.variant.f, argument.variant.getFloat()));
+                    case Variant::Type::STRING:
+                        return Node(std::min(operand.variant.getFloat(), argument.variant.getFloat()));
                     case Variant::Type::INT:
                         return Node(std::min(operand.variant.i, argument.variant.getInt()));
                     default:
@@ -1200,7 +1201,8 @@ namespace Liquid {
             if (operand.type) {
                 switch (operand.variant.type) {
                     case Variant::Type::FLOAT:
-                        return Node(std::max(operand.variant.f, argument.variant.getFloat()));
+                    case Variant::Type::STRING:
+                        return Node(std::max(operand.variant.getFloat(), argument.variant.getFloat()));
                     case Variant::Type::INT:
                         return Node(std::max(operand.variant.i, argument.variant.getInt()));
                     default:
