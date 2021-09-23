@@ -520,6 +520,10 @@ TEST(sanity, filters) {
     str = renderTemplate(ast, hash);
     ASSERT_EQ(str, "1");
 
+
+    ast = getParser().parse("{{ \"2021-09-23T13:00:00-05:00\" | date: \"%s\" }}");
+    str = renderTemplate(ast, hash);
+    ASSERT_EQ(str, "1632402000");
 }
 
 
