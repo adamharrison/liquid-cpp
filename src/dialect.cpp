@@ -1032,6 +1032,9 @@ namespace Liquid {
                         case Variant::Type::FLOAT:
                             return Node(Variant(operate(op1.variant.i, op2.variant.f)));
                         break;
+                        case Variant::Type::STRING:
+                            return Node(Variant(operate(op1.variant.getFloat(), op2.variant.getFloat())));
+                        break;
                         default:
                         break;
                     }
@@ -1043,6 +1046,20 @@ namespace Liquid {
                         break;
                         case Variant::Type::FLOAT:
                             return Node(Variant(operate(op1.variant.f, op2.variant.f)));
+                        break;
+                        case Variant::Type::STRING:
+                            return Node(Variant(operate(op1.variant.getFloat(), op2.variant.getFloat())));
+                        break;
+                        default:
+                        break;
+                    }
+                break;
+                case Variant::Type::STRING:
+                    switch (op2.variant.type) {
+                        case Variant::Type::INT:
+                        case Variant::Type::FLOAT:
+                        case Variant::Type::STRING:
+                            return Node(Variant(operate(op1.variant.getFloat(), op2.variant.getFloat())));
                         break;
                         default:
                         break;

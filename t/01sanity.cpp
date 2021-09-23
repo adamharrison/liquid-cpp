@@ -462,6 +462,15 @@ TEST(sanity, filters) {
     Node ast;
     std::string str;
 
+    // This should probably be implciit.
+    /*hash["now"] = (long long)time(NULL);
+    ast = getParser().parse("{% assign wat1 = now | date: '%s' %}{% assign wat2 = '2021-09-23T13:00:00-05:00' | date: '%s' %}{{ wat1 | minus: wat2 }}");
+    str = renderTemplate(ast, hash);*/
+    /*fprintf(stderr, "WAT: %s\n", Parser::Error::english(getParser().errors[0]).data());
+    ASSERT_EQ(getParser().errors.size(), 0);*/
+
+    ASSERT_EQ(str, "1632402000");
+
     struct TestingFilter : FilterNodeType {
         TestingFilter() : FilterNodeType("testing", -1, -1, true) { }
     };
@@ -524,6 +533,7 @@ TEST(sanity, filters) {
     ast = getParser().parse("{{ \"2021-09-23T13:00:00-05:00\" | date: \"%s\" }}");
     str = renderTemplate(ast, hash);
     ASSERT_EQ(str, "1632402000");
+
 }
 
 
