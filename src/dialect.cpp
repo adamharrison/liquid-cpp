@@ -1111,10 +1111,11 @@ namespace Liquid {
         CeilFilterNode() : FilterNodeType("ceil", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type) {
+            if (!operand.type) {
                 switch (operand.variant.type) {
+                    case Variant::Type::STRING:
                     case Variant::Type::FLOAT:
-                        return Node(ceil(operand.variant.f));
+                        return Node(ceil(operand.variant.getFloat()));
                     case Variant::Type::INT:
                         return Node(operand.variant.i);
                     default:
@@ -1129,10 +1130,11 @@ namespace Liquid {
         FloorFilterNode() : FilterNodeType("floor", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
-            if (operand.type) {
+            if (!operand.type) {
                 switch (operand.variant.type) {
                     case Variant::Type::FLOAT:
-                        return Node(ceil(operand.variant.f));
+                    case Variant::Type::STRING:
+                        return Node((double)floor(operand.variant.getFloat()));
                     case Variant::Type::INT:
                         return Node(operand.variant.i);
                     default:

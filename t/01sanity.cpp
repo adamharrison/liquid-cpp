@@ -464,12 +464,15 @@ TEST(sanity, filters) {
 
     // This should probably be implciit.
     /*hash["now"] = (long long)time(NULL);
-    ast = getParser().parse("{% assign wat1 = now | date: '%s' %}{% assign wat2 = '2021-09-23T13:00:00-05:00' | date: '%s' %}{{ wat1 | minus: wat2 }}");
-    str = renderTemplate(ast, hash);*/
-    /*fprintf(stderr, "WAT: %s\n", Parser::Error::english(getParser().errors[0]).data());
+    CPPVariable product = { };
+    product["created_at"] = "2021-09-01T00:00:00-00:00";
+    hash["product"] = std::move(product);
+    ast = getParser().parse("{% assign a = now | date: '%s' %}{% assign b = product.created_at | date: '%s' %}{% assign c = a | minus: b | divided_by: 86400 %}{{ a }} {{ b }} {{ c | floor }}");
+    str = renderTemplate(ast, hash);
     ASSERT_EQ(getParser().errors.size(), 0);*/
+    //fprintf(stderr, "WAT: %s\n", Parser::Error::english(getParser().errors[0]).data());
 
-    ASSERT_EQ(str, "1632402000");
+    //ASSERT_EQ(str, "1632402000");
 
     struct TestingFilter : FilterNodeType {
         TestingFilter() : FilterNodeType("testing", -1, -1, true) { }
