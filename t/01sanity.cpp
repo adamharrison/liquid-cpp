@@ -463,16 +463,63 @@ TEST(sanity, filters) {
     std::string str;
 
     // This should probably be implciit.
-    /*hash["now"] = (long long)time(NULL);
+    long long now = (long long)time(NULL);
+    hash["now"] = now;
     CPPVariable product = { };
     product["created_at"] = "2021-09-01T00:00:00-00:00";
+    product["tags"] = "sort_01234567";
     hash["product"] = std::move(product);
-    ast = getParser().parse("{% assign a = now | date: '%s' %}{% assign b = product.created_at | date: '%s' %}{% assign c = a | minus: b | divided_by: 86400 %}{{ a }} {{ b }} {{ c | floor }}");
-    str = renderTemplate(ast, hash);
-    ASSERT_EQ(getParser().errors.size(), 0);*/
-    //fprintf(stderr, "WAT: %s\n", Parser::Error::english(getParser().errors[0]).data());
 
-    //ASSERT_EQ(str, "1632402000");
+    ast = getParser().parse("{{ year_bit | append: day_bit} }}");
+    ASSERT_EQ(getParser().errors.size(), 1);
+
+    ast = getParser().parse("{{ \"abc\" | slice: 0,2 }}");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.data(), "ab");
+
+
+
+    /*ast = getParser().parse("{% assign published_timestamp = product.created_at | date: \"%s\" %}{% assign days_since_published = now | date: \"%s\" | minus: published_timestamp | divided_by: 86400 | floor %}\
+{% for tag in (product.tags | split: \", \") %}\
+    {% if tag contains 'sort_' %}\
+        {% assign sort_tag = tag | remove: 'sort_' %}\
+    {% endif %}\
+    {% if tag contains 'sort_' %}\
+        {% assign override_tag = '01234567' %}\
+    {% endif %}\
+{% endfor %}\
+{% if override_tag %}\
+    tag: {{ override_tag }}\
+    {% assign year_bit = override_tag | slice: 0,4 %}\
+    {% assign month_bit = override_tag | slice: 4,2 %}\
+    {% assign day_bit = override_tag | slice: 6,2 %}\
+\
+    year: {{ year_bit }} \
+    month: {{ month_bit }} \
+    day: {{ day_bit }}\
+\
+    {% assign override_string = year_bit | append: \"-\" | append: month_bit | append: \"-\" | append: day_bit} | append: 'T00:00:00-08:00' %}\
+\
+{{ override_string }}\
+\
+    {% assign override_timestamp = override_string | date: \"%s\" %}\
+    {% assign days_since_published = now | date: \"%s\" | minus: override_timestamp | divided_by: 86400 | floor %}\
+{% endif %}\
+{{ days_since_published }}{{ sort_tag | default: \"000000\" }}");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.data(), "");*/
+
+
+    ast = getParser().parse("{% assign a = now | date: '%s' %}{% assign b = product.created_at | date: '%s' %}{% assign c = a | minus: b | divided_by: 86400 | at_least: 0 %}{{ a }} {{ b }} {{ c | floor }}");
+    str = renderTemplate(ast, hash);
+    ASSERT_EQ(getParser().errors.size(), 0);
+
+    char buffer[512];
+    sprintf(buffer, "%lld 1630472400 %lld", now, (now - 1630472400)/86400);
+
+    ASSERT_STREQ(str.data(), buffer);
 
     struct TestingFilter : FilterNodeType {
         TestingFilter() : FilterNodeType("testing", -1, -1, true) { }
@@ -633,10 +680,20 @@ TEST(sanity, optimizer) {
 }
 
 TEST(sanity, composite) {
-    CPPVariable hash, order, transaction, event;
+    CPPVariable hash, order, transaction, event, variant, product;
     Node ast;
     std::string str;
 
+
+    variant["price"] = 10;
+    product["variants"] = CPPVariable({ variant });
+    product["tags"] = "sort_012345";
+    hash["product"] = std::move(product);
+
+    ast = getParser().parse("{% assign min_price = 999999999 %}{% for v in product.variants %}{% if v.price < min_price %}{% assign min_price = v.price %}{% endif %}{% endfor %}{% for tag in (product.tags | split: \", \") %}{% if tag contains 'sort_' %}{% assign sort_tag = tag | remove: 'sort_' %}{% endif %}{% endfor %}{{ min_price | times: 100 }}{{ sort_tag | default: \"000000\" }}");
+    str = renderTemplate(ast, hash);
+
+    ASSERT_STREQ(str.c_str(), "1000012345");
 
     hash["B"] = "D";
     ast = getParser().parse("A {{ B }} C", sizeof("A {{ B }} C")-1, "testfile");
@@ -644,7 +701,7 @@ TEST(sanity, composite) {
     ASSERT_EQ(str, "A D C");
 
     CPPVariable lip1, lip2, lip3, lip4;
-    CPPVariable line_item, line_item1, line_item2, product, product_option1, product_option2, product_option3;
+    CPPVariable line_item, line_item1, line_item2, product_option1, product_option2, product_option3;
 
     lip1["name"] = "Gift Email";
     lip1["value"] = "test1@gmail.com";
@@ -735,7 +792,6 @@ TEST(sanity, composite) {
     ASSERT_EQ(str, "Red");
 
 
-    CPPVariable variant;
     variant["id"] = 1;
     variant["option1"] = "Red";
     variant["option2"] = "Large";

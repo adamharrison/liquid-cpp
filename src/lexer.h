@@ -134,7 +134,7 @@ namespace Liquid {
         }
 
         bool isUTF8Character(const char* offset) {
-            return *offset & 0xC0;
+            return *offset & 0x80;
         }
 
         unsigned int getUTF8Character(const char* offset, const char* end, int* length) {
@@ -242,6 +242,7 @@ namespace Liquid {
                                         }
                                         ongoing = static_cast<T*>(this)->startOutputBlock(true);
                                         ++offset;
+                                        ++column;
                                     } else {
                                         if (offset - lastInitial - 1 > 0)
                                             static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial - 1);
@@ -257,6 +258,7 @@ namespace Liquid {
                                             static_cast<T*>(this)->literal(&str[lastInitial], i - lastInitial + 1);
                                         }
                                         ++offset;
+                                        ++column;
                                     } else {
                                         if (offset - lastInitial - 1 > 0)
                                             static_cast<T*>(this)->literal(&str[lastInitial], offset - lastInitial - 1);
@@ -269,11 +271,14 @@ namespace Liquid {
                             } break;
                         }
                         ++offset;
+                        ++column;
                     break;
                     case State::OUTPUT:
                     case State::CONTROL:
                     case State::CONTROL_HALT: {
-                        offset = (size_t)(nextBoundary(&str[offset], end, true) - str);
+                        size_t new_offset = (size_t)(nextBoundary(&str[offset], end, true) - str);
+                        column += new_offset - offset;
+                        offset = new_offset;
                         size_t startOfWord = offset, endOfWord;
                         int bytes = 1;
                         bool isNumber = true;
@@ -288,6 +293,7 @@ namespace Liquid {
                                     if (ongoing) {
                                         for (endOfWord = offset+1; endOfWord < size && (str[endOfWord] == '\\' || str[endOfWord] != '"'); ++endOfWord);
                                         ongoing = static_cast<T*>(this)->string(&str[offset+1], endOfWord - offset - 1);
+                                        column += (offset - (endOfWord + 1));
                                         offset = endOfWord+1;
                                         processComplete = true;
                                     }
@@ -297,6 +303,7 @@ namespace Liquid {
                                     if (ongoing) {
                                         for (endOfWord = offset+1; endOfWord < size && (str[endOfWord] == '\\' || str[endOfWord] != '\''); ++endOfWord);
                                         ongoing = static_cast<T*>(this)->string(&str[offset+1], endOfWord - offset - 1);
+                                        column += (offset - (endOfWord + 1));
                                         offset = endOfWord+1;
                                         processComplete = true;
                                     }
@@ -306,12 +313,14 @@ namespace Liquid {
                                     static_cast<T*>(this)->newline();
                                     processComplete = true;
                                     ++offset;
+                                    ++column;
                                 break;
                                 case ' ':
                                 case '\t':
                                     ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
                                     processComplete = true;
                                     ++offset;
+                                    ++column;
                                 break;
                                 case '-':
                                     // Special case: when this is NOT followed by a space, and it's part of a word, this is treated as part of a literal.
@@ -328,6 +337,7 @@ namespace Liquid {
                                     if (!isNumber) {
                                         ongoing = static_cast<T*>(this)->literal(&str[startOfWord], offset - startOfWord) && static_cast<T*>(this)->dot();
                                         ++offset;
+                                        ++column;
                                         processComplete = true;
                                     } else {
                                         if (hasPoint) {
@@ -336,6 +346,7 @@ namespace Liquid {
                                                 hasPoint = false;
                                                 ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - 1, isNumber, hasPoint);
                                                 --offset;
+                                                --column;
                                                 processComplete = true;
                                             } else {
                                                 isNumber = false;
@@ -372,10 +383,13 @@ namespace Liquid {
                                     if (state == State::CONTROL ||  state == State::CONTROL_HALT) {
                                         if (str[offset-1] == '%') {
                                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - (str[offset-2] == '-' ? 2 : 1), isNumber, hasPoint) && static_cast<T*>(this)->endControlBlock(str[offset-2] == '-');
+                                            size_t new_offset;
                                             if (str[offset-2] == '-')
-                                                offset = (size_t)(nextBoundary(&str[offset+1], end) - str);
+                                                new_offset = (size_t)(nextBoundary(&str[offset+1], end) - str);
                                             else
-                                                ++offset;
+                                                new_offset = offset + 1;
+                                            column += new_offset - offset;
+                                            offset = new_offset;
                                             lastInitial = offset;
                                             processComplete = true;
                                         }
@@ -383,11 +397,17 @@ namespace Liquid {
                                         if (str[offset-1] == '}') {
                                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - (str[offset-2] == '-' ? 2 : 1), isNumber, hasPoint) && static_cast<T*>(this)->endOutputBlock(str[offset-2] == '-');
                                             if (str[offset-2] == '-')
-                                                offset = (size_t)(nextBoundary(&str[offset+1], end) - str);
+                                                new_offset = (size_t)(nextBoundary(&str[offset+1], end) - str);
                                             else
-                                                ++offset;
+                                                new_offset = offset + 1;
+                                            column += new_offset - offset;
+                                            offset = new_offset;
                                             lastInitial = offset;
                                             processComplete = true;
+                                        } else if (offset < size - 1 && str[offset+1] != '}') {
+                                            ongoing = processControlChunk(&str[startOfWord], offset - startOfWord - (str[offset-2] == '-' ? 2 : 1), isNumber, hasPoint) && static_cast<T*>(this)->literal(&str[offset], 1);
+                                            ++offset;
+                                            ++column;
                                         }
                                     }
                                 } break;
@@ -429,8 +449,10 @@ namespace Liquid {
                             }
                             if (processComplete)
                                 break;
-                            else
+                            else {
                                 offset += bytes;
+                                ++column;
+                            }
                         }
                         if (offset == size && !processComplete)
                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
@@ -458,13 +480,18 @@ namespace Liquid {
                                         state = State::INITIAL;
                                         ongoing = static_cast<T*>(this)->startControlBlock(false) && static_cast<T*>(this)->literal(&str[tagStart], halt.size() + 3) && static_cast<T*>(this)->endControlBlock(false);
                                         ++offset;
-                                        if (hasSuppressed)
-                                            offset = (size_t)(nextBoundary(&str[offset], end) - str);
+                                        ++column;
+                                        if (hasSuppressed) {
+                                            size_t new_offset = (size_t)(nextBoundary(&str[offset], end) - str);
+                                            column = new_offset - offset;
+                                            offset = new_offset;
+                                        }
                                         lastInitial = offset;
                                         break;
                                     }
                                 }
                             }
+                            ++column;
                         } while (++offset < size);
                         if (state == State::HALT)
                             return Lexer::Error(*this, Lexer::Error::Type::LIQUID_LEXER_ERROR_TYPE_UNEXPECTED_END, halt);

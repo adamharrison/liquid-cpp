@@ -1151,7 +1151,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type) {
+            if (!operand.type) {
                 switch (operand.variant.type) {
                     case Variant::Type::FLOAT: {
                         if (!argument.type) {
@@ -1178,7 +1178,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type) {
+            if (!operand.type) {
                 switch (operand.variant.type) {
                     case Variant::Type::FLOAT:
                     case Variant::Type::STRING:
@@ -1198,7 +1198,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            if (operand.type) {
+            if (!operand.type) {
                 switch (operand.variant.type) {
                     case Variant::Type::FLOAT:
                     case Variant::Type::STRING:
@@ -1376,7 +1376,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto arg1 = getArgument(renderer, node, store, 0);
-            auto arg2 = getArgument(renderer, node, store, 0);
+            auto arg2 = getArgument(renderer, node, store, 1);
 
             if (operand.variant.type != Variant::Type::STRING)
                 return Node();
@@ -2125,6 +2125,15 @@ namespace Liquid {
             static constexpr int MAX_BUFFER_SIZE = 256;
             string buffer;
             buffer.resize(MAX_BUFFER_SIZE);
+            /*size_t timestamp;
+            while (true) {
+                timestamp = argument.find("%s");
+                if (timestamp == string::npos)
+                    break;
+                string td = std::to_string(timestamp);
+                argument.replace(timestamp, 2, td);
+                fprintf(stderr, "WAT: %s\n", td.data());
+            }*/
             buffer.resize(strftime(&buffer[0], MAX_BUFFER_SIZE, argument.c_str(), timeinfo));
             return Variant(move(buffer));
         }

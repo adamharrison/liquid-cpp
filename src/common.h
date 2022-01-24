@@ -310,8 +310,10 @@ namespace Liquid {
                 case Type::FLOAT: {
                     // We can't use to_string because that'll add an annoying amount of unecesarry 0s after the decimal point.
                     char buffer[512];
-                    int length = snprintf(buffer, sizeof(buffer), "%g", f);
-                    return string(buffer, length);
+                    int length = snprintf(buffer, sizeof(buffer), "%f", f), i, j;
+                    for (i = 0; i < length && buffer[i] != '.'; ++i);
+                    for (j = length; i < length && j > i && buffer[j-1] == '0'; --j);
+                    return string(buffer, j == i + 1 ? i : j);
                 }
                 case Type::INT:
                     return std::to_string(i);
