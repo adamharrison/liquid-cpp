@@ -477,6 +477,8 @@ namespace Liquid {
                 argumentNode = make_unique<Node>(Variant(""));
                 return true;
             }
+            if (argumentNode->children.size() > 0 && !argumentNode->children[argumentNode->children.size()-1])
+                argumentNode->children.pop_back();
         }
 
         if (nodes.back()->children.size() == 0 || nodes.back()->children.back().get())

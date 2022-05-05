@@ -462,13 +462,36 @@ TEST(sanity, filters) {
     Node ast;
     std::string str;
 
+
+
+    ast = getParser().parse("Test {{ product.id | times: }}");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.data(), "Test ");
+
     // This should probably be implciit.
     long long now = (long long)time(NULL);
     hash["now"] = now;
     CPPVariable product = { };
+    CPPVariable option = { };
+    CPPVariable variant = { };
+    option["name"] = "Color";
+    CPPVariable options;
+    options[0] = std::move(option);
+    product["options"] = std::move(options);
     product["created_at"] = "2021-09-01T00:00:00-00:00";
-    product["tags"] = "sort_01234567";
+    product["tags"] = "sort_01234567, hide-red";
+    variant["option1"] = "red";
+    hash["variant"] = std::move(variant);
     hash["product"] = std::move(product);
+
+
+    ast = getParser().parse("{% assign idx = nil %}{% for o in product.options %}{% if o.name == 'Color' %}{% assign idx = 'option' | append: forloop.index %}{% endif %}{% endfor %}{% if idx %}{% assign tag = 'hide-' | append: variant[idx] %}{% if product.tags contains tag %}0{% else %}1{% endif %}{% else %}1{% endif %}");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.data(), "0");
+
+
 
     ast = getParser().parse("{{ year_bit | append: day_bit} }}");
     ASSERT_EQ(getParser().errors.size(), 1);
@@ -477,6 +500,7 @@ TEST(sanity, filters) {
     ASSERT_EQ(getParser().errors.size(), 0);
     str = renderTemplate(ast, hash);
     ASSERT_STREQ(str.data(), "ab");
+
 
 
 
