@@ -35,7 +35,6 @@
 				<Option output="bin/01sanity" prefix_auto="1" extension_auto="1" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="--gtest_filter=sanity.filters" />
 				<MakeCommands>
 					<Build command="$make -f $makefile $target -j 4" />
 					<CompileFile command="$make -f $makefile $file" />

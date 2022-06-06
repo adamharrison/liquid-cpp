@@ -464,10 +464,11 @@ TEST(sanity, filters) {
 
 
 
-    ast = getParser().parse("Test {{ product.id | times: }}");
+    /*ast = getParser().parse("Test {{ product.id | times: }}");
     ASSERT_EQ(getParser().errors.size(), 0);
     str = renderTemplate(ast, hash);
-    ASSERT_STREQ(str.data(), "Test ");
+    ASSERT_STREQ(str.data(), "Test ");*/
+
 
     // This should probably be implciit.
     long long now = (long long)time(NULL);
@@ -478,6 +479,7 @@ TEST(sanity, filters) {
     option["name"] = "Color";
     CPPVariable options;
     options[0] = std::move(option);
+    product["title"] = "My Very First Product";
     product["options"] = std::move(options);
     product["created_at"] = "2021-09-01T00:00:00-00:00";
     product["tags"] = "sort_01234567, hide-red";
@@ -485,6 +487,11 @@ TEST(sanity, filters) {
     hash["variant"] = std::move(variant);
     hash["product"] = std::move(product);
 
+
+    ast = getParser().parse("Test {{ product.title | split: \" \" | first }}");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.data(), "Test My");
 
     ast = getParser().parse("{% assign idx = nil %}{% for o in product.options %}{% if o.name == 'Color' %}{% assign idx = 'option' | append: forloop.index %}{% endif %}{% endfor %}{% if idx %}{% assign tag = 'hide-' | append: variant[idx] %}{% if product.tags contains tag %}0{% else %}1{% endif %}{% else %}1{% endif %}");
     ASSERT_EQ(getParser().errors.size(), 0);

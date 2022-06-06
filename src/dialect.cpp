@@ -1505,12 +1505,24 @@ namespace Liquid {
 
     struct ArrayFilterNodeType : FilterNodeType {
         ArrayFilterNodeType(const std::string& symbol, int minArguments = -1, int maxArguments = -1) : FilterNodeType(symbol, minArguments, maxArguments) { }
+
+        virtual Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const { return Node(); }
+        virtual Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant& operand) const { return Node(); }
+
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
+            auto operand = getOperand(renderer, node, store);
+            if (operand.variant.type == Variant::Type::ARRAY)
+                return variantOperate(renderer, node, store, operand.variant);
+            else if (operand.variant.type == Variant::Type::VARIABLE)
+                return variableOperate(renderer, node, store, operand.variant.v);
+            return Node();
+        }
     };
 
     struct JoinFilterNode : ArrayFilterNodeType {
         JoinFilterNode() : ArrayFilterNodeType("join", 0, 1) { }
 
-        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const override {
             struct JoinStruct {
                 Renderer& renderer;
                 string accumulator;
@@ -1536,7 +1548,7 @@ namespace Liquid {
             return Node(joinStruct.accumulator);
         }
 
-        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant& operand) const {
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant& operand) const override {
             string accumulator;
             if (operand.type != Variant::Type::ARRAY || operand.a.size() == 0)
                 return Node();
@@ -1550,15 +1562,6 @@ namespace Liquid {
                 accumulator.append(operand.a[i].getString());
             }
             return operand.a[operand.a.size()-1];
-        }
-
-        Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            auto operand = getOperand(renderer, node, store);
-            if (operand.variant.type == Variant::Type::ARRAY)
-                return variantOperate(renderer, node, store, operand.variant);
-            else if (operand.variant.type == Variant::Type::VARIABLE)
-                return variableOperate(renderer, node, store, operand.variant.v);
-            return Node();
         }
     };
 
@@ -1851,18 +1854,19 @@ namespace Liquid {
     struct FirstFilterNode : ArrayFilterNodeType {
         FirstFilterNode() : ArrayFilterNodeType("first", 0, 0) { }
 
-        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const override {
             Variable v;
             if (!renderer.variableResolver.getArrayVariable(renderer, operand, 0, v))
                 return Node();
             return renderer.parseVariant(v);
         }
 
-        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) const {
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant& operand) const override {
             if (operand.type != Variant::Type::ARRAY || operand.a.size() == 0)
                 return Node();
             return operand.a[0];
         }
+
     };
 
     struct FirstDotFilterNode : DotFilterNodeType {
@@ -1921,7 +1925,7 @@ namespace Liquid {
     struct LastFilterNode : ArrayFilterNodeType {
         LastFilterNode() : ArrayFilterNodeType("last", 0, 0) { }
 
-        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const override {
             Variable v;
             long long size = renderer.variableResolver.getArraySize(renderer, operand);
             if (size == -1 || !renderer.variableResolver.getArrayVariable(renderer, operand, size - 1, v))
@@ -1929,7 +1933,7 @@ namespace Liquid {
             return renderer.parseVariant(v);
         }
 
-        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant operand) const {
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant& operand) const override {
             if (operand.type != Variant::Type::ARRAY || operand.a.size() == 0)
                 return Node();
             return operand.a[operand.a.size()-1];
@@ -1981,7 +1985,7 @@ namespace Liquid {
     struct IndexFilterNode : ArrayFilterNodeType {
         IndexFilterNode() : ArrayFilterNodeType("index", 1, 1) { }
 
-        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const {
+        Node variableOperate(Renderer& renderer, const Node& node, Variable store, Variable operand) const override {
             Variable v;
             auto argument = getArgument(renderer, node, store, 0);
             int idx = argument.variant.i;
@@ -1990,7 +1994,7 @@ namespace Liquid {
             return Node(v);
         }
 
-        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant& operand) const {
+        Node variantOperate(Renderer& renderer, const Node& node, Variable store, const Variant& operand) const override {
             auto argument = getArgument(renderer, node, store, 0);
             long long idx = argument.variant.i;
             if (operand.type != Variant::Type::ARRAY || idx >= (long long)operand.a.size())
