@@ -500,6 +500,20 @@ TEST(sanity, filters) {
     hash["variant"] = std::move(variant);
     hash["product"] = std::move(product);
 
+    ast = getParser().parse("{{ product.body_html | split: '<li>' | slice: 1 | join: '<li>' | prepend: '<li>' }}");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.data(), "<li>\
+        Bullet point 1.\
+    \
+    </li>\
+    <li>\
+        Bullet point 2.\
+    </li>\
+    <li>\
+        Bullet point 3.\
+    </li>");
+
     ast = getParser().parse("{%- assign product_split = product.body_html | split: '<li>' -%}{{ product_split | slice: 1, product_split.size | join: '<li>' | prepend: '<li>' }}");
     ASSERT_EQ(getParser().errors.size(), 0);
     str = renderTemplate(ast, hash);

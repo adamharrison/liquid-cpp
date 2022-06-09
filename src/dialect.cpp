@@ -1382,13 +1382,14 @@ namespace Liquid {
                 case Variant::Type::STRING: {
                     string str = renderer.getString(operand);
                     long long offset = std::max(std::min(arg1.variant.getInt(), (long long)str.size()), 0LL);
-                    long long size = std::min(arg2.variant.getInt(), (long long)(str.size() - offset));
+                    long long size = std::min((long long)(arg2.variant.type != Variant::Type::NIL ? arg2.variant.getInt() : str.size()), (long long)(str.size() - offset));
                     return Variant(str.substr(offset, size));
                 }
                 case Variant::Type::VARIABLE: {
                     Variant v(vector<Variant>{ });
                     long long start = std::max(arg1.variant.getInt(), 0LL);
-                    long long end = std::min(start + arg2.variant.getInt(), renderer.variableResolver.getArraySize(renderer, operand.variant.v));
+                    long long size = renderer.variableResolver.getArraySize(renderer, operand.variant.v);
+                    long long end = std::min(start + (arg2.variant.type != Variant::Type::NIL ? arg2.variant.getInt() : size), size);
                     for (int i = start; i < end; ++i) {
                         Variable var;
                         if (renderer.variableResolver.getArrayVariable(renderer, operand.variant.v, i, &var.pointer))
@@ -1401,7 +1402,7 @@ namespace Liquid {
                         return Node();
                     Variant v(vector<Variant>{ });
                     long long start = std::max(arg1.variant.getInt(), 0LL);
-                    long long end = std::min(start + arg2.variant.getInt(), (long long)operand.variant.a.size());
+                    long long end = std::min(start + (long long)(arg2.variant.type != Variant::Type::NIL ? arg2.variant.getInt() : operand.variant.a.size()), (long long)operand.variant.a.size());
                     for (int i = start; i < end; ++i)
                         v.a.push_back(operand.variant.a[i]);
                     return v;
