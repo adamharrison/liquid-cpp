@@ -1279,7 +1279,7 @@ namespace Liquid {
             auto operand = getOperand(renderer, node, store);
             auto argument1 = getArgument(renderer, node, store, 1);
             auto argument2 = getArgument(renderer, node, store, 2);
-            return Variant(operand.variant.getInt() > 1 ? argument2.getString() : argument1.getString());
+            return Variant(operand.variant.getInt() > 1 ? renderer.getString(argument2) : renderer.getString(argument1));
         }
     };
 
@@ -1288,7 +1288,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            return Variant(argument.getString() + operand.getString());
+            return Variant(renderer.getString(argument) + renderer.getString(operand));
         }
     };
     struct RemoveFilterNode : FilterNodeType {
@@ -1356,9 +1356,9 @@ namespace Liquid {
             auto argumentPattern = getArgument(renderer, node, store, 0);
             auto argumentReplacement = getArgument(renderer, node, store, 1);
             string accumulator;
-            string str = operand.getString();
-            string pattern = argumentPattern.getString();
-            string replacement = argumentReplacement.getString();
+            string str = renderer.getString(operand);
+            string pattern = renderer.getString(argumentPattern);
+            string replacement = renderer.getString(argumentReplacement);
             size_t start = 0, idx;
             while ((idx = str.find(pattern, start)) != string::npos) {
                 if (idx > start)
@@ -1378,12 +1378,36 @@ namespace Liquid {
             auto arg1 = getArgument(renderer, node, store, 0);
             auto arg2 = getArgument(renderer, node, store, 1);
 
-            if (operand.variant.type != Variant::Type::STRING)
-                return Node();
-            string str = operand.getString();
-            long long offset = std::max(std::min(arg1.variant.getInt(), (long long)str.size()), 0LL);
-            long long size = std::min(arg2.variant.getInt(), (long long)(str.size() - offset));
-            return Variant(str.substr(offset, size));
+            switch (operand.variant.type) {
+                case Variant::Type::STRING: {
+                    string str = renderer.getString(operand);
+                    long long offset = std::max(std::min(arg1.variant.getInt(), (long long)str.size()), 0LL);
+                    long long size = std::min(arg2.variant.getInt(), (long long)(str.size() - offset));
+                    return Variant(str.substr(offset, size));
+                }
+                case Variant::Type::VARIABLE: {
+                    Variant v(vector<Variant>{ });
+                    long long start = std::max(arg1.variant.getInt(), 0LL);
+                    long long end = std::min(start + arg2.variant.getInt(), renderer.variableResolver.getArraySize(renderer, operand.variant.v));
+                    for (int i = start; i < end; ++i) {
+                        Variable var;
+                        if (renderer.variableResolver.getArrayVariable(renderer, operand.variant.v, i, &var.pointer))
+                            v.a.push_back(var);
+                    }
+                    return v;
+                }
+                case Variant::Type::ARRAY: {
+                    if (operand.variant.a.size() == 0)
+                        return Node();
+                    Variant v(vector<Variant>{ });
+                    long long start = std::max(arg1.variant.getInt(), 0LL);
+                    long long end = std::min(start + arg2.variant.getInt(), (long long)operand.variant.a.size());
+                    for (int i = start; i < end; ++i)
+                        v.a.push_back(operand.variant.a[i]);
+                    return v;
+                }
+                default: return Node();
+            }
         }
     };
     struct SplitFilterNode : FilterNodeType {
@@ -1392,8 +1416,8 @@ namespace Liquid {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             Variant result { vector<Variant>() };
-            string str = operand.getString();
-            string splitter = argument.getString();
+            string str = renderer.getString(operand);
+            string splitter = renderer.getString(argument);
             size_t start = 0, idx;
             while ((idx = str.find(splitter, start)) != string::npos) {
                 if (idx > start)
@@ -1408,7 +1432,7 @@ namespace Liquid {
         StripFilterNode() : FilterNodeType("strip", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
-            string str = operand.getString();
+            string str = renderer.getString(operand);
             size_t start, end;
             for (start = 0; start < str.size() && isblank(str[start]); ++start);
             for (end = str.size()-1; end > 0 && isblank(str[end]); --end);
@@ -1419,7 +1443,7 @@ namespace Liquid {
         LStripFilterNode() : FilterNodeType("lstrip", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
-            string str = operand.getString();
+            string str = renderer.getString(operand);
             size_t start;
             for (start = 0; start < str.size() && isblank(str[start]); ++start);
             return Node(str.substr(start, str.size() - start));
@@ -1429,7 +1453,7 @@ namespace Liquid {
         RStripFilterNode() : FilterNodeType("rstrip", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
-            string str = operand.getString();
+            string str = renderer.getString(operand);
             size_t end;
             for (end = str.size()-1; end > 0 && isblank(str[end]); --end);
             return Node(str.substr(0, end + 1));
@@ -1439,7 +1463,7 @@ namespace Liquid {
         StripNewlinesFilterNode() : FilterNodeType("strip_newlines", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
-            string str = operand.getString();
+            string str = renderer.getString(operand);
             string accumulator;
             accumulator.reserve(str.size());
             for (auto it = str.begin(); it != str.end(); ++it) {
@@ -1555,13 +1579,13 @@ namespace Liquid {
             string joiner = "";
             auto argument = getArgument(renderer, node, store, 0);
             if (!argument.type)
-                joiner = argument.getString();
+                joiner = renderer.getString(argument);
             for (size_t i = 0; i < operand.a.size(); ++i) {
                 if (i > 0)
                     accumulator.append(joiner);
-                accumulator.append(operand.a[i].getString());
+                accumulator.append(renderer.getString(operand.a[i]));
             }
-            return operand.a[operand.a.size()-1];
+            return Variant(accumulator);
         }
     };
 
@@ -1648,7 +1672,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            MapStruct mapStruct = { renderer, argument.getString(), nullptr };
+            MapStruct mapStruct = { renderer, renderer.getString(argument), nullptr };
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
                     accumulate(renderer, mapStruct, operand.variant.v);
@@ -1714,7 +1738,7 @@ namespace Liquid {
             }
 
             if (!argument.type && argument.variant.type == Variant::Type::STRING) {
-                property = argument.getString();
+                property = renderer.getString(argument);
                 std::sort(accumulator.a.begin(), accumulator.a.end(), [&property, &renderer](Variant& a, Variant& b) -> bool {
                     if (a.type != Variant::Type::VARIABLE || b.type != Variant::Type::VARIABLE)
                         return false;
@@ -1789,7 +1813,7 @@ namespace Liquid {
             auto operand = getOperand(renderer, node, store);
             auto arg1 = getArgument(renderer, node, store, 0);
             auto arg2 = getArgument(renderer, node, store, 1);
-            WhereStruct whereStruct = { renderer, arg1.getString(), arg2.variant, nullptr };
+            WhereStruct whereStruct = { renderer, renderer.getString(arg1), arg2.variant, nullptr };
             switch (operand.variant.type) {
                 case Variant::Type::VARIABLE:
                     accumulate(whereStruct, operand.variant.v);

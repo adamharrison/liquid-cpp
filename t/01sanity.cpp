@@ -484,9 +484,40 @@ TEST(sanity, filters) {
     product["created_at"] = "2021-09-01T00:00:00-00:00";
     product["tags"] = "sort_01234567, hide-red";
     variant["option1"] = "red";
+    product["body_html"] = "This is a test description.\
+    <p>Here's more text.</p>\
+    Here's a list:\
+    <li>\
+        Bullet point 1.\
+    \
+    </li>\
+    <li>\
+        Bullet point 2.\
+    </li>\
+    <li>\
+        Bullet point 3.\
+    </li>";
     hash["variant"] = std::move(variant);
     hash["product"] = std::move(product);
 
+    ast = getParser().parse("{%- assign product_split = product.body_html | split: '<li>' -%}{{ product_split | slice: 1, product_split.size | join: '<li>' | prepend: '<li>' }}");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.data(), "<li>\
+        Bullet point 1.\
+    \
+    </li>\
+    <li>\
+        Bullet point 2.\
+    </li>\
+    <li>\
+        Bullet point 3.\
+    </li>");
+
+    ast = getParser().parse("Test {{ product.title | split: \" \" | slice: 1, 2 | join: \" \" }}");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.data(), "Test Very First");
 
     ast = getParser().parse("Test {{ product.title | split: \" \" | first }}");
     ASSERT_EQ(getParser().errors.size(), 0);
