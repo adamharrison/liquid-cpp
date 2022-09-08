@@ -39,7 +39,7 @@ namespace Liquid {
 
             operator bool() const { return type != Type::LIQUID_LEXER_ERROR_TYPE_NONE; }
 
-            static string english(const LiquidLexerError& error) {
+            static std::string english(const LiquidLexerError& error) {
                 char buffer[512] = { 0 };
                 switch (error.type) {
                     case Type::LIQUID_LEXER_ERROR_TYPE_NONE: break;

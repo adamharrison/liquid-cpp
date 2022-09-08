@@ -7,6 +7,7 @@
 #include <ctime>
 #include <algorithm>
 #include <unordered_set>
+#include <functional>
 
 namespace Liquid {
 
