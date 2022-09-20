@@ -21,6 +21,7 @@ void liquidImplementStrictStandardDialect(LiquidContext context) {
 void liquidImplementPermissiveStandardDialect(LiquidContext context) {
     StandardDialect::implementPermissive(*static_cast<Context*>(context.context));
 }
+
 #ifdef LIQUID_INCLUDE_WEB_DIALECT
     void liquidImplementWebDialect(LiquidContext context) {
         WebDialect::implement(*static_cast<Context*>(context.context));
