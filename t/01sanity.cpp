@@ -1089,6 +1089,12 @@ TEST(sanity, error) {
         ast = getParser().parse("{% assign a = a | plus: 5");
     }, Parser::Exception);
 
+
+
+    ASSERT_NO_THROW({
+        ast = getParser().parse("{{ product.title | split: }}");
+    });
+
     ASSERT_NO_THROW({
         ast = getParser().parse("{% assign a a | plus: 5 %}");
     });
