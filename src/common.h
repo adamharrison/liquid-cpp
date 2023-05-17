@@ -70,6 +70,12 @@ namespace Liquid {
         FALSY_EMPTY_STRING      = 2,
         FALSY_NIL               = 4
     };
+    enum ECoercion {
+        COERCE_NONE              = 0,
+        COERCE_STRING_TO_NUMBERS = 1,
+        COERCE_NUMBERS_TO_STRING = 2,
+        COERCE_ALL               = 3
+    };
     // Represents everything that can be addressed by textual liquid. A built-in type.
     struct Variant {
 

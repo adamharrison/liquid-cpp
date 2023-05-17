@@ -307,7 +307,10 @@ namespace Liquid {
                         lastNode->children.pop_back();
                         auto operatorNode = make_unique<Node>(op);
                         operatorNode->children.push_back(move(lastNode));
-                        parser.nodes.back() = move(operatorNode);
+
+                        unique_ptr<Node> node = make_unique<Node>(context.getVariableNodeType());
+                        node->children.push_back(move(operatorNode));
+                        parser.nodes.back() = move(node);
                     } else {
                         lastNode->children.back() = move(make_unique<Node>(Variant(move(opName))));
                     }

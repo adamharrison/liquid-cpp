@@ -229,23 +229,27 @@ namespace Liquid {
         for (size_t i = offset; valid && i < node.children.size(); ++i) {
             auto& link = node.children[i];
             auto node = retrieveRenderedNode(*link.get(), store);
-            switch (node.variant.type) {
-                case Variant::Type::INT:
-                    if (!variableResolver.getArrayVariable(*this, storePointer, node.variant.i, storePointer)) {
+            if (link.get()->type && link.get()->type->type == NodeType::DOT_FILTER && !node.type) {
+                inject(storePointer, node.variant);
+            } else {
+                switch (node.variant.type) {
+                    case Variant::Type::INT:
+                        if (!variableResolver.getArrayVariable(*this, storePointer, node.variant.i, storePointer)) {
+                            storePointer = Variable({ nullptr });
+                            valid = false;
+                        }
+                    break;
+                    case Variant::Type::STRING: {
+                        if (!variableResolver.getDictionaryVariable(*this, storePointer, node.variant.s.data(), storePointer)) {
+                            storePointer = Variable({ nullptr });
+                            valid = false;
+                        }
+                    } break;
+                    default:
                         storePointer = Variable({ nullptr });
                         valid = false;
-                    }
-                break;
-                case Variant::Type::STRING: {
-                    if (!variableResolver.getDictionaryVariable(*this, storePointer, node.variant.s.data(), storePointer)) {
-                        storePointer = Variable({ nullptr });
-                        valid = false;
-                    }
-                } break;
-                default:
-                    storePointer = Variable({ nullptr });
-                    valid = false;
-                break;
+                    break;
+                }
             }
         }
         if (logUnknownVariables && !valid)

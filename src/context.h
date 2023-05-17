@@ -248,6 +248,7 @@ namespace Liquid {
             }
         };
 
+        ECoercion coerciveness = COERCE_NONE;
         EFalsiness falsiness = FALSY_FALSE;
         bool disallowArrayLiterals = false;
         bool disallowGroupingOutsideAssign = false;

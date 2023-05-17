@@ -30,7 +30,9 @@ namespace Liquid {
             // Determines whether something is truthy/falsy.
             // In strict; this is set to FALSY_NIL, which emulates ruby; meaning only NIL, and the false boolean are false.
             // In permissive; this is set to FALSY_EMPTY_STRING | FALSY_NIL | FALSY_0, which emulates perl, where all those are treated as false (the sane option, really).
-            EFalsiness falsiness
+            EFalsiness falsiness,
+            // Determines to what degree things should be coerced when performing operations.
+            ECoercion coerciveness
         );
 
         static void implementStrict(Context& context) {
@@ -41,7 +43,8 @@ namespace Liquid {
                 true,
                 true,
                 true,
-                FALSY_NIL
+                FALSY_NIL,
+                COERCE_NONE
             );
         }
 
@@ -57,7 +60,8 @@ namespace Liquid {
                 false,
                 false,
                 false,
-                (EFalsiness)(FALSY_NIL | FALSY_0 | FALSY_EMPTY_STRING)
+                (EFalsiness)(FALSY_NIL | FALSY_0 | FALSY_EMPTY_STRING),
+                COERCE_ALL
             );
         }
     };

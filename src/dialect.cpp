@@ -804,6 +804,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             Node op1 = getOperand(renderer, node, store, 0);
             Node op2 = getOperand(renderer, node, store, 1);
+            Node(Variant(operate(op1.variant.getFloat(), op2.variant.getFloat())));
             switch (op1.variant.type) {
                 case Variant::Type::INT:
                     switch (op2.variant.type) {
@@ -2232,8 +2233,9 @@ namespace Liquid {
         context.template registerType<DateFilterNode>();
     }
 
-    void StandardDialect::implement(Context& context, bool globalAssignsOnly, bool disallowParentheses, bool assignConditionalOperatorsOnly, bool assignOutputFiltersOnly, bool disableArrayLiterals, EFalsiness falsiness) {
+    void StandardDialect::implement(Context& context, bool globalAssignsOnly, bool disallowParentheses, bool assignConditionalOperatorsOnly, bool assignOutputFiltersOnly, bool disableArrayLiterals, EFalsiness falsiness, ECoercion coerciveness) {
         context.falsiness = falsiness;
+        context.coerciveness = coerciveness;
         context.disallowArrayLiterals = disableArrayLiterals;
         context.disallowGroupingOutsideAssign = disallowParentheses;
 

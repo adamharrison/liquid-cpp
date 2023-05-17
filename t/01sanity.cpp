@@ -528,6 +528,12 @@ TEST(sanity, filters) {
         Bullet point 3.\
     </li>");
 
+    hash["product"]["body_html"] = "<p>It may be chilly out, but this dress is packing a lot of HEAT! Featuring a double peek-a-boo neckline and cheeky side slit, this dress is an excellent choice for the gals who want a dress with a little edge.</p>\n<p><strong><span style=\"text-decoration: underline;\">Note:</span></strong> Dresses at Le Chateau may run smaller than Suzy Shier dresses. Please consult our <strong><a href=\"https://suzyshier.com/pages/le-chateau-size-chart/\" title=\"Size chart\"><span style=\"text-decoration: underline;\">size chart</span></a></strong> for more accurate measurements.</p>\n<li>Knit fabric</li>\n<li>Halter neckline</li>\n<li>Double peekaboo front keyhole</li>\n<li>Spaghetti straps</li>\n<li>Open back</li>\n<li>Bodycon fit</li>\n<li>Mini length</li>\n<li>Front side slit</li>\n<li>100% polyester lining</li>\n<li>96% polyester, 4% elastane</li>\n<li>Machine wash in cold water</li>";
+    ast = getParser().parse("{{ product.body_html | split: '<li>' | slice: 1 | join: '' | remove: '</li>' }}");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.data(), "Knit fabric\nHalter neckline\nDouble peekaboo front keyhole\nSpaghetti straps\nOpen back\nBodycon fit\nMini length\nFront side slit\n100% polyester lining\n96% polyester, 4% elastane\nMachine wash in cold water");
+
     ast = getParser().parse("Test {{ product.title | split: \" \" | slice: 1, 2 | join: \" \" }}");
     ASSERT_EQ(getParser().errors.size(), 0);
     str = renderTemplate(ast, hash);
@@ -759,6 +765,22 @@ TEST(sanity, composite) {
     CPPVariable hash, order, transaction, event, variant, product;
     Node ast;
     std::string str;
+
+    CPPVariable variantList = CPPVariable({ });
+    variant["sku"] = "0024545-ASD-2134";
+    variantList.a.push_back(move(make_unique<CPPVariable>(variant)));
+
+    product["variants"] = move(variantList);
+    hash["product"] = std::move(product);
+
+
+    ast = getParser().parse("{% assign digits = product.variants.first.sku | slice: 5, 2 | plus: 0 %}{{ digits }}{% if digits >= 63 %}63{% elsif digits >= 61 %}61{% elsif digits >= 40 %}40{% elsif digits >= 21 %}21{% elsif digits >= 1 %}01{% endif %}");
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.c_str(), "4540");
+
+    ast = getParser().parse("{% assign digits = product.variants[0].sku | slice: 5, 2 | plus: 0 %}{{ digits }}{% if digits >= 63 %}63{% elsif digits >= 61 %}61{% elsif digits >= 40 %}40{% elsif digits >= 21 %}21{% elsif digits >= 1 %}01{% endif %}");
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.c_str(), "4540");
 
 
     variant["price"] = 10;
