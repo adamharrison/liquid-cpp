@@ -230,7 +230,10 @@ namespace Liquid {
             auto& link = node.children[i];
             auto node = retrieveRenderedNode(*link.get(), store);
             if (link.get()->type && link.get()->type->type == NodeType::DOT_FILTER && !node.type) {
-                inject(storePointer, node.variant);
+                if (node.variant.type == Variant::Type::VARIABLE)
+                    storePointer = node.variant.v;
+                else
+                    inject(storePointer, node.variant);
             } else {
                 switch (node.variant.type) {
                     case Variant::Type::INT:
