@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_CXX_FLAGS "-Wall -fPIC")
-set(CMAKE_CXX_FLAGS_DEBUG "-g -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g ")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -s")
 FILE(GLOB CPPSources src/*.cpp)
 

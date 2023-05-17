@@ -7,6 +7,7 @@
 #include <ctime>
 #include <algorithm>
 #include <unordered_set>
+#include <functional>
 
 namespace Liquid {
 
@@ -1420,6 +1421,10 @@ namespace Liquid {
             Variant result { vector<Variant>() };
             string str = renderer.getString(operand);
             string splitter = renderer.getString(argument);
+            if (splitter.size() == 0) {
+                result.a.push_back(str);
+                return Variant(std::move(result));
+            }
             size_t start = 0, idx;
             while ((idx = str.find(splitter, start)) != string::npos) {
                 if (idx > start)
