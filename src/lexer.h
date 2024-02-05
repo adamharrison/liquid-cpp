@@ -137,13 +137,18 @@ namespace Liquid {
             return *offset & 0x80;
         }
 
+        // Note, this returns a integer representing the *bytes* not the *codepoints*.
         unsigned int getUTF8Character(const char* offset, const char* end, int* length) {
             int bytes = 1;
-            int c = *offset++;
-            while ((*offset & 0xC0) == 0x80) {
-                if (++offset >= end)
+            unsigned char* uoffset = (unsigned char*)offset;
+            unsigned char* uend = (unsigned char*)end;
+            unsigned int c = *uoffset;
+            while ((*uoffset & 0xC0) == 0x80) {
+                if (++uoffset >= uend)
                     break;
-                c |= *offset << (8*++bytes);
+                c <<= 8;
+                c |= *uoffset;
+                ++bytes;
             }
             *length = bytes;
             return c;
@@ -416,8 +421,8 @@ namespace Liquid {
                                 } break;
                                 default:
                                     unsigned int character;
-                                    if (isUTF8Character(&str[startOfWord])) {
-                                        character = getUTF8Character(&str[startOfWord], end, &bytes);
+                                    if (isUTF8Character(&str[offset])) {
+                                        character = getUTF8Character(&str[offset], end, &bytes);
                                     } else {
                                         character = str[offset];
                                     }

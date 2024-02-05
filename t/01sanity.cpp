@@ -186,22 +186,22 @@ TEST(sanity, whitespace) {
 
 
     // UTF-8 whitespace.
-    ast = getParser().parse("asdbfsdf             {{- 1 -}}b");
+    ast = getParser().parse(u8"asdbfsdf             {{- 1 -}}b");
     str = renderTemplate(ast, variable);
     ASSERT_EQ(str, "asdbfsdf1b");
 
-    ast = getParser().parse("asdbfsdf        {{ 1 }} b");
+    ast = getParser().parse(u8"asdbfsdf        {{ 1 }} b");
     str = renderTemplate(ast, variable);
     ASSERT_EQ(str, "asdbfsdf        1 b");
 
-    ast = getParser().parse("asdbfsdf        {{- 1 }} b");
+    ast = getParser().parse(u8"asdbfsdf        {{- 1 }} b");
     str = renderTemplate(ast, variable);
     ASSERT_EQ(str, "asdbfsdf1 b");
 
-    ast = getParser().parse("asdbfsdf        {{- 1 -}} b");
+    ast = getParser().parse(u8"asdbfsdf        {{- 1 -}} b");
     str = renderTemplate(ast, variable);
     ASSERT_EQ(str, "asdbfsdf1b");
-    ast = getParser().parse("asdbfsdf        {{- 1 -}}b");
+    ast = getParser().parse(u8"asdbfsdf        {{- 1 -}}b");
     str = renderTemplate(ast, variable);
     ASSERT_EQ(str, "asdbfsdf1b");
 
@@ -788,6 +788,15 @@ TEST(sanity, composite) {
     CPPVariable hash, order, transaction, event, variant, product;
     Node ast;
     std::string str;
+
+    FILE* file = fopen("/tmp/test.liquid", "rb");
+    fseek(file, 0, SEEK_END);
+    long length = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    str.resize(length);
+    fread(str.data(), sizeof(char), length, file);
+    ast = getParser().parse(str.data(), length, "/tmp/test.liquid");
+    fclose(file);
 
 
     ast = getParser().parse("{% if a > 2 -%}1{% else-%}45{% endif %}");
