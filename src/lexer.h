@@ -328,6 +328,9 @@ namespace Liquid {
                                         if (!isWord || offset+1 >= size || isWhitespace(&str[offset+1], end)) {
                                             ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
                                             isNumber = false;
+                                        } else if (offset+1 < size && (str[offset+1] == '%' || str[offset+1] == '}')) {
+                                            ongoing = processControlChunk(&str[startOfWord], offset - startOfWord, isNumber, hasPoint);
+                                            processComplete = true;
                                         }
                                     } else {
                                         isWord = false;

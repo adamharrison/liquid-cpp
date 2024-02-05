@@ -476,6 +476,8 @@ TEST(sanity, filters) {
     CPPVariable product = { };
     CPPVariable option = { };
     CPPVariable variant = { };
+    CPPVariable metafield = { };
+    CPPVariable metafields;
     option["name"] = "Color";
     CPPVariable options;
     options[0] = std::move(option);
@@ -483,6 +485,12 @@ TEST(sanity, filters) {
     product["options"] = std::move(options);
     product["created_at"] = "2021-09-01T00:00:00-00:00";
     product["tags"] = "sort_01234567, hide-red";
+    product["product_type"] = "bodysuits";
+    metafield["key"] = "color_map";
+    metafield["namespace"] = "details";
+    metafield["value"] = "multi pass";
+    metafields[0] = std::move(metafield);
+    product["metafields"] = std::move(metafields);
     variant["option1"] = "red";
     product["body_html"] = "This is a test description.\
     <p>Here's more text.</p>\
@@ -499,6 +507,19 @@ TEST(sanity, filters) {
     </li>";
     hash["variant"] = std::move(variant);
     hash["product"] = std::move(product);
+
+
+    ast = getParser().parse("{% assign normalized = \"black blue brown green grey multi nude orange pink purple red white yellow\" | split: \" \" %}{% for p in product.metafields %}{% if p.namespace == \"details\" and p.key == \"color_map\" %}{% assign desc = p.value %}{% endif %}{% endfor %}{% if desc %}{% for c in normalized %}{% if desc contains c %}{{ c }}{% break %}{% endif %}{% endfor %}{% endif %}");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.data(), "multi");
+
+    ast = getParser().parse("{% assign desc = \"test bodysuits\" %}{% if desc -%}\n{%- if product.product_type == \"bodysuits\" %}{% if desc contains \"bodysuit\" %}bodysuit, romper, jumpsuit, catsuit{% endif -%}\n{%- elsif product.product_type == \"bralettes\" %}{% if desc contains \"bralette\" %}bralette{% endif -%}\n{%- elsif product.product_type == \"bras\" %}{% if desc contains \"unlined underwire\" or desc contains \"unlined balconette\" %}underwire, unlined underwire, unlined balconette{% endif -%}\n{%- elsif product.product_type == \"camis\" %}{% if desc contains \"crop cami\" %}crop cami, longline bralette{% elsif desc contains \"cami\" %}cami, crop cami{% endif -%}\n{%- elsif product.product_type == \"corsets\" %}{% if desc contains \"corset\" %}corset, crop corset, longline underwire{% endif -%}\n{%- elsif product.product_type == \"cropped corsets\" %}{% if desc contains \"crop corset\" or desc contains \"longling underwire\" %}crop corset, longline underwire, corset{% endif -%}\n{%- elsif product.product_type == \"garter belts\" %}{% if desc contains \"garter belt\" %}garter belt{% endif -%}\n{%- elsif product.product_type == \"jumpsuits\" %}{% if desc contains \"jumpsuit\" %}jumpsuit, catsuit, bodysuit, romper{% elsif desc contains \"romper\" %}romper, bodysuit, jumpsuit{% elsif desc contains \"catsuit\" %}catsuit, jumpsuit, bodysuit, romper{% endif -%}\n{%- elsif product.product_type == \"longline braletes\" %}{% if desc contains \"longline bralette\" %}longline bralette, crop cami{% endif -%}\n{%- elsif product.product_type == \"lounge bottoms\" %}{% if desc contains \"short\" %}short, romper{% elsif desc contains \"pant\" %}pant, jumpsuit{% endif -%}\n{%- elsif product.product_type == \"lounge tops\" %}{% if desc contains \"top\" %}top{% endif -%}\n{%- elsif product.product_type == \"panties\" %}{% if desc contains \"string\" %}string, thong{% elsif desc contains \"thong\" %}thong, low rise thong, high leg thong, string{% elsif desc contains \"bikini\" %}bikini, low rise bikini, high leg bikini{% elsif desc contains \"hipster\" %}hipster, bikini, high waist brief{% elsif desc contains \"short\" %}short, high waist brief{% elsif desc contains \"high waist brief\" %}high waist brief, short{% endif -%}\n{%- elsif product.product_type == \"slips\" %}{% if desc contains \"slip\" or desc contains \"babydoll\" or desc contains \"dress\" %}dress, slip, babydoll{% endif -%}\n{%- elsif product.product_type == \"swim bottoms\" %}{% if desc contains \"bikini bottom\" %}bikini bottom, cover-up top, cover-up bottom, cover-up dress{% endif -%}\n{%- elsif product.product_type == \"swim one-piece\" %}{% if desc contains \"one-piece swimsuit\" %}one-piece swimsuit, cover-up bottom, cover-up top, cover-up dress{% endif -%}\n{%- elsif product.product_type == \"swim tops\" %}{% if desc contains \"bikini top\" %}bikini top, cover-up bottom, cover-up top, cover-up dress{% endif -%}\n{%- elsif product.product_type == \"cover-ups tops\" %}{% if desc contains \"top\" %}bikini bottom, bikini top, bikini one-piece{% endif -%}\n{%- elsif product.product_type == \"cover-ups bottoms\" %}{% if desc contains \"pant\" %}bikini top, bikini one-pipece, bikini bottom{% endif -%}\n{%- elsif product.product_type == \"cover-ups one-piece\" %}{% if desc contains \"dress\" %}bikini top, bikini bottom, bikini one-piece{% endif %}{% endif %}{% endif -%}");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.data(), "bodysuit, romper, jumpsuit, catsuit");
+
+
 
     ast = getParser().parse("{{ product.body_html | split: '<li>' | slice: 1 | join: '<li>' | prepend: '<li>' }}");
     ASSERT_EQ(getParser().errors.size(), 0);
@@ -543,6 +564,8 @@ TEST(sanity, filters) {
     ASSERT_EQ(getParser().errors.size(), 0);
     str = renderTemplate(ast, hash);
     ASSERT_STREQ(str.data(), "Test My");
+
+
 
     ast = getParser().parse("{% assign idx = nil %}{% for o in product.options %}{% if o.name == 'Color' %}{% assign idx = 'option' | append: forloop.index %}{% endif %}{% endfor %}{% if idx %}{% assign tag = 'hide-' | append: variant[idx] %}{% if product.tags contains tag %}0{% else %}1{% endif %}{% else %}1{% endif %}");
     ASSERT_EQ(getParser().errors.size(), 0);
@@ -766,6 +789,12 @@ TEST(sanity, composite) {
     Node ast;
     std::string str;
 
+
+    ast = getParser().parse("{% if a > 2 -%}1{% else-%}45{% endif %}");
+    str = renderTemplate(ast, hash);
+    ASSERT_EQ(str, "45");
+
+
     CPPVariable variantList = CPPVariable({ });
     variant["sku"] = "0024545-ASD-2134";
     variantList.a.push_back(move(make_unique<CPPVariable>(variant)));
@@ -862,7 +891,6 @@ TEST(sanity, composite) {
     ast = getParser().parse("{% assign b = order %}{{ b.id }}");
     str = renderTemplate(ast, hash);
     ASSERT_EQ(str, "2");
-
 
 
 
