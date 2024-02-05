@@ -68,6 +68,8 @@ static bool liquidCgetString(LiquidRenderer renderer, void* variable, char* targ
 }
 
 static long long liquidCgetStringLength(LiquidRenderer renderer, void* variable) {
+    if (TYPE((VALUE)variable) != T_STRING)
+        return -1;
     return RSTRING_LEN((VALUE)variable);
 }
 
