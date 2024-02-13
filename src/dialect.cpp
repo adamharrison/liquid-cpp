@@ -2133,24 +2133,28 @@ namespace Liquid {
             auto operand = getOperand(renderer, node, store);
             time_t timeT = 0;
             if (operand.variant.type == Variant::Type::STRING) {
-                // Gets the appropriate epoch date. This is deficient, and doesn't handle all computations correctly involving leap seconds, or changing timezones and whatnot.
-                // At this point, it's good enough. Look into getting an acutal datetime library in here.
-                int year, month, day, hour, minute, second, tz_hour, tz_min;
-                if (sscanf(operand.variant.getString().c_str(), "%d-%d-%dT%d:%d:%d%d:%d", &year, &month, &day, &hour, &minute, &second, &tz_hour, &tz_min) == 8) {
-                    struct tm date;
-                    memset(&date, 0, sizeof(date));
-                    date.tm_sec = second;
-                    date.tm_min = minute;
-                    date.tm_hour = hour;
-                    date.tm_mday = day;
-                    date.tm_mon = (month - 1);
-                    date.tm_year = (year - 1900);
-                    //strptime(operand.variant.getString().c_str(), "%Y-%m-%dT%H:%M:%S%z", &date);
-                    timeT = mktime(&date);
-                    if (tz_hour < 0)
-                        tz_min *= -1;
-                    int offset = tz_hour * 3600 + tz_min * 60;
-                    timeT += offset;
+                if (operand.variant.s == "now") {
+                    timeT = time(NULL);
+                } else {
+                    // Gets the appropriate epoch date. This is deficient, and doesn't handle all computations correctly involving leap seconds, or changing timezones and whatnot.
+                    // At this point, it's good enough. Look into getting an acutal datetime library in here.
+                    int year, month, day, hour, minute, second, tz_hour, tz_min;
+                    if (sscanf(operand.variant.getString().c_str(), "%d-%d-%dT%d:%d:%d%d:%d", &year, &month, &day, &hour, &minute, &second, &tz_hour, &tz_min) == 8) {
+                        struct tm date;
+                        memset(&date, 0, sizeof(date));
+                        date.tm_sec = second;
+                        date.tm_min = minute;
+                        date.tm_hour = hour;
+                        date.tm_mday = day;
+                        date.tm_mon = (month - 1);
+                        date.tm_year = (year - 1900);
+                        //strptime(operand.variant.getString().c_str(), "%Y-%m-%dT%H:%M:%S%z", &date);
+                        timeT = mktime(&date);
+                        if (tz_hour < 0)
+                            tz_min *= -1;
+                        int offset = tz_hour * 3600 + tz_min * 60;
+                        timeT += offset;
+                    }
                 }
             } else {
                 timeT = (time_t)operand.variant.getInt();

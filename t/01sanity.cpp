@@ -618,13 +618,18 @@ TEST(sanity, filters) {
 
 
     ast = getParser().parse("{% assign a = now | date: '%s' %}{% assign b = product.created_at | date: '%s' %}{% assign c = a | minus: b | divided_by: 86400 | at_least: 0 %}{{ a }} {{ b }} {{ c | floor }}");
-    str = renderTemplate(ast, hash);
+    string str1 = renderTemplate(ast, hash);
     ASSERT_EQ(getParser().errors.size(), 0);
+
+    ast = getParser().parse("{% assign a = 'now' | date: '%s' %}{% assign b = product.created_at | date: '%s' %}{% assign c = a | minus: b | divided_by: 86400 | at_least: 0 %}{{ a }} {{ b }} {{ c | floor }}");
+    string str2 = renderTemplate(ast, hash);
+    ASSERT_EQ(getParser().errors.size(), 0);
+    ASSERT_EQ(str1, str2);
 
     char buffer[512];
     sprintf(buffer, "%lld 1630472400 %lld", now, (now - 1630472400)/86400);
 
-    ASSERT_STREQ(str.data(), buffer);
+    ASSERT_STREQ(str1.data(), buffer);
 
     struct TestingFilter : FilterNodeType {
         TestingFilter() : FilterNodeType("testing", -1, -1, true) { }
@@ -789,14 +794,20 @@ TEST(sanity, composite) {
     Node ast;
     std::string str;
 
-    FILE* file = fopen("/tmp/test.liquid", "rb");
+    hash["url"] = std::string("https://TEST.myshopify.com/apps/giftregistry/registry/1");
+    ast = getParser().parse("{{ url | remove: \"https://\" | split: \"/\" | first | prepend: \"https://\" }}/pages/comfort-guarantee");
+    str = renderTemplate(ast, hash);
+    ASSERT_EQ(str, "https://TEST.myshopify.com/pages/comfort-guarantee");
+
+
+    /*FILE* file = fopen("/tmp/test.liquid", "rb");
     fseek(file, 0, SEEK_END);
     long length = ftell(file);
     fseek(file, 0, SEEK_SET);
     str.resize(length);
     fread(str.data(), sizeof(char), length, file);
     ast = getParser().parse(str.data(), length, "/tmp/test.liquid");
-    fclose(file);
+    fclose(file);*/
 
 
     ast = getParser().parse("{% if a > 2 -%}1{% else-%}45{% endif %}");
