@@ -790,12 +790,13 @@ TEST(sanity, optimizer) {
 }
 
 TEST(sanity, composite) {
-    CPPVariable hash, order, transaction, event, variant, product;
+    CPPVariable hash, order, transaction, event, variant, product, registry;
     Node ast;
     std::string str;
 
-    hash["url"] = std::string("https://TEST.myshopify.com/apps/giftregistry/registry/1");
-    ast = getParser().parse("{{ url | remove: \"https://\" | split: \"/\" | first | prepend: \"https://\" }}/pages/comfort-guarantee");
+    registry["url"] = std::string("https://TEST.myshopify.com/apps/giftregistry/registry/1");
+    hash["registry"] = std::move(registry);
+    ast = getParser().parse("{{ registry.url | remove: \"https://\" | split: \"/\" | first | prepend: \"https://\" }}/pages/comfort-guarantee");
     str = renderTemplate(ast, hash);
     ASSERT_EQ(str, "https://TEST.myshopify.com/pages/comfort-guarantee");
 
@@ -1022,6 +1023,11 @@ TEST(sanity, strict) {
     ast = parser.parse("{% if a + 2 > 1 %}a{% endif %}");
     result = renderer.render(ast, hash);
     ASSERT_TRUE(parser.errors.size() > 0);
+
+
+    ast = parser.parse("{{ \"test\" | prepend: \"test2\" }}");
+    result = renderer.render(ast, hash);
+    ASSERT_EQ(result, "test2test");
 }
 TEST(sanity, clang) {
     CPPVariable hash = { };
