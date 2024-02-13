@@ -344,7 +344,23 @@ namespace Liquid {
                         }
                         if (parser.filterState == Parser::EFilterState::NAME) {
                             parser.filterState = Parser::EFilterState::COLON;
-                            const FilterNodeType* op = context.getFilterType(opName);
+                            const FilterNodeType* op = NULL;
+                            for (auto it = parser.nodes.rbegin(); it != parser.nodes.rend() && !op; ++it) {
+                                if (it->get()->type) {
+                                    switch (it->get()->type->type) {
+                                        case NodeType::Type::TAG:
+                                        case NodeType::Type::OUTPUT: {
+                                            auto& filters = static_cast<const ContextualNodeType*>(it->get()->type)->filters;
+                                            auto filterIt = filters.find(opName);
+                                            if (filterIt != filters.end())
+                                                op = static_cast<FilterNodeType*>(filterIt->second.get());
+                                        } break;
+                                        default: break;
+                                    }
+                                }
+                            }
+                            if (!op)
+                                op = context.getFilterType(opName);
                             bool unknown = !op;
                             if (unknown) {
                                 parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNKNOWN_FILTER, opName));
