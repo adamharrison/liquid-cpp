@@ -8,6 +8,7 @@ namespace Liquid {
 
     struct NodeType;
     struct Variable;
+    struct FilterNodeType;
 
     struct Parser {
         const Context& context;
@@ -206,6 +207,8 @@ namespace Liquid {
         // Unparses the tree into text. Useful when used with optimization.
         void unparse(const Node& node, std::string& target, Parser::State state = Parser::State::NODE);
         std::string unparse(const Node& node) { std::string target; unparse(node, target); return target; }
+
+        const FilterNodeType* getFilterType(const std::string& opName) const;
     };
 }
 

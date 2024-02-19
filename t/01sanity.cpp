@@ -26,6 +26,18 @@ Context& getContext() {
     return context;
 }
 
+string getTestFile(const std::string& path) {
+    string str;
+    FILE* file = fopen(path.data(), "rb");
+    fseek(file, 0, SEEK_END);
+    long length = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    str.resize(length);
+    fread(str.data(), sizeof(char), length, file);
+    fclose(file);
+    return str;
+}
+
 Renderer& getRenderer() {
     static Renderer renderer(getContext(), CPPVariableResolver());
     return renderer;
@@ -790,7 +802,7 @@ TEST(sanity, optimizer) {
 }
 
 TEST(sanity, composite) {
-    CPPVariable hash, order, transaction, event, variant, product, registry;
+    CPPVariable hash, order, transaction, event, variant, product, registry, shop;
     Node ast;
     std::string str;
 
@@ -801,14 +813,6 @@ TEST(sanity, composite) {
     ASSERT_EQ(str, "https://TEST.myshopify.com/pages/comfort-guarantee");
 
 
-    /*FILE* file = fopen("/tmp/test.liquid", "rb");
-    fseek(file, 0, SEEK_END);
-    long length = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    str.resize(length);
-    fread(str.data(), sizeof(char), length, file);
-    ast = getParser().parse(str.data(), length, "/tmp/test.liquid");
-    fclose(file);*/
 
 
     ast = getParser().parse("{% if a > 2 -%}1{% else-%}45{% endif %}");
