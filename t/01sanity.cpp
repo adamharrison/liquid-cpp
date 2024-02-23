@@ -812,7 +812,27 @@ TEST(sanity, composite) {
     str = renderTemplate(ast, hash);
     ASSERT_EQ(str, "https://TEST.myshopify.com/pages/comfort-guarantee");
 
+    CPPVariable line_item1, line_item2;
+    
+    order["id"] = 941532;
+    line_item1["title"] = "Jellycat If I Were a Dog Book";
+    line_item2["title"] = "Pictures of cats";
+    order["line_items"] = { line_item1, line_item2 };
+    hash["order"] = order;
+    
+    ast = getParser().parse("{% for item in order.line_items %}INSIDE LOOP: {{ item.title }}{% endfor %}");
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.c_str(), "INSIDE LOOP: Jellycat If I Were a Dog BookINSIDE LOOP: Pictures of cats");
 
+    shop["hostname"] = "TEST.myshopify.com";
+    hash["shop"] = shop;
+    ast = getParser().parse("{{ shop.url }}");
+    str = renderTemplate(ast, hash);
+
+    long long now = (long long)time(NULL);
+    hash["now"] = now;
+    ast = getParser().parse("{{ now }}");
+    str = renderTemplate(ast, hash);
 
 
     ast = getParser().parse("{% if a > 2 -%}1{% else-%}45{% endif %}");
@@ -853,7 +873,7 @@ TEST(sanity, composite) {
     ASSERT_EQ(str, "A D C");
 
     CPPVariable lip1, lip2, lip3, lip4;
-    CPPVariable line_item, line_item1, line_item2, product_option1, product_option2, product_option3;
+    CPPVariable line_item, product_option1, product_option2, product_option3;
 
     lip1["name"] = "Gift Email";
     lip1["value"] = "test1@gmail.com";
