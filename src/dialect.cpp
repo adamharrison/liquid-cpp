@@ -2160,7 +2160,7 @@ namespace Liquid {
                 timeT = (time_t)operand.variant.getInt();
             }
             string argument = getArgument(renderer, node, store, 0).getString();
-            struct tm * timeinfo = localtime(&timeT);
+            struct tm * timeinfo = std::gmtime(&timeT);
             static constexpr int MAX_BUFFER_SIZE = 256;
             string buffer;
             buffer.resize(MAX_BUFFER_SIZE);
