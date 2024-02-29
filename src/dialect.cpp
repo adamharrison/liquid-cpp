@@ -2135,6 +2135,7 @@ namespace Liquid {
             if (operand.variant.type == Variant::Type::STRING) {
                 if (operand.variant.s == "now") {
                     timeT = time(NULL);
+
                 } else {
                     // Gets the appropriate epoch date. This is deficient, and doesn't handle all computations correctly involving leap seconds, or changing timezones and whatnot.
                     // At this point, it's good enough. Look into getting an acutal datetime library in here.
@@ -2148,12 +2149,7 @@ namespace Liquid {
                         date.tm_mday = day;
                         date.tm_mon = (month - 1);
                         date.tm_year = (year - 1900);
-                        //strptime(operand.variant.getString().c_str(), "%Y-%m-%dT%H:%M:%S%z", &date);
-                        timeT = mktime(&date);
-                        if (tz_hour < 0)
-                            tz_min *= -1;
-                        int offset = tz_hour * 3600 + tz_min * 60;
-                        timeT += offset;
+                        timeT = timegm(&date);
                     }
                 }
             } else {
@@ -2173,6 +2169,9 @@ namespace Liquid {
                 argument.replace(timestamp, 2, td);
                 fprintf(stderr, "WAT: %s\n", td.data());
             }*/
+            setenv("TZ", "", 1); // unset the TZ env var. An unset TZ defaults to UTC
+            tzset(); // strftime %s uses mktime which uses local timezone. This sets the local timezone to UTC
+
             buffer.resize(strftime(&buffer[0], MAX_BUFFER_SIZE, argument.c_str(), timeinfo));
             return Variant(move(buffer));
         }

@@ -639,9 +639,27 @@ TEST(sanity, filters) {
     ASSERT_EQ(str1, str2);
 
     char buffer[512];
-    sprintf(buffer, "%lld 1630472400 %lld", now, (now - 1630472400)/86400);
-
+    // 1630454400 = Wednesday, September 1, 2021 12:00:00 AM UTC
+    sprintf(buffer, "%lld 1630454400 %lld", now, (now - 1630454400)/86400);
     ASSERT_STREQ(str1.data(), buffer);
+
+    ast = getParser().parse("{{ 'now' | date: '%Y-%m-%d %H:%M %z %Z %s' }}");
+    string str3 = renderTemplate(ast, hash);
+    ASSERT_EQ(getParser().errors.size(), 0);
+
+    ast = getParser().parse("{{ 'now' | date: '%Y-%m-%d %H:%M %z %Z' }}");
+    string str4 = renderTemplate(ast, hash);
+    ASSERT_EQ(getParser().errors.size(), 0);
+
+    ast = getParser().parse("{{ 'now' | date: '%s' }}");
+    string str5 = renderTemplate(ast, hash);
+    ASSERT_EQ(getParser().errors.size(), 0);
+
+
+    string str4_5 = str4 + " " + str5;
+    ASSERT_EQ(str3, str4_5);
+
+
 
     struct TestingFilter : FilterNodeType {
         TestingFilter() : FilterNodeType("testing", -1, -1, true) { }
@@ -1252,7 +1270,7 @@ TEST(sanity, web) {
 
     ast = getParser().parse("{{ 1608524371 | date: \"%B %d, %Y\" }}");
     str = renderTemplate(ast, hash);
-    ASSERT_EQ(str, "December 20, 2020");
+    ASSERT_EQ(str, "December 21, 2020");
 
     ast = getParser().parse("{{ \"tefasdfsdf\" | link_to: \"//test.com\", \"titletest\" }}");
     str = renderTemplate(ast, hash);
