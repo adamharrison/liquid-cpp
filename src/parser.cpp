@@ -227,23 +227,23 @@ namespace Liquid {
     }
 
     const FilterNodeType* Parser::getFilterType(const std::string& opName) const {
-        const FilterNodeType* op = NULL;
-        for (auto it = nodes.rbegin(); it != nodes.rend() && !op; ++it) {
-            if (it->get()->type) {
-                switch (it->get()->type->type) {
-                    case NodeType::Type::TAG:
-                    case NodeType::Type::OUTPUT: {
-                        auto& filters = static_cast<const ContextualNodeType*>(it->get()->type)->filters;
-                        auto filterIt = filters.find(opName);
-                        if (filterIt != filters.end())
-                            op = static_cast<FilterNodeType*>(filterIt->second.get());
-                    } break;
-                    default: break;
+        const FilterNodeType* op = context.getFilterType(opName);
+        if (!op){
+            for (auto it = nodes.rbegin(); it != nodes.rend() && !op; ++it) {
+                if (it->get()->type) {
+                    switch (it->get()->type->type) {
+                        case NodeType::Type::TAG:
+                        case NodeType::Type::OUTPUT: {
+                            auto& filters = static_cast<const ContextualNodeType*>(it->get()->type)->filters;
+                            auto filterIt = filters.find(opName);
+                            if (filterIt != filters.end())
+                                op = static_cast<FilterNodeType*>(filterIt->second.get());
+                        } break;
+                        default: break;
+                    }
                 }
             }
         }
-        if (!op)
-            op = context.getFilterType(opName);
         return op;
     }
 
