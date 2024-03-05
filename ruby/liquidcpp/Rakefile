@@ -1,9 +1,5 @@
 require "rake/extensiontask"
 
-Rake::ExtensionTask.new "liquidcpp" do |ext|
-	ext.lib_dir = "lib/liquidcpp"
-end
-
 spec = Gem::Specification.new "liquidcpp", "0.1.0" do |s|
 	s.name		    = 'liquidcpp'
 	s.version	    = '1.0.0'
@@ -15,7 +11,7 @@ spec = Gem::Specification.new "liquidcpp", "0.1.0" do |s|
 	s.homepage	    = 'https://github.com/adamharrison/liquid-cpp'
 	s.license	    = 'MIT'
 	s.extensions    = ["ext/liquidcpp/extconf.rb"]
-	s.files         = ["ext/liquidcpp/extconf.rb", "ext/liquidcpp/liquid.c"]
+	s.files         = ["ext/liquidcpp/extconf.rb", "ext/liquidcpp/liquid.c", "lib/liquidcpp.rb", "lib/liquidcpp.so"]
 end
 
 Gem::PackageTask.new(spec) do |pkg|
