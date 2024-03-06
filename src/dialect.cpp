@@ -1220,7 +1220,8 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            return Variant(operand.getString() + argument.getString());
+            string result = renderer.getString(operand) + renderer.getString(argument);
+            return Variant(result);
         }
     };
 
@@ -1236,7 +1237,7 @@ namespace Liquid {
         CapitalizeFilterNode() : FilterNodeType("capitalize", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
-            string str = operand.getString();
+            string str = renderer.getString(operand);
             str[0] = toupper(str[0]);
             return Node(str);
         }
@@ -1245,7 +1246,7 @@ namespace Liquid {
         DowncaseFilterNode() : FilterNodeType("downcase", 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
-            string str = operand.getString();
+            string str = renderer.getString(operand);
             std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::tolower(c); });
             return Variant(str);
         }
@@ -1253,7 +1254,8 @@ namespace Liquid {
     struct HandleGenericFilterNode : FilterNodeType {
         HandleGenericFilterNode(const string& symbol) : FilterNodeType(symbol, 0, 0) { }
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
-            string str = getOperand(renderer, node, store).getString();
+            auto operand = getOperand(renderer, node, store);
+            string str = renderer.getString(operand);
             string accumulator;
             accumulator.reserve(str.size());
             bool lastHyphen = true;
@@ -1299,8 +1301,8 @@ namespace Liquid {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             string accumulator;
-            string str = operand.getString();
-            string rm = argument.getString();
+            string str = renderer.getString(operand);
+            string rm = renderer.getString(argument);
             size_t start = 0, idx;
             while ((idx = str.find(rm, start)) != string::npos) {
                 if (idx > start)
@@ -1317,8 +1319,8 @@ namespace Liquid {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
             string accumulator;
-            string str = operand.getString();
-            string rm = argument.getString();
+            string str = renderer.getString(operand);
+            string rm = renderer.getString(argument);
             size_t start = 0, idx;
             while ((idx = str.find(rm, start)) != string::npos) {
                 if (idx > start)
@@ -1337,9 +1339,9 @@ namespace Liquid {
             auto argumentPattern = getArgument(renderer, node, store, 0);
             auto argumentReplacement = getArgument(renderer, node, store, 1);
             string accumulator;
-            string str = operand.getString();
-            string pattern = argumentPattern.getString();
-            string replacement = argumentReplacement.getString();
+            string str = renderer.getString(operand);
+            string pattern = renderer.getString(argumentPattern);
+            string replacement = renderer.getString(argumentReplacement);
             size_t start = 0, idx;
             while ((idx = str.find(pattern, start)) != string::npos) {
                 if (idx > start)
@@ -1488,10 +1490,10 @@ namespace Liquid {
             auto customEllipsis = getArgument(renderer, node, store, 1);
             string ellipsis = "...";
             if (customEllipsis.variant.type == Variant::Type::STRING)
-                ellipsis = customEllipsis.getString();
+                ellipsis = renderer.getString(customEllipsis);
             long long count = characterCount.variant.getInt();
             if (count > (long long)ellipsis.size()) {
-                string str = operand.getString();
+                string str = renderer.getString(operand);
                 return Variant(str.substr(0, std::min((long long)(count - ellipsis.size()), (long long)str.size())) + ellipsis);
             }
             return Variant(ellipsis.substr(0, std::min(count, (long long)ellipsis.size())));
@@ -1504,7 +1506,7 @@ namespace Liquid {
             auto wordCount = getArgument(renderer, node, store, 0);
             auto customEllipsis = getArgument(renderer, node, store, 1);
             string ellipsis = "...";
-            string str = operand.getString();
+            string str = renderer.getString(operand);
             int targetWordCount = wordCount.variant.getInt();
             int ongoingWordCount = 0;
             bool previousBlank = false;
@@ -1528,7 +1530,7 @@ namespace Liquid {
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
             auto operand = getOperand(renderer, node, store);
             auto argument = getArgument(renderer, node, store, 0);
-            string str = operand.getString();
+            string str = renderer.getString(operand);
             std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::toupper(c); });
             return Variant(str);
         }
@@ -1564,7 +1566,7 @@ namespace Liquid {
             JoinStruct joinStruct({ renderer, "", "", 0 });
             auto argument = getArgument(renderer, node, store, 0);
             if (!argument.type)
-                joinStruct.joiner = argument.getString();
+                joinStruct.joiner = renderer.getString(argument);
 
 
             renderer.variableResolver.iterate(renderer, operand, +[](void* variable, void* data) {
@@ -2083,7 +2085,7 @@ namespace Liquid {
                 case Variant::Type::STRING:
                     return Variant((long long)operand.variant.s.size());
                 default:
-                    return Variant((long long)operand.variant.getString().size());
+                    return Variant((long long)renderer.getString(operand.variant).size());
             }
         }
 
@@ -2139,7 +2141,7 @@ namespace Liquid {
                     // Gets the appropriate epoch date. This is deficient, and doesn't handle all computations correctly involving leap seconds, or changing timezones and whatnot.
                     // At this point, it's good enough. Look into getting an acutal datetime library in here.
                     int year, month, day, hour, minute, second, tz_hour, tz_min;
-                    if (sscanf(operand.variant.getString().c_str(), "%d-%d-%dT%d:%d:%d%d:%d", &year, &month, &day, &hour, &minute, &second, &tz_hour, &tz_min) == 8) {
+                    if (sscanf(renderer.getString(operand.variant).c_str(), "%d-%d-%dT%d:%d:%d%d:%d", &year, &month, &day, &hour, &minute, &second, &tz_hour, &tz_min) == 8) {
                         struct tm date;
                         memset(&date, 0, sizeof(date));
                         date.tm_sec = second;
@@ -2159,7 +2161,8 @@ namespace Liquid {
             } else {
                 timeT = (time_t)operand.variant.getInt();
             }
-            string argument = getArgument(renderer, node, store, 0).getString();
+            auto arg = getArgument(renderer, node, store, 0);
+            string argument = renderer.getString(arg);
             struct tm * timeinfo = localtime(&timeT);
             static constexpr int MAX_BUFFER_SIZE = 256;
             string buffer;

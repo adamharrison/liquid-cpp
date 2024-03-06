@@ -122,6 +122,34 @@ static bool liquidCgetArrayVariable(LiquidRenderer renderer, void* variable, lon
 }
 
 static bool liquidCiterate(LiquidRenderer renderer, void* variable, bool liquidCcallback(void* variable, void* data), void* data, int start, int limit, bool reverse) {
+    VALUE value = (VALUE)variable;
+    VALUE array_value;
+    if (TYPE(value) != T_ARRAY)
+        return -1;
+
+    int length = RARRAY_LEN(value);
+    if (length > limit)
+        length = limit;
+    length = length - 1;
+    if (length < 0)
+        length += RARRAY_LEN(value)+1;
+    if (length >= 0) {
+        if (reverse) {
+            start = RARRAY_LEN(value) - start;
+            for (size_t i = length; i >= start; --i) {
+                array_value = rb_ary_entry((VALUE)variable, i);
+                if (TYPE((VALUE)array_value))
+                    liquidCcallback(array_value, data);
+            }
+        } else {
+            for (size_t i = start; i <= length; ++i) {
+                array_value = rb_ary_entry((VALUE)variable, i);
+                if (TYPE((VALUE)array_value)){
+                    liquidCcallback(array_value, data);
+                }
+            }
+        }
+    }
     return false;
 }
 
@@ -158,10 +186,10 @@ static void* liquidCcreateFloat(LiquidRenderer renderer, double value) {
     return (void*)DBL2NUM(value);
 }
 static void* liquidCcreateBool(LiquidRenderer renderer, bool value) {
-    return (void*)Qtrue;
+    return (void*)(value ? Qtrue : Qfalse);
 }
 static void* liquidCcreateInteger(LiquidRenderer renderer, long long value) {
-    return (void*)Qfalse;
+    return (void*)LL2NUM(value);
 }
 static void* liquidCcreateString(LiquidRenderer renderer, const char* str) {
     return (void*)rb_str_new2(str);
