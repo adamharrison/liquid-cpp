@@ -26,8 +26,15 @@ class LiquidCPP
             timeOp = nil
         end
         next unless timeOp && timeOp.class == Time
-        time_utc = timeOp.utc
-        time_utc.strftime(argument[0].to_s)
+        timeUTC = timeOp.utc
+        timeUTC.strftime(argument[0].to_s)
       })
+      self.registerFilter("money", 0, 0, LiquidCPP::OPTIMIZATION_SCHEME_NONE, Proc.new { |renderer, node, store, operand, argument|
+        moneyFormat = store["shop"]["money_format"]
+        moneyFormat = '$ {{ amount }}' unless moneyFormat
+        moneyAmount = sprintf('%.2f', operand / 100.0);
+        moneyFormat.gsub(/\{\{\s*amount\s*\}\}/, moneyAmount) 
+      })
+
     end
   end
