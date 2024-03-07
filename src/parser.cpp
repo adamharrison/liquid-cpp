@@ -354,7 +354,6 @@ namespace Liquid {
                         std::string opName = std::string(str, len);
                         if (opName == "|") {
                             // In the case where we're chaining filters, and there are no arguments; the precense of another | is enough to terminate this an popUntil the filter.
-                            // Or until the previous open parentheses group, as these can override precedence.
                             if (
                                 ((parser.filterState == Parser::EFilterState::COLON || parser.filterState == Parser::EFilterState::ARGUMENTS) && !parser.popNodeUntil(NodeType::Type::FILTER)) ||
                                 (parser.filterState != Parser::EFilterState::UNSET && parser.filterState != Parser::EFilterState::ARGUMENTS && parser.filterState != Parser::EFilterState::COLON)
