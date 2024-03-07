@@ -123,11 +123,12 @@ static bool liquidCgetArrayVariable(LiquidRenderer renderer, void* variable, lon
 
 static bool liquidCiterate(LiquidRenderer renderer, void* variable, bool liquidCcallback(void* variable, void* data), void* data, int start, int limit, bool reverse) {
     VALUE value = (VALUE)variable;
+    int length;
     VALUE array_value;
-    if (TYPE(value) != T_ARRAY)
-        return -1;
+	if (TYPE((VALUE)variable) != T_ARRAY)
+        return false;
 
-    int length = RARRAY_LEN(value);
+    length = RARRAY_LEN(value);
     if (length > limit)
         length = limit;
     length = length - 1;
@@ -136,16 +137,16 @@ static bool liquidCiterate(LiquidRenderer renderer, void* variable, bool liquidC
     if (length >= 0) {
         if (reverse) {
             start = RARRAY_LEN(value) - start;
-            for (size_t i = length; i >= start; --i) {
+            for (int i = length; i >= start; --i) {
                 array_value = rb_ary_entry((VALUE)variable, i);
                 if (TYPE((VALUE)array_value))
-                    liquidCcallback(array_value, data);
+                    liquidCcallback((void*)array_value, data);
             }
         } else {
-            for (size_t i = start; i <= length; ++i) {
+            for (int i = start; i <= length; ++i) {
                 array_value = rb_ary_entry((VALUE)variable, i);
                 if (TYPE((VALUE)array_value)){
-                    liquidCcallback(array_value, data);
+                    liquidCcallback((void*)array_value, data);
                 }
             }
         }
