@@ -455,6 +455,8 @@ namespace Liquid {
             parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_INVALID_SYMBOL, "("));
             return true;
         }
+        if (parser.filterState == Parser::EFilterState::ARGUMENTS)
+            parser.filterState = Parser::EFilterState::UNSET;
         return parser.pushNode(make_unique<Node>(context.getGroupNodeType()), true);
     }
     bool Parser::Lexer::closeParenthesis() {
@@ -467,6 +469,9 @@ namespace Liquid {
         if (!parser.popNodeUntil(NodeType::Type::GROUP)) {
             parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNBALANCED_GROUP));
             return false;
+        }
+        if (parser.nodes.size() > 1 && parser.nodes[parser.nodes.size()-2]->type->type == Liquid::NodeType::ARGUMENTS) {
+            parser.filterState = Parser::EFilterState::ARGUMENTS;
         }
         return true;
     }
