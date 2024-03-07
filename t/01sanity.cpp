@@ -484,6 +484,24 @@ TEST(sanity, filters) {
 
     char buffer[1024];
 
+    ast = getParser().parse("{{ (1 + 2) | times: 2}}");
+    ASSERT_NO_PARSER_ERRORS();
+    str = renderTemplate(ast, hash);
+    ASSERT_EQ(str, "6");
+
+    ast = getParser().parse("{% assign a = 2 | plus: 2 %}{{ a }}");
+    ASSERT_NO_PARSER_ERRORS();
+    str = renderTemplate(ast, hash);
+    ASSERT_EQ(str, "4");
+
+    ast = getParser().parse("{{ 1 + 2 | times: 2}}");
+    ASSERT_NO_PARSER_ERRORS();
+    str = renderTemplate(ast, hash);
+    ASSERT_EQ(str, "6");
+
+
+
+
     ast = getParser().parse("{{ 1 | plus: (1 | plus: 2) }}");
     ASSERT_NO_PARSER_ERRORS();
 
