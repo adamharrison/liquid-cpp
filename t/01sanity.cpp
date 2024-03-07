@@ -60,6 +60,13 @@ Optimizer& getOptimizer() {
     return optimizer;
 }
 
+void ASSERT_NO_PARSER_ERRORS() {
+    for (size_t i = 0; i < getParser().errors.size(); ++i) {
+        fprintf(stderr, "Error parsing: %s\n", Liquid::Parser::Error::english(getParser().errors[i]).c_str());
+    }
+    ASSERT_EQ(getParser().errors.size(), 0);
+}
+
 string renderTemplate(const Node& ast, Variable variable) {
     // Whether these tests run on the interpreter or on the renderer.
     return getRenderer().render(ast, variable);
@@ -473,6 +480,25 @@ TEST(sanity, filters) {
     CPPVariable hash = { };
     Node ast;
     std::string str;
+    long long now = (long long)time(NULL);
+
+    char buffer[1024];
+
+    ast = getParser().parse("{{ 1 | plus: (1 | plus: 2) }}");
+    ASSERT_NO_PARSER_ERRORS();
+
+    ast = getParser().parse("{{ \"helloworld \" | append: (\"now\" | date: \"%s\") }}");
+    ASSERT_NO_PARSER_ERRORS();
+    str = renderTemplate(ast, hash);
+    sprintf(buffer, "helloworld %lld", now);
+    ASSERT_STREQ(str.data(), buffer);
+
+    ast = getParser().parse("{{ (\"now\" | date: \"%s\") }}");
+    ASSERT_NO_PARSER_ERRORS();
+
+    ast = getParser().parse("{{ \"helloworld \" | append: 1709827882 }}");
+    str = renderTemplate(ast, hash);
+    ASSERT_EQ(str, "helloworld 1709827882");
 
 
 
@@ -483,7 +509,6 @@ TEST(sanity, filters) {
 
 
     // This should probably be implciit.
-    long long now = (long long)time(NULL);
     hash["now"] = now;
     CPPVariable product = { };
     CPPVariable option = { };
@@ -638,7 +663,6 @@ TEST(sanity, filters) {
     ASSERT_EQ(getParser().errors.size(), 0);
     ASSERT_EQ(str1, str2);
 
-    char buffer[512];
     sprintf(buffer, "%lld 1630472400 %lld", now, (now - 1630472400)/86400);
 
     ASSERT_STREQ(str1.data(), buffer);
