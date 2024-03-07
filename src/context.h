@@ -145,6 +145,7 @@ namespace Liquid {
         int minArguments;
         int maxArguments;
         bool allowsWildcardQualifiers;
+        int priority;
 
         // Wildcard Qualifier.
         struct QualifierNodeType : NodeType {
@@ -156,7 +157,7 @@ namespace Liquid {
             Node render(Renderer& renderer, const Node& node, Variable store) const override { return Node(); }
         };
 
-        FilterNodeType(string symbol, int minArguments = -1, int maxArguments = -1, bool allowsWildcardQualifiers = false, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : NodeType(NodeType::Type::FILTER, symbol, -1, optimization), minArguments(minArguments), maxArguments(maxArguments), allowsWildcardQualifiers(allowsWildcardQualifiers) { }
+        FilterNodeType(string symbol, int minArguments = -1, int maxArguments = -1, bool allowsWildcardQualifiers = false, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : NodeType(NodeType::Type::FILTER, symbol, -1, optimization), minArguments(minArguments), maxArguments(maxArguments), allowsWildcardQualifiers(allowsWildcardQualifiers), priority(0) { }
 
         Node getOperand(Renderer& renderer, const Node& node, Variable store) const;
         Node getArgument(Renderer& renderer, const Node& node, Variable store, int idx) const;

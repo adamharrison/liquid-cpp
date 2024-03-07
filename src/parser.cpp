@@ -375,8 +375,13 @@ namespace Liquid {
                             auto operatorNode = make_unique<Node>(op);
                             if (unknown)
                                 operatorNode->children.push_back(make_unique<Node>(Variant(opName)));
-                            auto& parentNode = parser.nodes[parser.nodes.size()-2];
-                            assert(parentNode->type);
+                            while (parser.nodes.size() > 2) {
+                                Node* parentNode = parser.nodes[parser.nodes.size()-2].get();
+                                assert(parentNode->type);
+                                if (parentNode->type->type != NodeType::Type::OPERATOR || static_cast<const OperatorNodeType*>(parentNode->type)->priority < op->priority)
+                                    break;
+                                parser.popNode();
+                            }
                             unique_ptr<Node> variableNode = move(parser.nodes.back());
                             operatorNode->children.push_back(move(variableNode));
                             operatorNode->children.push_back(nullptr);
@@ -470,7 +475,7 @@ namespace Liquid {
             parser.pushError(Parser::Error(*this, Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNBALANCED_GROUP));
             return false;
         }
-        if (parser.nodes.size() > 1 && parser.nodes[parser.nodes.size()-2]->type->type == Liquid::NodeType::ARGUMENTS) {
+        if (parser.nodes.size() > 3 && parser.nodes[parser.nodes.size()-2]->type->type == Liquid::NodeType::ARGUMENTS && parser.nodes[parser.nodes.size()-3]->type->type == Liquid::NodeType::FILTER) {
             parser.filterState = Parser::EFilterState::ARGUMENTS;
         }
         return true;
