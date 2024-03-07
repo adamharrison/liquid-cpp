@@ -1,4 +1,6 @@
 require "liquidcpp/liquidcpp"
+require "json"
+
 class LiquidCPP 
     alias_method :orig_initialize, :initialize
     def initialize(*args)
@@ -35,6 +37,8 @@ class LiquidCPP
         moneyAmount = sprintf('%.2f', operand / 100.0);
         moneyFormat.gsub(/\{\{\s*amount\s*\}\}/, moneyAmount) 
       })
-
+      self.registerFilter("json", 0, 0, LiquidCPP::OPTIMIZATION_SCHEME_NONE, Proc.new { |renderer, node, store, operand, argument|
+        operand.to_json
+      })
     end
   end
