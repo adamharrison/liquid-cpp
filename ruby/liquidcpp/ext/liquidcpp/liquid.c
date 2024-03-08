@@ -16,6 +16,8 @@ typedef struct SLiquidCRubyContext LiquidCRubyContext;
 // Variable types.
 
 static LiquidVariableType liquidCgetType(LiquidRenderer renderer, void* variable) {
+    if (!variable)
+        return LIQUID_VARIABLE_TYPE_NIL;
     switch (TYPE(variable)) {
         case T_FIXNUM:
         case T_BIGNUM:
