@@ -1,4 +1,6 @@
 require "liquidcpp/liquidcpp"
+require "json"
+
 class LiquidCPP 
     alias_method :orig_initialize, :initialize
     def initialize(*args)
@@ -26,8 +28,11 @@ class LiquidCPP
             timeOp = nil
         end
         next unless timeOp && timeOp.class == Time
-        time_utc = timeOp.utc
-        time_utc.strftime(argument[0].to_s)
+        timeUTC = timeOp.utc
+        timeUTC.strftime(argument[0].to_s)
+      })
+      self.registerFilter("json", 0, 0, LiquidCPP::OPTIMIZATION_SCHEME_NONE, Proc.new { |renderer, node, store, operand, argument|
+        operand.to_json
       })
     end
   end
