@@ -9,11 +9,16 @@ namespace Liquid {
 
     struct Renderer;
 
-    struct LiteralType {
-        string symbol;
+    struct LiteralNodeType : NodeType {
         Variant value;
 
-        LiteralType(string symbol, Variant value) : symbol(symbol), value(value) { }
+        LiteralNodeType(string symbol, Variant value, ELiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_NONE) : NodeType(Type::LITERAL, symbol, 0, optimization), value(value) { }
+
+
+        Node render(Renderer& renderer, const Node& node, Variable store) const override {
+            return Node(value);
+        }
+
     };
 
     struct ContextualNodeType : NodeType {
@@ -281,7 +286,7 @@ namespace Liquid {
         unordered_map<string, unique_ptr<NodeType>> binaryOperatorTypes;
         unordered_map<string, unique_ptr<NodeType>> filterTypes;
         unordered_map<string, unique_ptr<NodeType>> dotFilterTypes;
-        unordered_map<string, unique_ptr<LiteralType>> literalTypes;
+        unordered_map<string, unique_ptr<NodeType>> literalTypes;
 
         ConcatenationNode concatenationNodeType;
         OutputNode outputNodeType;
@@ -332,15 +337,13 @@ namespace Liquid {
                 case NodeType::Type::DOT_FILTER:
                     dotFilterTypes[type->symbol] = move(type);
                 break;
+                case NodeType::Type::LITERAL:
+                    literalTypes[type->symbol] = move(type);
+                break;
                 default:
                     assert(false);
                 break;
             }
-            return value;
-        }
-        LiteralType* registerType(unique_ptr<LiteralType> type) {
-            LiteralType* value = type.get();
-            literalTypes[type->symbol] = move(type);
             return value;
         }
         template <class T> T* registerType() { return static_cast<T*>(registerType(make_unique<T>())); }
@@ -378,11 +381,11 @@ namespace Liquid {
             return static_cast<DotFilterNodeType*>(it->second.get());
         }
 
-        const LiteralType* getLiteralType(string symbol) const {
+        const LiteralNodeType* getLiteralType(string symbol) const {
             auto it = literalTypes.find(symbol);
             if (it == literalTypes.end())
                 return nullptr;
-            return static_cast<LiteralType*>(it->second.get());
+            return static_cast<LiteralNodeType*>(it->second.get());
         }
 
         void optimize(Node& ast, Variable store);

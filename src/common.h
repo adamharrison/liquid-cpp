@@ -515,6 +515,7 @@ namespace Liquid {
             TAG,
             GROUP,
             GROUP_DEREFERENCE,
+            LITERAL,
             ARRAY_LITERAL,
             OUTPUT,
             ARGUMENTS,

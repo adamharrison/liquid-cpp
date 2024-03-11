@@ -440,9 +440,15 @@ TEST(sanity, specialLiterals) {
     Node ast;
     std::string str;
 
+    ast = getParser().parse("{% capture email_body %}All you have to do is activate it and choose a password.{% endcapture %}{% if custom_message != blank %} <p>{{ custom_message }}</p> {% else %} <p>{{ email_body }}</p> {% endif %}");
+    str = renderTemplate(ast, hash);
+    ASSERT_EQ(str, " <p>All you have to do is activate it and choose a password.</p> ");
+
     ast = getParser().parse("{% assign a = true %}{{ a }}");
     str = renderTemplate(ast, hash);
     ASSERT_EQ(str, "true");
+
+
 }
 
 

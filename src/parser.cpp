@@ -318,9 +318,9 @@ namespace Liquid {
             case Parser::State::LIQUID_ARGUMENT:
             case Parser::State::ARGUMENT: {
                 std::string opName = std::string(str, len);
-                const LiteralType* type = SUPER::context.getLiteralType(opName);
+                const LiteralNodeType* type = SUPER::context.getLiteralType(opName);
                 if (type)
-                    return parser.pushNode(make_unique<Node>(type->value));
+                    return parser.pushNode(make_unique<Node>(type));
                 auto& lastNode = parser.nodes.back();
                 if (lastNode->type && (lastNode->type->type == NodeType::Type::VARIABLE || lastNode->type->type == NodeType::Type::DOT_FILTER) && !lastNode->children.back().get()) {
                     // Check for dot filters.

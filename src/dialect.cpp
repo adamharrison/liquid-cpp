@@ -846,8 +846,27 @@ namespace Liquid {
         bool operate(A a, B b) const { return Function()(a, b); }
 
         Node render(Renderer& renderer, const Node& node, Variable store) const override {
+            // Special call-out for blank. The worst Shopify literal.
             Node op1 = getOperand(renderer, node, store, 0);
             Node op2 = getOperand(renderer, node, store, 1);
+
+            bool isBlank1 = node.children.size() > 0 && node.children[0].get()->type && node.children[0].get()->type->type == NodeType::Type::LITERAL && node.children[0].get()->type->symbol == "blank";
+            bool isBlank2 = node.children.size() > 0 && node.children[1].get()->type && node.children[1].get()->type->type == NodeType::Type::LITERAL && node.children[1].get()->type->symbol == "blank";
+
+            if (isBlank1) {
+                if (op2.variant.type == Variant::Type::STRING)
+                    return Node(operate(op2.variant.s, ""));
+                else if (op2.variant.type == Variant::Type::NIL)
+                    return Node(operate(true, true));
+                return Node(operate(true, false));
+            }
+            if (isBlank2) {
+                if (op1.variant.type == Variant::Type::STRING)
+                    return Node(operate(op1.variant.s, ""));
+                else if (op1.variant.type == Variant::Type::NIL)
+                    return Node(operate(true, true));
+                return Node(operate(true, false));
+            }
 
             if (op2.variant.type == Variant::Type::NIL)
                 return Node(operate(op1.variant.type, Variant::Type::NIL));
@@ -2181,11 +2200,11 @@ namespace Liquid {
         }
     };
 
-    struct TrueLiteral : LiteralType { TrueLiteral() : LiteralType("true", Variant(true)) { } };
-    struct FalseLiteral : LiteralType { FalseLiteral() : LiteralType("false", Variant(false)) { } };
-    struct NullLiteral : LiteralType { NullLiteral() : LiteralType("null", Variant(nullptr)) { } };
-    struct NilLiteral : LiteralType { NilLiteral() : LiteralType("nil", Variant(nullptr)) { } };
-    struct BlankLiteral : LiteralType { BlankLiteral() : LiteralType("blank", Variant("")) { } };
+    struct TrueLiteralNode : LiteralNodeType { TrueLiteralNode() : LiteralNodeType("true", Variant(true), LIQUID_OPTIMIZATION_SCHEME_FULL) { } };
+    struct FalseLiteralNode : LiteralNodeType { FalseLiteralNode() : LiteralNodeType("false", Variant(false), LIQUID_OPTIMIZATION_SCHEME_FULL) { } };
+    struct NullLiteralNode : LiteralNodeType { NullLiteralNode() : LiteralNodeType("null", Variant(nullptr), LIQUID_OPTIMIZATION_SCHEME_FULL) { } };
+    struct NilLiteralNode : LiteralNodeType { NilLiteralNode() : LiteralNodeType("nil", Variant(nullptr), LIQUID_OPTIMIZATION_SCHEME_FULL) { } };
+    struct BlankLiteralNode : LiteralNodeType { BlankLiteralNode() : LiteralNodeType("blank", Variant(""), LIQUID_OPTIMIZATION_SCHEME_NONE) { } };
 
     template <class T>
     void registerStandardDialectFilters(T& context) {
@@ -2326,10 +2345,10 @@ namespace Liquid {
         context.registerType<FirstDotFilterNode>();
         context.registerType<LastDotFilterNode>();
 
-        context.registerType<TrueLiteral>();
-        context.registerType<FalseLiteral>();
-        context.registerType<NullLiteral>();
-        context.registerType<NilLiteral>();
-        context.registerType<BlankLiteral>();
+        context.registerType<TrueLiteralNode>();
+        context.registerType<FalseLiteralNode>();
+        context.registerType<NullLiteralNode>();
+        context.registerType<NilLiteralNode>();
+        context.registerType<BlankLiteralNode>();
     }
 }
