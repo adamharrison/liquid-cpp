@@ -813,13 +813,13 @@ VALUE method_liquidC_registerDotFilter(VALUE self, VALUE symbol, VALUE optimizat
 
 void Init_liquidcpp() {
     VALUE liquidC, liquidCRenderer, liquidCOptimizer, liquidCParser, liquidCCompiler, liquidCError;
-    liquidC = rb_define_class("LiquidCPP", rb_cData);
-    liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cData);
-    liquidCOptimizer = rb_define_class_under(liquidC, "Optimizer", rb_cData);
-    liquidCTemplate = rb_define_class_under(liquidC, "Template", rb_cData);
-    liquidCParser = rb_define_class_under(liquidC, "Parser", rb_cData);
-    liquidCCompiler = rb_define_class_under(liquidC, "Compiler", rb_cData);
-    liquidCProgram = rb_define_class_under(liquidC, "Program", rb_cData);
+    liquidC = rb_define_class("LiquidCPP", rb_cObject);
+    liquidCRenderer = rb_define_class_under(liquidC, "Renderer", rb_cObject);
+    liquidCOptimizer = rb_define_class_under(liquidC, "Optimizer", rb_cObject);
+    liquidCTemplate = rb_define_class_under(liquidC, "Template", rb_cObject);
+    liquidCParser = rb_define_class_under(liquidC, "Parser", rb_cObject);
+    liquidCCompiler = rb_define_class_under(liquidC, "Compiler", rb_cObject);
+    liquidCProgram = rb_define_class_under(liquidC, "Program", rb_cObject);
 
     liquidCError = rb_define_class_under(liquidC, "Error", rb_eStandardError);
     rb_define_attr(liquidCError, "type", 1, 0);
