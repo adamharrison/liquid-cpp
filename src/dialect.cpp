@@ -372,7 +372,7 @@ namespace Liquid {
 
     struct ForNode : TagNodeType {
         struct InOperatorNode : OperatorNodeType {
-            InOperatorNode() :  OperatorNodeType("in", Arity::BINARY, 0, Fixness::INFIX, LIQUID_OPTIMIZATION_SCHEME_SHIELD) { }
+            InOperatorNode() :  OperatorNodeType("in", Arity::BINARY, MAX_PRIORITY, Fixness::INFIX, LIQUID_OPTIMIZATION_SCHEME_SHIELD) { }
             Node render(Renderer& renderer, const Node& node, Variable store) const override { return Node(); }
         };
 

@@ -173,7 +173,7 @@ namespace Liquid {
             break;
             case Parser::State::ARGUMENT:
             case Parser::State::LIQUID_ARGUMENT:
-                return parser.pushNode(move(make_unique<Node>(Variant(std::string(str, len)))));
+                return parser.pushNode(make_unique<Node>(Variant(std::string(str, len))));
             break;
         }
         return true;
@@ -190,7 +190,7 @@ namespace Liquid {
             break;
             case Parser::State::ARGUMENT:
             case Parser::State::LIQUID_ARGUMENT: {
-                return parser.pushNode(move(make_unique<Node>(Variant(i))));
+                return parser.pushNode(make_unique<Node>(Variant(i)));
             } break;
         }
         return true;
@@ -207,7 +207,7 @@ namespace Liquid {
             break;
             case Parser::State::ARGUMENT:
             case Parser::State::LIQUID_ARGUMENT: {
-                return parser.pushNode(move(make_unique<Node>(Variant(f))));
+                return parser.pushNode(make_unique<Node>(Variant(f)));
             } break;
         }
         return true;

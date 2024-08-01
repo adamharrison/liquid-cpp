@@ -1,6 +1,7 @@
 #ifndef LIQUIDCONTEXT_H
 #define LIQUIDCONTEXT_H
 
+#include <limits.h>
 #include "common.h"
 #include "parser.h"
 #include "renderer.h"
@@ -108,6 +109,7 @@ namespace Liquid {
         EnclosedNodeType(string symbol, int minArguments = -1, int maxArguments = -1, LiquidOptimizationScheme optimization = LIQUID_OPTIMIZATION_SCHEME_FULL) : TagNodeType(Composition::ENCLOSED, symbol, minArguments, maxArguments, optimization) { }
     };
 
+    static constexpr int MAX_PRIORITY = INT_MIN;
     struct OperatorNodeType : NodeType {
         enum class Arity {
             NONARY,

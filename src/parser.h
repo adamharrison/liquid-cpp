@@ -72,7 +72,7 @@ namespace Liquid {
                         sprintf(buffer, "Invalid symbol '%s' on line %lu, column %lu.", error.details.args[0], error.details.line, error.details.column);
                     break;
                     case Parser::Error::Type::LIQUID_PARSER_ERROR_TYPE_UNEXPECTED_END: {
-                        if (error.details.args[0])
+                        if (error.details.args[0][0])
                             sprintf(buffer, "Unexpected end to block '%s' on line %lu, column %lu.", error.details.args[0], error.details.line, error.details.column);
                         else
                             sprintf(buffer, "Unexpected end to block on line %lu, column %lu.", error.details.line, error.details.column);

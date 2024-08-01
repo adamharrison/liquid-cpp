@@ -353,8 +353,15 @@ TEST(sanity, forloop) {
     CPPVariable array = { 1, 5, 10, 20 };
     CPPVariable hash = { };
     hash["list"] = std::move(array);
+    hash["a"] = "1,5,6";
     Node ast;
     std::string str;
+
+
+    ast = getParser().parse("{% for i in a | split: \",\" %}{{ i }}{% endfor %}");
+    str = renderTemplate(ast, hash);
+    ASSERT_EQ(str, "156");
+
 
     ast = getParser().parse("{% for i in list %}{% unless forloop.first %},{% endunless%}{{ forloop.index0 }}{% endfor %}");
     str = renderTemplate(ast, hash);
@@ -414,6 +421,7 @@ TEST(sanity, forloop) {
     ast = getParser().parse("{% for i in lissdfsdft %}{{ i }}{% else %}fdsfdf{% endfor %}");
     str = renderTemplate(ast, hash);
     ASSERT_EQ(str, "fdsfdf");
+
 
 
 
