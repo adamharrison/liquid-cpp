@@ -120,7 +120,7 @@ namespace Liquid {
             
             setDictionaryVariable = +[](LiquidRenderer renderer, void* variable, const char* key, void* target) { 
                 assert(static_cast<Renderer*>(renderer.renderer)->resolverCustomData);
-                rapidjson::Value& value = *static_cast<rapidjson::Value*>(target);
+                rapidjson::Value& value = *static_cast<rapidjson::Value*>(variable);
                 if (!value.IsObject())
                     return (void*)NULL;
                 value.AddMember(rapidjson::Value(key, ((rapidjson::Document*)static_cast<Renderer*>(renderer.renderer)->resolverCustomData)->GetAllocator()), *static_cast<rapidjson::Value*>(target), ((rapidjson::Document*)static_cast<Renderer*>(renderer.renderer)->resolverCustomData)->GetAllocator());

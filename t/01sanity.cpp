@@ -1261,6 +1261,15 @@ TEST(sanity, rj) {
     renderer.resolverCustomData = &d;
 
     string str;
+    d.SetObject();
+
+    
+    ast = getParser().parse("{% assign total = 0 %}{{ total }}"); 
+    str = renderer.render(ast, &d);
+    ASSERT_EQ(str, "0");
+    
+
+    
     rapidjson::Document f(rapidjson::kObjectType);
     rapidjson::Value v(rapidjson::kArrayType);
     v.PushBack(rapidjson::Value(10), f.GetAllocator());
@@ -1269,15 +1278,16 @@ TEST(sanity, rj) {
     str = renderer.render(ast, &f);
 
     ASSERT_EQ(str, "1");
-    /*
+
+
+    
     ast = getParser().parse("{{ a }}");
-    rapidjson::Document d;
 
     d.Parse("{\"a\":\"b\"}");
 
     str = renderer.render(ast, &d);
 
-    ASSERT_EQ(str, "b");*/
+    ASSERT_EQ(str, "b");
 
 }
 
