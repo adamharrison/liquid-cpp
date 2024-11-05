@@ -121,8 +121,9 @@ namespace Liquid {
 
         // Used for the C interface.
         Node returnValue;
-        void* customData;
+        void* customData = NULL;
         LiquidVariableResolver variableResolver;
+        void* resolverCustomData = NULL;
 
         Renderer(const Context& context);
         Renderer(const Context& context, LiquidVariableResolver variableResolver);

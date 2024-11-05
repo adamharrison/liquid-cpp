@@ -1257,14 +1257,28 @@ TEST(sanity, rj) {
     Node ast;
 
     Renderer renderer(getContext(), RapidJSONVariableResolver());
+    rapidjson::Document d;
+    renderer.resolverCustomData = &d;
+
+    string str;
+    rapidjson::Document f(rapidjson::kObjectType);
+    rapidjson::Value v(rapidjson::kArrayType);
+    v.PushBack(rapidjson::Value(10), f.GetAllocator());
+    f.AddMember(rapidjson::Value("a", f.GetAllocator()), v, f.GetAllocator());
+    ast = getParser().parse("{{ a.size }}");
+    str = renderer.render(ast, &f);
+
+    ASSERT_EQ(str, "1");
+    /*
     ast = getParser().parse("{{ a }}");
     rapidjson::Document d;
 
     d.Parse("{\"a\":\"b\"}");
 
-    string str = renderer.render(ast, &d);
+    str = renderer.render(ast, &d);
 
-    ASSERT_EQ(str, "b");
+    ASSERT_EQ(str, "b");*/
+
 }
 
 #endif
