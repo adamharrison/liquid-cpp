@@ -130,6 +130,12 @@ TEST(sanity, divide) {
     auto ast = getParser().parse("asdbfsdf {{ a / 2 }} b");
     auto str = renderTemplate(ast, variable);
     ASSERT_EQ(str, "asdbfsdf 1 b");
+    ast = getParser().parse("asdbfsdf {{ a / 0 }} b");
+    str = renderTemplate(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf 0 b");
+    ast = getParser().parse("asdbfsdf {{ a / 0.0 }} b");
+    str = renderTemplate(ast, variable);
+    ASSERT_EQ(str, "asdbfsdf 0 b");
 }
 
 TEST(sanity, orderOfOperations) {

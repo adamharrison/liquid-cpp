@@ -755,10 +755,19 @@ namespace Liquid {
         }
     };
 
+    struct DivisionOperation {
+        template< class T, class U >
+        constexpr auto operator()(T&& lhs, U&& rhs) const -> decltype(std::forward<T>(lhs) / std::forward<U>(rhs)) {
+            if (rhs == 0)
+                return 0;
+            return lhs / rhs;
+        }
+    };
+
     struct PlusOperatorNode : ArithmeticOperatorNode<std::plus<>> { PlusOperatorNode() : ArithmeticOperatorNode<std::plus<>>("+", 5) { } };
     struct MinusOperatorNode : ArithmeticOperatorNode<std::minus<>> { MinusOperatorNode() : ArithmeticOperatorNode<std::minus<>>("-", 5) { } };
     struct MultiplyOperatorNode : ArithmeticOperatorNode<std::multiplies<>> { MultiplyOperatorNode() : ArithmeticOperatorNode<std::multiplies<>>("*", 10) { } };
-    struct DivideOperatorNode : ArithmeticOperatorNode<std::divides<>> { DivideOperatorNode() : ArithmeticOperatorNode<std::divides<>>("/", 10) { } };
+    struct DivideOperatorNode : ArithmeticOperatorNode<DivisionOperation> { DivideOperatorNode() : ArithmeticOperatorNode<DivisionOperation>("/", 10) { } };
     struct ModuloOperatorNode : OperatorNodeType {
         ModuloOperatorNode() : OperatorNodeType("%", Arity::BINARY, 10) { }
 
