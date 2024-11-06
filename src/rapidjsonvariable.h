@@ -12,6 +12,8 @@ namespace Liquid {
     struct RapidJSONVariableResolver : LiquidVariableResolver {
         RapidJSONVariableResolver() {
             getType = +[](LiquidRenderer renderer, void* variable) {
+                if (!variable)
+                    return LIQUID_VARIABLE_TYPE_NIL;
                 switch (static_cast<rapidjson::Value*>(variable)->GetType()) {
                     case 0:
                         return LIQUID_VARIABLE_TYPE_NIL;
