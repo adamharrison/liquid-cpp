@@ -99,10 +99,27 @@ namespace Liquid {
             };
 
             iterate = +[](LiquidRenderer renderer, void* variable, bool (*callback)(void* variable, void* data), void* data, int start, int limit, bool reverse) {
-                if (static_cast<rapidjson::Value*>(variable)->IsArray()) {
-
-                } else if (static_cast<rapidjson::Value*>(variable)->IsObject()) {
-
+                rapidjson::Value& value = *static_cast<rapidjson::Value*>(variable);
+                if (value.IsArray()) {
+                    if (limit < 0)
+                        limit = (int)value.Size() + limit + 1;
+                    if (start < 0)
+                        start = 0;
+                    int endIndex = std::min(start+limit-1, (int)value.Size());
+                    if (reverse) {
+                        for (int i = endIndex; i >= start; --i) {
+                            if (!callback(&value[i], data))
+                                break;
+                        }
+                    } else {
+                        for (int i = start; i <= endIndex; ++i) {
+                            if (!callback(&value[i], data))
+                                break;
+                        }
+                    }
+                    return true;
+                } else if (value.IsObject()) {
+                    return false;
                 }
                 return false;
             };

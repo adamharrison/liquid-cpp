@@ -1273,11 +1273,21 @@ TEST(sanity, rj) {
     rapidjson::Document f(rapidjson::kObjectType);
     rapidjson::Value v(rapidjson::kArrayType);
     v.PushBack(rapidjson::Value(10), f.GetAllocator());
+    v.PushBack(rapidjson::Value(20), f.GetAllocator());
+    v.PushBack(rapidjson::Value(30), f.GetAllocator());
+    v.PushBack(rapidjson::Value(40), f.GetAllocator());
     f.AddMember(rapidjson::Value("a", f.GetAllocator()), v, f.GetAllocator());
     ast = getParser().parse("{{ a.size }}");
     str = renderer.render(ast, &f);
+    ASSERT_EQ(str, "4");
 
-    ASSERT_EQ(str, "1");
+    ast = getParser().parse("{{ a.first }}");
+    str = renderer.render(ast, &f);
+    ASSERT_EQ(str, "10");
+
+    ast = getParser().parse("{% for b in a %}{{ b }}{% endfor %}");
+    str = renderer.render(ast, &f);
+    ASSERT_EQ(str, "10203040");
 
 
     
