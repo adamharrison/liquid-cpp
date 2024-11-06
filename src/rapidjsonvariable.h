@@ -6,8 +6,20 @@
 #include "context.h"
 
 #include <rapidjson/document.h>
+// #include <rapidjson/filereadstream.h>
+// #include <rapidjson/writer.h>
+// #include <rapidjson/stringbuffer.h>
+// #include <rapidjson/error/error.h>
+// #include <rapidjson/error/en.h>
 
 namespace Liquid {
+
+    // void dumpVariable(void* variable) {
+    //     rapidjson::StringBuffer sb;
+    //     rapidjson::Writer<rapidjson::StringBuffer> swriter(sb);
+    //     static_cast<rapidjson::Value*>(variable)->Accept(swriter);
+    //     fprintf(stderr, "DUMP: %s\n", sb.GetString());
+    // }
 
     struct RapidJSONVariableResolver : LiquidVariableResolver {
         RapidJSONVariableResolver() {
@@ -138,11 +150,17 @@ namespace Liquid {
             };
             
             setDictionaryVariable = +[](LiquidRenderer renderer, void* variable, const char* key, void* target) { 
-                assert(static_cast<Renderer*>(renderer.renderer)->resolverCustomData);
+                rapidjson::Document* document = (rapidjson::Document*)static_cast<Renderer*>(renderer.renderer)->resolverCustomData;
+                assert(document);
                 rapidjson::Value& value = *static_cast<rapidjson::Value*>(variable);
                 if (!value.IsObject())
                     return (void*)NULL;
-                value.AddMember(rapidjson::Value(key, ((rapidjson::Document*)static_cast<Renderer*>(renderer.renderer)->resolverCustomData)->GetAllocator()), *static_cast<rapidjson::Value*>(target), ((rapidjson::Document*)static_cast<Renderer*>(renderer.renderer)->resolverCustomData)->GetAllocator());
+                rapidjson::Value copy;
+                if (value.HasMember(key)) {
+                    value[key] = *static_cast<rapidjson::Value*>(target);
+                } else {
+                    value.AddMember(rapidjson::Value(key, document->GetAllocator()).Move(), *static_cast<rapidjson::Value*>(target), ((rapidjson::Document*)static_cast<Renderer*>(renderer.renderer)->resolverCustomData)->GetAllocator());
+                }
                 return (void*)&value[key];
             };
 

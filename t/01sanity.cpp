@@ -1262,8 +1262,19 @@ TEST(sanity, rj) {
 
     string str;
     d.SetObject();
-
+    d.Parse("{\"products\":[{\"inventory_quantity\":1},{\"inventory_quantity\":3}]}");
     
+    ast = getParser().parse("{% assign total = 0 %}{% for p in products %}{% assign total = total + p.inventory_quantity %}{% endfor %}{{ total }}"); 
+    str = renderer.render(ast, &d);
+    ASSERT_EQ(str, "4");
+    
+    d.Parse("{\"products\":[{\"variants\":[{\"inventory_quantity\":1},{\"inventory_quantity\":3}]},{\"variants\":[{\"inventory_quantity\":9},{\"inventory_quantity\":6}]}]}");
+
+    ast = getParser().parse("{% assign total = 0 %}{% for p in products %}{% for v in p.variants %}{% assign total = total + v.inventory_quantity %}{% endfor %}{% endfor %}{{ total }}"); 
+    str = renderer.render(ast, &d);
+    ASSERT_EQ(str, "19");
+    
+    d.SetObject();
     ast = getParser().parse("{% assign total = 0 %}{{ total }}"); 
     str = renderer.render(ast, &d);
     ASSERT_EQ(str, "0");
