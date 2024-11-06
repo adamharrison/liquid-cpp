@@ -11,6 +11,15 @@
 
 namespace Liquid {
 
+    struct DivisionOperation {
+        template< class T, class U >
+        constexpr auto operator()(T&& lhs, U&& rhs) const -> decltype(std::forward<T>(lhs) / std::forward<U>(rhs)) {
+            if (rhs == 0)
+                return 0;
+            return lhs / (double)rhs;
+        }
+    };
+
     template <bool allowGlobals>
     struct AssignNode : TagNodeType {
 
@@ -755,15 +764,6 @@ namespace Liquid {
         }
     };
 
-    struct DivisionOperation {
-        template< class T, class U >
-        constexpr auto operator()(T&& lhs, U&& rhs) const -> decltype(std::forward<T>(lhs) / std::forward<U>(rhs)) {
-            if (rhs == 0)
-                return 0;
-            return lhs / rhs;
-        }
-    };
-
     struct PlusOperatorNode : ArithmeticOperatorNode<std::plus<>> { PlusOperatorNode() : ArithmeticOperatorNode<std::plus<>>("+", 5) { } };
     struct MinusOperatorNode : ArithmeticOperatorNode<std::minus<>> { MinusOperatorNode() : ArithmeticOperatorNode<std::minus<>>("-", 5) { } };
     struct MultiplyOperatorNode : ArithmeticOperatorNode<std::multiplies<>> { MultiplyOperatorNode() : ArithmeticOperatorNode<std::multiplies<>>("*", 10) { } };
@@ -1105,7 +1105,7 @@ namespace Liquid {
     struct PlusFilterNode : ArithmeticFilterNode<std::plus<>> { PlusFilterNode() : ArithmeticFilterNode<std::plus<>>("plus") { } };
     struct MinusFilterNode : ArithmeticFilterNode<std::minus<>> { MinusFilterNode() : ArithmeticFilterNode<std::minus<>>("minus") { } };
     struct MultiplyFilterNode : ArithmeticFilterNode<std::multiplies<>> { MultiplyFilterNode() : ArithmeticFilterNode<std::multiplies<>>("times") { } };
-    struct DivideFilterNode : ArithmeticFilterNode<std::divides<>> { DivideFilterNode() : ArithmeticFilterNode<std::divides<>>("divided_by") { } };
+    struct DivideFilterNode : ArithmeticFilterNode<DivisionOperation> { DivideFilterNode() : ArithmeticFilterNode<DivisionOperation>("divided_by") { } };
     struct ModuloFilterNode : FilterNodeType {
         ModuloFilterNode() : FilterNodeType("modulo", 1, 1) { }
 
