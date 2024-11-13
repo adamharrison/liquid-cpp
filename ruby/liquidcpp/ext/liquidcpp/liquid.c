@@ -46,7 +46,7 @@ static bool liquidCgetBool(LiquidRenderer renderer, void* variable, bool* target
     switch (TYPE(variable)) {
         case T_TRUE:
         case T_FALSE:
-            *target = RTEST(variable);
+            *target = RTEST((VALUE)variable);
             return true;
         default:
             return false;
@@ -55,7 +55,7 @@ static bool liquidCgetBool(LiquidRenderer renderer, void* variable, bool* target
 }
 
 static bool liquidCgetTruthy(LiquidRenderer renderer, void* variable) {
-    return RTEST(variable);
+    return RTEST((VALUE)variable);
 }
 
 static bool liquidCgetString(LiquidRenderer renderer, void* variable, char* target) {
