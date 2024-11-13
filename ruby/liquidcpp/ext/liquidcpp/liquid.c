@@ -18,7 +18,7 @@ typedef struct SLiquidCRubyContext LiquidCRubyContext;
 static LiquidVariableType liquidCgetType(LiquidRenderer renderer, void* variable) {
     if (!variable)
         return LIQUID_VARIABLE_TYPE_NIL;
-    switch (TYPE(variable)) {
+    switch (TYPE((VALUE)variable)) {
         case T_FIXNUM:
         case T_BIGNUM:
             return LIQUID_VARIABLE_TYPE_INT;
@@ -43,7 +43,7 @@ static LiquidVariableType liquidCgetType(LiquidRenderer renderer, void* variable
 
 
 static bool liquidCgetBool(LiquidRenderer renderer, void* variable, bool* target) {
-    switch (TYPE(variable)) {
+    switch (TYPE((VALUE)variable)) {
         case T_TRUE:
         case T_FALSE:
             *target = RTEST((VALUE)variable);
@@ -171,7 +171,7 @@ static void* liquidCsetDictionaryVariable(LiquidRenderer renderer, void* variabl
 }
 
 static void* liquidCsetArrayVariable(LiquidRenderer renderer, void* variable, long long idx, void* target) {
-    if (TYPE(variable) != T_ARRAY)
+    if (TYPE((VALUE)variable) != T_ARRAY)
         return NULL;
     rb_ary_store((VALUE)variable, idx, (VALUE)target);
     return target;
