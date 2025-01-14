@@ -1413,14 +1413,22 @@ namespace Liquid {
             switch (operand.variant.type) {
                 case Variant::Type::STRING: {
                     string str = renderer.getString(operand);
-                    long long offset = std::max(std::min(arg1.variant.getInt(), (long long)str.size()), 0LL);
+                    long long offset = std::min(arg1.variant.getInt(), (long long)str.size());
+                    if (offset < 0)
+                        offset += str.size();
+                    if (offset < 0)
+                        offset = 0;
                     long long size = std::min((long long)(arg2.variant.type != Variant::Type::NIL ? arg2.variant.getInt() : str.size()), (long long)(str.size() - offset));
                     return Variant(str.substr(offset, size));
                 }
                 case Variant::Type::VARIABLE: {
                     Variant v(vector<Variant>{ });
-                    long long start = std::max(arg1.variant.getInt(), 0LL);
+                    long long start = arg1.variant.getInt();
                     long long size = renderer.variableResolver.getArraySize(renderer, operand.variant.v);
+                    if (start < 0)
+                        start += size;
+                    if (start < 0)
+                        start = 0;
                     long long end = std::min(start + (arg2.variant.type != Variant::Type::NIL ? arg2.variant.getInt() : size), size);
                     for (int i = start; i < end; ++i) {
                         Variable var;
@@ -1433,7 +1441,11 @@ namespace Liquid {
                     if (operand.variant.a.size() == 0)
                         return Node();
                     Variant v(vector<Variant>{ });
-                    long long start = std::max(arg1.variant.getInt(), 0LL);
+                    long long start = arg1.variant.getInt();
+                    if (start < 0)
+                        start += operand.variant.a.size();
+                    if (start < 0)
+                        start = 0;
                     long long end = std::min(start + (long long)(arg2.variant.type != Variant::Type::NIL ? arg2.variant.getInt() : operand.variant.a.size()), (long long)operand.variant.a.size());
                     for (int i = start; i < end; ++i)
                         v.a.push_back(operand.variant.a[i]);

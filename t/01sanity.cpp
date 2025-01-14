@@ -595,6 +595,11 @@ TEST(sanity, filters) {
     ASSERT_STREQ(str.data(), "bodysuit, romper, jumpsuit, catsuit");
 
 
+    ast = getParser().parse("{{ '34' | prepend: '000000' | slice: -6, 6 }}");
+    ASSERT_EQ(getParser().errors.size(), 0);
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.data(), "000034");
+
 
     ast = getParser().parse("{{ product.body_html | split: '<li>' | slice: 1 | join: '<li>' | prepend: '<li>' }}");
     ASSERT_EQ(getParser().errors.size(), 0);
@@ -1269,24 +1274,24 @@ TEST(sanity, rj) {
     string str;
     d.SetObject();
     d.Parse("{\"products\":[{\"inventory_quantity\":1},{\"inventory_quantity\":3}]}");
-    
-    ast = getParser().parse("{% assign total = 0 %}{% for p in products %}{% assign total = total + p.inventory_quantity %}{% endfor %}{{ total }}"); 
+
+    ast = getParser().parse("{% assign total = 0 %}{% for p in products %}{% assign total = total + p.inventory_quantity %}{% endfor %}{{ total }}");
     str = renderer.render(ast, &d);
     ASSERT_EQ(str, "4");
-    
+
     d.Parse("{\"products\":[{\"variants\":[{\"inventory_quantity\":1},{\"inventory_quantity\":3}]},{\"variants\":[{\"inventory_quantity\":9},{\"inventory_quantity\":6}]}]}");
 
-    ast = getParser().parse("{% assign total = 0 %}{% for p in products %}{% for v in p.variants %}{% assign total = total + v.inventory_quantity %}{% endfor %}{% endfor %}{{ total }}"); 
+    ast = getParser().parse("{% assign total = 0 %}{% for p in products %}{% for v in p.variants %}{% assign total = total + v.inventory_quantity %}{% endfor %}{% endfor %}{{ total }}");
     str = renderer.render(ast, &d);
     ASSERT_EQ(str, "19");
-    
+
     d.SetObject();
-    ast = getParser().parse("{% assign total = 0 %}{{ total }}"); 
+    ast = getParser().parse("{% assign total = 0 %}{{ total }}");
     str = renderer.render(ast, &d);
     ASSERT_EQ(str, "0");
-    
 
-    
+
+
     rapidjson::Document f(rapidjson::kObjectType);
     rapidjson::Value v(rapidjson::kArrayType);
     v.PushBack(rapidjson::Value(10), f.GetAllocator());
@@ -1307,7 +1312,7 @@ TEST(sanity, rj) {
     ASSERT_EQ(str, "10203040");
 
 
-    
+
     ast = getParser().parse("{{ a }}");
 
     d.Parse("{\"a\":\"b\"}");
