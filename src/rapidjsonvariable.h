@@ -85,7 +85,7 @@ namespace Liquid {
                 if (!static_cast<rapidjson::Value*>(variable)->IsNumber())
                     return false;
                 *target = static_cast<rapidjson::Value*>(variable)->GetFloat();
-                return false;
+                return true;
             };
             getDictionaryVariable = +[](LiquidRenderer renderer, void* variable, const char* key, void** target) {
                 if (!static_cast<rapidjson::Value*>(variable)->IsObject() || !static_cast<rapidjson::Value*>(variable)->HasMember(key))
