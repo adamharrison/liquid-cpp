@@ -342,7 +342,7 @@ namespace Liquid {
                                     }
                                 break;
                                 case '.':
-                                    if (!isNumber) {
+                                    if (!hasPoint && !isNumber && (offset > size - 1 || str[offset+1] != '.')) {
                                         ongoing = static_cast<T*>(this)->literal(&str[startOfWord], offset - startOfWord) && static_cast<T*>(this)->dot();
                                         ++offset;
                                         ++column;

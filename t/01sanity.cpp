@@ -868,6 +868,16 @@ TEST(sanity, optimizer) {
     hash["a"] = nullptr;
 }
 
+TEST(sanity, sequence) {
+    CPPVariable hash;
+    Node ast;
+    std::string str;
+    
+    ast = getParser().parse("{% assign start = 17 %}{% for i in (start..19) %}{{ i }}{% endfor %}");
+    str = renderTemplate(ast, hash);
+    ASSERT_STREQ(str.c_str(), "171819");
+}
+
 TEST(sanity, composite) {
     CPPVariable hash, order, transaction, event, variant, product, registry, shop;
     Node ast;
